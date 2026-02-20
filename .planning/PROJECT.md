@@ -1,0 +1,118 @@
+# Asciicker Rust Port
+
+## What This Is
+
+A Rust/Bevy reimplementation of the Asciicker C++ game engine (~82K lines across 48 files). Asciicker is a multiplayer ASCII-art game featuring a custom CPU software rasterizer that renders 3D worlds using CP437 glyphs with per-cell foreground/background colors. The port preserves the original's unique aesthetic while modernizing the architecture with Bevy ECS, GPU-accelerated ASCII output via Mage Core's 4-texture approach, and Alex Harri's 6D shape-vector glyph matching at the RESOLVE stage.
+
+## Core Value
+
+The CPU rasterizer must produce visually identical output to the C++ engine — same glyphs, same colors, same depth ordering — so that existing Asciicker worlds render correctly in the Rust port.
+
+## Requirements
+
+### Validated
+
+<!-- Shipped and confirmed valuable. -->
+
+(None yet — ship to validate)
+
+### Active
+
+- [ ] Load and parse .xp sprite files (gzip compressed, CP437 glyphs, 3+ layers: colorkey/height/visual)
+- [ ] Load and parse .a3d world files (header "AS3D" 0x44335341 LE, mesh library + terrain patches + instances + BSP)
+- [ ] Implement 6-stage rendering pipeline: CLEAR -> TERRAIN -> WORLD -> SHADOW -> REFLECTION -> RESOLVE
+- [ ] Implement SampleBuffer with 2x supersampled depth/color buffer
+- [ ] Port Bresenham line and barycentric triangle rasterization
+- [ ] Port RGB555 -> xterm-256 color quantization
+- [ ] Port auto_mat shade/glyph lookup tables
+- [ ] Implement terrain system with quadtree heightmaps (HEIGHT_CELLS=4, 5x5 vertex grid per patch)
+- [ ] Implement BSP tree world loading with SAH construction
+- [ ] Implement sphere-based physics collision (TOI sweep, face/edge/vertex tests)
+- [ ] Port character state machine (idle, walk, run, attack, block, etc.)
+- [ ] Port 5D equipment sprite lookup
+- [ ] Implement deferred sprite blit (after RESOLVE stage)
+- [ ] Implement GPU-accelerated ASCII output as Bevy render plugin (Mage Core 4-texture approach: char index, fg, bg, font atlas)
+- [ ] Integrate Alex Harri 6D shape-vector k-d tree matching at RESOLVE stage (replaces auto_mat glyph selection; auto_mat still used for fg/bg color)
+- [ ] Perspective camera with Q/E rotation toggle (D004-D005: perspective REQUIRED)
+- [ ] Basic multiplayer networking (client-server model)
+- [ ] Audio system via bevy_kira_audio (16-track mixer)
+- [ ] Water rendering with reflective surface
+- [ ] Weather effects (rain, snow)
+- [ ] Main menu and game state management
+
+### Out of Scope
+
+- Editor/URDO system — complex, separate tool; defer to post-v1
+- Mobile/web platform targets — desktop-first (Windows/Linux/macOS)
+- Custom engine from scratch — Bevy provides ECS, input, audio, windowing (Decision D001)
+- GPU rasterization — CPU rasterizer matches C++ fidelity (Decision D003); GPU only for final ASCII output
+- Full Alex Harri 6D vectors from day one — start with auto_mat, upgrade to 6D after performance validation (Decision D010)
+
+## Context
+
+### C++ Reference
+- Original codebase: `/Users/r/Downloads/asciicker-Y9-2/` (~82K lines, 48 files)
+- Comprehensive architecture documentation in `docs/arch/` (30+ per-file analyses)
+- 4 skill packs documenting C++ subsystem internals (engine-render, world-loading, physics-system, game-mechanics)
+
+### Technology Stack
+- **Engine**: Bevy 0.18+ (ECS, input, audio, windowing) — Decision D001 (2026-02-19)
+- **ASCII Rendering**: Mage Core 4-texture GPU approach as Bevy render plugin (char index + fg + bg + font atlas via WGPU/WGSL)
+- **Glyph Selection**: Alex Harri 6D shape-vector k-d tree matching (phased: 2D first per D010, upgrade to 6D after validation)
+- **CPU Rasterizer**: Custom (port of C++ render.cpp) outputs to SampleBuffer
+- **Audio**: bevy_kira_audio for 16-track mixer
+
+### Reference Implementations
+- **Mage Core**: `/Users/r/Projects/ascii research/Mage-core` (~2000 lines Rust, v0.2.0, GPU-accelerated ASCII rendering)
+- **Alex Harri**: `/Users/r/Projects/ascii research/alexharri-ascii` (TypeScript/WebGL2, 6D shape-vector matching with k-d tree)
+
+### Existing Skeleton
+- `asciicker-rust/` directory has ~385 LOC Bevy 0.18.0 skeleton (does NOT compile — 4 missing modules)
+- Defines components: Position, Sprite/XpCell/SpriteLayer, Character/Equipment, TerrainPatch/QuadNode, Camera
+- Has partial rendering stubs: SampleBuffer/Sample/RGB555, RenderPhase enum, triangle rasterization stub
+- Zero tests, 541MB stale build artifacts, not tracked in git
+- GSD Phase 1 will decide whether to salvage, restructure, or restart
+
+### Research Corpus
+- 135+ documentation files covering C++ architecture, rendering deep dives, ECS conversion strategies, Bevy integration, gap analyses, and implementation plans
+- 89 tracked unknowns: 42 resolved (47%), 47 remaining (6 CRITICAL all resolved, 13 HIGH remaining)
+- 124 identified gaps across rendering, game logic, terrain/world, systems, and integration
+- 6 gap resolution plans (rendering, game logic, systems, integration, ancestor cleanup, SampleBuffer bridge)
+
+### Known C++ Bugs (Pre-Port)
+- TERRAIN-001: terrain.cpp:613 — `if(x)` should be `if(y)`
+- TERRAIN-002: terrain.cpp:805 — `u < y` should be `u < v`
+- TERRAIN-003: terrain.cpp:1671 — same as TERRAIN-002
+- TERRAIN-004: terrain.cpp:480,492 — verify `>` vs `>=` intent
+
+### Critical Constants (from C++ source)
+- HEIGHT_SCALE = 16 (terrain.h:54)
+- HEIGHT_CELLS = 4 (terrain.h:60, produces 5x5 vertex grid)
+- VISUAL_CELLS = 8 (terrain.h:66, produces 8x8 material cells)
+- Coordinate system: Z is UP (physics.h:41)
+- XP format: 16-byte global header (version + layers + width + height)
+- A3D magic: 0x44335341 ("AS3D" little-endian)
+
+## Constraints
+
+- **Tech Stack**: Bevy 0.18+ (Rust 2021 edition) — D001 final, no custom engine
+- **Visual Fidelity**: CPU rasterizer output must match C++ engine pixel-for-pixel where possible
+- **Binary Compatibility**: Must load original .xp sprites and .a3d world files unchanged
+- **Performance**: Target 60 FPS at 1080p with full scene (terrain + world + sprites + effects)
+- **Architecture**: ECS-first design; map C++ DOD structs to Bevy components
+- **Rendering Pipeline**: CPU rasterizer -> SampleBuffer -> RESOLVE (glyph/color selection) -> GPU output (Mage Core style)
+
+## Key Decisions
+
+| Decision | Rationale | Outcome |
+|----------|-----------|---------|
+| D001: Use Bevy Engine | Provides ECS, input, audio, UI — avoids building from scratch | -- Pending |
+| D003: CPU rasterizer first | Matches C++ fidelity; GPU only for final ASCII output | -- Pending |
+| D004-D005: Perspective required | Q/E rotation and toggle features depend on it | -- Pending |
+| D010: Keep auto_mat initially | Speed to first render; hybrid with k-d tree added later | -- Pending |
+| D012: Shape-match within RESOLVE | Alex Harri k-d tree replaces auto_mat glyph selection at RESOLVE stage | -- Pending |
+| D040: 2D vs 6D vectors | Pending — needs performance data after initial implementation | -- Pending |
+| D041: Ancestor cleanup | Pending — needs research on C++ behavior | -- Pending |
+
+---
+*Last updated: 2026-02-20 after initialization*
