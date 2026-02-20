@@ -47,11 +47,13 @@ Plans:
   3. An .a3d world file loads and produces the correct BSP tree structure and instance list (3 variant types, correct format version detection), verified by golden-file snapshot
   4. All loaders integrate with Bevy AssetServer -- assets load via `Handle<XpSprite>`, `Handle<A3dTerrain>`, `Handle<A3dWorld>` with async loading and typed access
   5. `cargo test` passes all golden-file comparisons with zero diff against C++ reference data
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
+- [ ] 02-01-PLAN.md -- XP sprite parser with shared error/constants (TDD, wave 1)
+- [ ] 02-02-PLAN.md -- A3D terrain and material table parsers (TDD, wave 1)
+- [ ] 02-03-PLAN.md -- A3D world and AKM mesh parsers (TDD, wave 1)
+- [ ] 02-04-PLAN.md -- Bevy AssetLoader integration and golden-file tests (wave 2)
 
 ### Phase 3: GPU Output
 **Goal**: A Bevy render plugin displays an AsciiCellGrid as colored CP437 glyphs in a window using the Mage Core 4-texture WGSL shader approach, independent of the CPU rasterizer
