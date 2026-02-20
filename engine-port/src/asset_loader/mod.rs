@@ -1,5 +1,11 @@
 use bevy::prelude::*;
 
+pub mod constants;
+pub mod error;
+pub mod xp_sprite;
+
+pub use error::AssetError;
+
 pub struct AssetLoaderPlugin;
 
 impl Plugin for AssetLoaderPlugin {

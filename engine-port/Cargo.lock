@@ -206,6 +206,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bevy",
+ "bytemuck",
+ "flate2",
  "thiserror 2.0.18",
 ]
 
