@@ -10,9 +10,9 @@
 //!
 //! Grid/wireframe spare bits override glyph selection.
 
-use super::material::{auto_mat_lookup, Material};
-use super::quantize::{rgb2pal, rgb555_to_rgb888, rgb8_to_rgb5};
-use super::sample_buffer::{spare_bits, Sample};
+use super::material::{Material, auto_mat_lookup};
+use super::quantize::{rgb2pal, rgb8_to_rgb5, rgb555_to_rgb888};
+use super::sample_buffer::{Sample, spare_bits};
 use super::types::AnsiCell;
 
 /// Resolve the 2x-supersampled SampleBuffer into an AnsiCell grid.
@@ -84,9 +84,9 @@ pub fn resolve(
             let dominant = dominant_sample(s00, s10, s01, s11);
 
             // Determine if reflection (spare & PARITY_MASK == REFLECTION and not mesh)
-            let is_reflection =
-                (combined_spare & spare_bits::PARITY_MASK) == spare_bits::REFLECTION
-                    && (combined_spare & spare_bits::MESH_FLAG) == 0;
+            let is_reflection = (combined_spare & spare_bits::PARITY_MASK)
+                == spare_bits::REFLECTION
+                && (combined_spare & spare_bits::MESH_FLAG) == 0;
 
             // Diffuse divisor: reflections use 400 (darker), normal uses 255
             let diffuse_divisor: u32 = if is_reflection { 400 } else { 255 };
@@ -410,7 +410,10 @@ mod tests {
         resolve(&samples, dw, dh, ascii_w, ascii_h, &materials, &mut output);
 
         let cell = &output[(2 * ascii_w + 2) as usize];
-        assert_eq!(cell.spare, 0xFF, "Rendered mesh cell should have spare=0xFF");
+        assert_eq!(
+            cell.spare, 0xFF,
+            "Rendered mesh cell should have spare=0xFF"
+        );
         // auto_mat for pure red should produce a valid palette index
         assert!(
             cell.fg >= 16 && cell.fg <= 231,
