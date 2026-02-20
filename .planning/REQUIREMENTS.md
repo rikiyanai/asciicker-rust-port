@@ -100,6 +100,14 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **GAME-02**: Main menu with basic navigation
 - [ ] **GAME-03**: Weather effects (rain, snow particle systems)
 
+### Audit Remediation
+
+- [x] **AUDIT-01**: TextureView lifetime safety — persisted BindGroup must not hold references to dropped local TextureView objects (R04)
+- [x] **AUDIT-02**: GameVec3 newtype wrapper — replace type alias with newtype to prevent silent coordinate space mixing (R08)
+- [x] **AUDIT-03**: Parser robustness — checked_mul for sprite dimensions, is_finite for transform matrices (R10, R11)
+- [x] **AUDIT-04**: GPU pipeline hardening — font atlas error logging, glyph index validation (R13, R16)
+- [x] **AUDIT-05**: Plugin ordering integration test — verify cross-plugin resource dependencies don't break on init order (R09)
+
 ### Visual Quality
 
 - [ ] **VIS-01**: Alex Harri 6D shape-vector glyph matching integrated at RESOLVE stage (phased: auto_mat first, then 2D, then 6D)
@@ -162,6 +170,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GPU-03 | Phase 3 | Complete |
 | GPU-04 | Phase 3 | Complete |
 | GPU-05 | Phase 3 | Pending |
+| AUDIT-01 | Phase 3.1 | Complete |
+| AUDIT-02 | Phase 3.1 | Complete |
+| AUDIT-03 | Phase 3.1 | Complete |
+| AUDIT-04 | Phase 3.1 | Complete |
+| AUDIT-05 | Phase 3.1 | Complete |
 | REND-01 | Phase 4 | Complete |
 | REND-02 | Phase 4 | Complete |
 | REND-03 | Phase 4 | Complete |

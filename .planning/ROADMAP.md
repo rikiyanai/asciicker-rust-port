@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Foundation** - Compiling Bevy 0.18 skeleton with plugin-per-subsystem architecture and ECS conventions
 - [x] **Phase 2: Asset Parsers** - XP sprite and A3D world/terrain binary file loaders with golden-file tests
 - [ ] **Phase 3: GPU Output** - Bevy render plugin displaying ASCII glyphs via Mage Core 4-texture WGSL shader
-- [ ] **Phase 3.1: Audit Remediation** - Fix Critical/High severity code-level risks from Phases 1-3 audit before Phase 5 integration (INSERTED)
+- [x] **Phase 3.1: Audit Remediation** - Fix Critical/High severity code-level risks from Phases 1-3 audit before Phase 5 integration (INSERTED)
 - [x] **Phase 4: CPU Rasterizer Core** - SampleBuffer, triangle/line rasterization, materials, color quantization, and RESOLVE stage
 - [ ] **Phase 5: Pipeline Integration** - Full 6-stage rendering pipeline producing real scene output from .a3d world files
 - [ ] **Phase 6: Physics and Character** - Sphere collision, character state machine, player input, water, and effects
@@ -73,19 +73,24 @@ Plans:
 - [x] 03-03-PLAN.md -- Window resize handling + visual verification checkpoint (wave 3)
 
 ### Phase 3.1: Audit Remediation (INSERTED)
-**Goal**: Fix code-level risks from the Phases 1-4 audit that would cause failures or undefined behavior during Phase 5 pipeline integration — TextureView lifetime, coordinate safety, parser robustness, GPU hardening
+**Goal**: Fix code-level risks from the Phases 1-4 audit that would cause failures or undefined behavior during Phase 5 pipeline integration — TextureView lifetime, coordinate safety, parser robustness, GPU hardening, plus Phase 4 execution gap closures (dead unsafe code, exhaustive quantization tests, LUT consistency, reflection path, boundary tests)
 **Depends on**: Phase 3, Phase 4
-**Requirements**: AUDIT-01, AUDIT-02, AUDIT-03, AUDIT-04, AUDIT-05
+**Requirements**: AUDIT-01, AUDIT-02, AUDIT-03, AUDIT-04, AUDIT-05, GAP-02, GAP-03, GAP-06, GAP-10, GAP-11
 **Success Criteria** (what must be TRUE):
   1. TextureView objects in GPU BindGroup have correct lifetime management — no use-after-free under high-frequency texture updates
   2. GameVec3 is a newtype wrapper that prevents silent mixing with Bevy Vec3 at compile time
   3. Asset parsers validate sprite dimensions (checked_mul) and transform matrices (is_finite) without panicking on malformed input
   4. Font atlas loading failure produces a visible warn! log instead of a silent black screen
   5. An integration test verifies all plugins initialize in correct order without resource-missing panics
+  6. RGB555 rgb2pal() returns valid xterm-256 index for all 32768 input values
+  7. auto_mat LUT passes full-table consistency check (valid fg/bg indices, non-zero glyphs)
+  8. Dead unsafe SampleBuffer accessors removed or justified with safety comments
+  9. SampleBuffer boundary tests pass (zero-size, border pixels, last valid index)
+  10. Reflection palette path produces correctly darkened output vs non-reflection path
 **Plans**: 1 plan
 
 Plans:
-- [ ] 031-01-PLAN.md -- Fix all 5 audit items: TextureView lifetime, GameVec3 newtype, parser robustness, GPU hardening, plugin ordering test (wave 1)
+- [x] 031-01-PLAN.md -- Fix 5 audit items + 5 Phase 4 execution gaps: TextureView lifetime, GameVec3 newtype, parser robustness, GPU hardening, plugin ordering test, RGB555 validation, auto_mat consistency, dead unsafe cleanup, boundary tests, reflection path test (wave 1)
 
 ### Phase 4: CPU Rasterizer Core
 **Goal**: The CPU rasterizer produces correct AnsiCell output from hard-coded geometry, matching C++ reference output within the 1% cell difference threshold, at 60fps or better at 240x135 ASCII resolution
@@ -172,7 +177,7 @@ Note: Phases 3 and 4 are independent (both depend only on Phase 1) and can execu
 | 1. Foundation | 2/2 | Complete | 2026-02-20 |
 | 2. Asset Parsers | 4/4 | Complete | 2026-02-20 |
 | 3. GPU Output | 3/3 | Complete | 2026-02-20 |
-| 3.1 Audit Remediation | 0/1 | Planned | - |
+| 3.1 Audit Remediation | 1/1 | Complete | 2026-02-20 |
 | 4. CPU Rasterizer Core | 4/4 | Complete | 2026-02-20 |
 | 5. Pipeline Integration | 0/6 | Planned | - |
 | 6. Physics and Character | 0/3 | Planned | - |

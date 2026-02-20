@@ -5,25 +5,25 @@
 See: .planning/PROJECT.md (updated 2026-02-20)
 
 **Core value:** The CPU rasterizer must produce visually identical output to the C++ engine -- same glyphs, same colors, same depth ordering -- so that existing Asciicker worlds render correctly in the Rust port.
-**Current focus:** Phase 3: GPU Output (03-03 Task 2 human checkpoint pending)
+**Current focus:** Phase 5: Pipeline Integration (next after Phase 3.1 audit remediation)
 
 ## Current Position
 
-Phase: 3 of 7 (GPU Output) -- IN PROGRESS (Task 2 human checkpoint pending)
-Plan: 3 of 3 in current phase (03-03-PLAN.md Task 1 committed, Task 2 pending human verification)
-Status: Phase 4 complete (commit `0cdfc24`), Phase 3 awaiting human visual verification checkpoint
-Last activity: 2026-02-20 -- Applied MSAA fix (F005), committed resize handler (03-03 Task 1)
+Phase: 3.1 of 7 (Audit Remediation) -- COMPLETE
+Plan: 1 of 1 in current phase (031-01 complete)
+Status: Phase 3.1 complete (commits `281301e`, `d8039ea`, `78170a3`). Ready for Phase 5.
+Last activity: 2026-02-20 -- Completed audit remediation: TextureView fix, GameVec3 newtype, parser robustness, plugin ordering tests, Phase 4 gap closures
 
-Progress: [########..] 76%
+Progress: [########..] 80%
 
-**Note:** Phase 4 completed in parallel with Phase 3 (both depend only on Phase 1). Phase 3 is blocked on human visual verification (03-03 Task 2). Three uncommitted changes exist: Msaa::Off fix on Camera2d, STATE.md decision entries, config.json trailing newline.
+**Note:** Phase 3.1 inserted between Phase 4 and Phase 5. All audit items and Phase 4 execution gaps resolved. 188 tests passing (140 lib + 48 integration). Phase 3 human visual verification checkpoint (03-03 Task 2) still pending from prior session.
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 12
-- Average duration: ~5 min
-- Total execution time: ~1.0 hours
+- Total plans completed: 13
+- Average duration: ~6 min
+- Total execution time: ~1.1 hours
 
 **By Phase:**
 
@@ -32,12 +32,12 @@ Progress: [########..] 76%
 | 1 - Foundation | 2 | ~12 min | ~6 min |
 | 2 - Asset Parsers | 4 | 21 min | ~5 min |
 | 3 - GPU Output | 2 | 15 min | ~8 min |
+| 3.1 - Audit Remediation | 1 | 8 min | 8 min |
 | 4 - CPU Rasterizer Core | 4 | 30 min | ~8 min |
 
 **Recent Trend:**
-- Last 5 plans: 03-02, 04-03, 04-04, 03-03 (Task 1 only)
-- Trend: Consistent ~7-8 min per plan
-- Note: 03-03 Task 2 is a human checkpoint (not automated)
+- Last 5 plans: 04-03, 04-04, 03-03 (Task 1 only), 031-01
+- Trend: Consistent ~8 min per plan
 
 *Updated after each plan completion*
 
@@ -84,6 +84,10 @@ Recent decisions affecting current work:
 - 04-04: Mesh flag in combined spare OR determines mesh vs material path (matches C++ behavior)
 - 04-04: Elevation thresholds 0.5/2.0/5.0 for height-difference to 0-3 mapping
 - 04-04: Grid overlay uses positional parity for +/-/| selection (simplified for Phase 4)
+- 031-01: GameVec3 newtype uses Deref<Target=Vec3> for ergonomic read access while preventing implicit assignment
+- 031-01: TextureView fields stored in AsciiGpuTextures struct outliving BindGroup (both prepare and resize paths)
+- 031-01: Dead unsafe unchecked SampleBuffer accessors removed (zero callers in codebase)
+- 031-01: Plugin ordering test uses AssetPlugin + ImagePlugin for full 8-plugin init verification
 
 ### Pending Todos
 
@@ -100,5 +104,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Phase 4 complete (commit `0cdfc24`). Phase 3 plan 03-03 Task 1 committed (`0dfe33d`), Task 2 (human visual checkpoint) pending. Three uncommitted changes: Msaa::Off fix, STATE.md updates, config.json trailing newline.
+Stopped at: Completed 031-01-PLAN.md (Phase 3.1 Audit Remediation). All 10 requirements addressed. Ready for Phase 5 pipeline integration.
 Resume file: None
