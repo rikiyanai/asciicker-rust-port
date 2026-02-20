@@ -27,8 +27,8 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Rendering Pipeline
 
 - [x] **REND-01**: SampleBuffer implemented with 2x supersampling and double-allocation for fast clear
-- [ ] **REND-02**: Bresenham line rasterization matches C++ output
-- [ ] **REND-03**: Barycentric triangle rasterization with duck-typed shader support
+- [x] **REND-02**: Bresenham line rasterization matches C++ output
+- [x] **REND-03**: Barycentric triangle rasterization with duck-typed shader support
 - [ ] **REND-04**: 6-stage pipeline executes in order: CLEAR -> TERRAIN -> WORLD -> SHADOW -> REFLECTION -> RESOLVE
 - [x] **REND-05**: Material system with auto_mat LUT (32KB, shade[4][16] elevation/diffuse lookup)
 - [x] **REND-06**: RGB555 -> xterm-256 color quantization with correct projection/reflection scales
@@ -163,8 +163,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GPU-04 | Phase 3 | Pending |
 | GPU-05 | Phase 3 | Pending |
 | REND-01 | Phase 4 | Complete |
-| REND-02 | Phase 4 | Pending |
-| REND-03 | Phase 4 | Pending |
+| REND-02 | Phase 4 | Complete |
+| REND-03 | Phase 4 | Complete |
 | REND-04 | Phase 4 | Pending |
 | REND-05 | Phase 4 | Complete |
 | REND-06 | Phase 4 | Complete |
