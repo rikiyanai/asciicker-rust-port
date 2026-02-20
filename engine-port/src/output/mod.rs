@@ -1,4 +1,5 @@
 pub mod ascii_cell_grid;
+pub mod gpu_plugin;
 pub mod gpu_types;
 
 use bevy::prelude::*;
