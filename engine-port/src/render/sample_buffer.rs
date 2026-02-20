@@ -1,84 +1,170 @@
 use bevy::prelude::*;
+use bytemuck::{Pod, Zeroable};
 
 use super::config::RenderConfig;
 
-/// A single sample in the rasterizer's output buffer.
-///
-/// Matches the C++ engine's sample layout for performance.
-#[derive(Debug, Clone, Copy)]
-pub struct Sample {
-    /// Depth value for Z-buffering.
-    pub depth: f32,
-    /// Color in RGB555 format (15-bit color).
-    pub color_rgb555: u16,
-    /// CP437 glyph index.
-    pub glyph: u16,
-    /// Material identifier for shade table lookup.
-    pub material_id: u8,
+/// Spare-byte bit constants matching the C++ engine's sample flags.
+pub mod spare_bits {
+    /// Parity mask (2 LSBs) -- used for grid-phase alternation.
+    pub const PARITY_MASK: u8 = 0x03;
+    /// Grid overlay flag.
+    pub const GRID: u8 = 0x04;
+    /// Set when this sample came from a mesh (vs terrain/sky).
+    pub const MESH_FLAG: u8 = 0x08;
+    /// Wireframe rendering flag.
+    pub const WIREFRAME: u8 = 0x40;
+    /// Reflection bits (same mask as parity; context-dependent).
+    pub const REFLECTION: u8 = 0x03;
 }
 
-impl Default for Sample {
-    fn default() -> Self {
+/// A single sample in the rasterizer's output buffer.
+///
+/// Matches the C++ engine layout: `visual(u16) | diffuse(u8) | spare(u8) | height(f32)`.
+/// Total size is 8 bytes with `#[repr(C)]` for stable, Pod-safe layout.
+#[derive(Debug, Clone, Copy, Pod, Zeroable)]
+#[repr(C)]
+pub struct Sample {
+    /// Material index OR packed RGB555 color value.
+    pub visual: u16,
+    /// Lighting intensity 0-255 (0xFF = fully lit).
+    pub diffuse: u8,
+    /// Bit flags -- see [`spare_bits`] module.
+    pub spare: u8,
+    /// Depth value for Z-buffering. `-1_000_000.0` = cleared (sky).
+    pub height: f32,
+}
+
+impl Sample {
+    /// Depth value used to represent a cleared (empty/sky) sample.
+    pub const CLEAR_HEIGHT: f32 = -1_000_000.0;
+
+    /// Half of the C++ HEIGHT_SCALE constant (16.0 / 2 = 8.0).
+    /// Used as the depth-test epsilon.
+    const HALF_HEIGHT_SCALE: f32 = 8.0;
+
+    /// Returns the canonical clear state for a sample.
+    ///
+    /// Sky-blue RGB555 color, full diffuse, MESH_FLAG set, height = CLEAR_HEIGHT.
+    /// The RGB555 value is `(0x0C | (0x0C << 5) | (0x1B << 10))` = `0x6D8C`.
+    pub fn clear_state() -> Self {
         Self {
-            depth: f32::MAX,
-            color_rgb555: 0,
-            glyph: 0,
-            material_id: 0,
+            visual: 0x0C | (0x0C << 5) | (0x1B << 10),
+            diffuse: 0xFF,
+            spare: spare_bits::MESH_FLAG,
+            height: Self::CLEAR_HEIGHT,
         }
+    }
+
+    /// Read-only depth test: returns `true` if this sample is behind or at `z`
+    /// (within half-height-scale tolerance), meaning a new fragment at depth `z`
+    /// should be written here.
+    #[inline]
+    pub fn depth_test_ro(&self, z: f32) -> bool {
+        self.height <= z + Self::HALF_HEIGHT_SCALE
+    }
+
+    /// Returns `true` if this sample came from a mesh (MESH_FLAG set).
+    #[inline]
+    pub fn is_mesh(&self) -> bool {
+        self.spare & spare_bits::MESH_FLAG != 0
     }
 }
 
 /// 2x supersampled depth/color buffer for the CPU rasterizer.
 ///
-/// Flat Vec<Sample> layout with index methods matching C++ for performance.
-/// Dimensions derived from RenderConfig at initialization.
+/// Uses a double-allocation pattern: `clear_state` holds a cached template
+/// of cleared samples, and `clear()` copies it into `samples` via
+/// `copy_from_slice` (compiles to memcpy because `Sample` is `Copy + Pod`).
+///
+/// Dimensions are `(2 * ascii_width + 4) x (2 * ascii_height + 4)`.
 #[derive(Resource)]
 pub struct SampleBuffer {
-    /// Width in samples (ascii_width * supersample_factor).
+    /// Width in samples.
     pub width: u32,
-    /// Height in samples (ascii_height * supersample_factor).
+    /// Height in samples.
     pub height: u32,
-    /// Flat sample storage (row-major: index = y * width + x).
+    /// Working sample storage (row-major: index = y * width + x).
     pub samples: Vec<Sample>,
+    /// Cached cleared template -- same size as `samples`.
+    clear_state: Vec<Sample>,
 }
 
 impl FromWorld for SampleBuffer {
     fn from_world(world: &mut World) -> Self {
         let config = world.resource::<RenderConfig>();
-        let w = config.sample_width();
-        let h = config.sample_height();
-        Self {
-            width: w,
-            height: h,
-            samples: vec![Sample::default(); (w * h) as usize],
-        }
+        Self::new(config.ascii_width, config.ascii_height)
     }
 }
 
 impl SampleBuffer {
-    /// Get a reference to the sample at (x, y).
+    /// Create a new SampleBuffer with dimensions `(2*ascii_width+4) x (2*ascii_height+4)`.
+    pub fn new(ascii_width: u32, ascii_height: u32) -> Self {
+        let w = 2 * ascii_width + 4;
+        let h = 2 * ascii_height + 4;
+        let size = (w * h) as usize;
+        let clear_sample = Sample::clear_state();
+        let clear_state = vec![clear_sample; size];
+        let samples = clear_state.clone();
+        Self {
+            width: w,
+            height: h,
+            samples,
+            clear_state,
+        }
+    }
+
+    /// Clear all samples by copying the cached clear template.
+    ///
+    /// Because `Sample` is `Copy + Pod`, this compiles to a single `memcpy`.
+    #[inline]
+    pub fn clear(&mut self) {
+        self.samples.copy_from_slice(&self.clear_state);
+    }
+
+    /// Compute the flat index for coordinates `(x, y)`.
+    #[inline]
+    pub fn flat_index(&self, x: u32, y: u32) -> usize {
+        (y * self.width + x) as usize
+    }
+
+    /// Get a reference to the sample at `(x, y)`.
     ///
     /// # Panics
-    /// Panics if x >= width or y >= height.
+    /// Panics if `x >= width` or `y >= height`.
+    #[inline]
     pub fn sample_at(&self, x: u32, y: u32) -> &Sample {
-        let idx = (y * self.width + x) as usize;
+        let idx = self.flat_index(x, y);
         &self.samples[idx]
     }
 
-    /// Get a mutable reference to the sample at (x, y).
+    /// Get a mutable reference to the sample at `(x, y)`.
     ///
     /// # Panics
-    /// Panics if x >= width or y >= height.
+    /// Panics if `x >= width` or `y >= height`.
+    #[inline]
     pub fn sample_at_mut(&mut self, x: u32, y: u32) -> &mut Sample {
-        let idx = (y * self.width + x) as usize;
+        let idx = self.flat_index(x, y);
         &mut self.samples[idx]
     }
 
-    /// Clear all samples to default values (depth = MAX, color = 0, glyph = 0).
-    pub fn clear(&mut self) {
-        for sample in &mut self.samples {
-            *sample = Sample::default();
-        }
+    /// Get a reference to the sample at `(x, y)` without bounds checking.
+    ///
+    /// # Safety
+    /// Caller must ensure `x < width` and `y < height`.
+    #[inline]
+    pub unsafe fn sample_at_unchecked(&self, x: u32, y: u32) -> &Sample {
+        let idx = self.flat_index(x, y);
+        unsafe { self.samples.get_unchecked(idx) }
+    }
+
+    /// Get a mutable reference to the sample at `(x, y)` without bounds checking.
+    ///
+    /// # Safety
+    /// Caller must ensure `x < width` and `y < height`.
+    #[inline]
+    pub unsafe fn sample_at_mut_unchecked(&mut self, x: u32, y: u32) -> &mut Sample {
+        let idx = self.flat_index(x, y);
+        unsafe { self.samples.get_unchecked_mut(idx) }
     }
 }
 
@@ -86,55 +172,133 @@ impl SampleBuffer {
 mod tests {
     use super::*;
 
-    fn make_buffer(width: u32, height: u32) -> SampleBuffer {
-        SampleBuffer {
-            width,
-            height,
-            samples: vec![Sample::default(); (width * height) as usize],
-        }
+    #[test]
+    fn sample_is_8_bytes() {
+        assert_eq!(std::mem::size_of::<Sample>(), 8);
     }
 
     #[test]
-    fn default_sample_has_max_depth() {
-        let sample = Sample::default();
-        assert_eq!(sample.depth, f32::MAX);
-        assert_eq!(sample.color_rgb555, 0);
-        assert_eq!(sample.glyph, 0);
-        assert_eq!(sample.material_id, 0);
+    fn clear_state_has_correct_fields() {
+        let s = Sample::clear_state();
+        // Sky-blue: r5=0x0C, g5=0x0C, b5=0x1B => packed = 0x6D8C
+        assert_eq!(s.visual, 0x0C | (0x0C << 5) | (0x1B << 10));
+        assert_eq!(s.diffuse, 0xFF);
+        assert_eq!(s.spare, spare_bits::MESH_FLAG);
+        assert_eq!(s.height, Sample::CLEAR_HEIGHT);
     }
 
     #[test]
-    fn buffer_dimensions() {
-        let buf = make_buffer(480, 270);
-        assert_eq!(buf.width, 480);
-        assert_eq!(buf.height, 270);
-        assert_eq!(buf.samples.len(), 480 * 270);
+    fn depth_test_ro_passes_when_behind() {
+        let s = Sample {
+            height: 10.0,
+            ..Sample::clear_state()
+        };
+        // z = 10.0: height(10) <= 10 + 8 = true
+        assert!(s.depth_test_ro(10.0));
+        // z = 20.0: height(10) <= 20 + 8 = true
+        assert!(s.depth_test_ro(20.0));
+    }
+
+    #[test]
+    fn depth_test_ro_fails_when_in_front() {
+        let s = Sample {
+            height: 30.0,
+            ..Sample::clear_state()
+        };
+        // z = 10.0: height(30) <= 10 + 8 = 18 => false
+        assert!(!s.depth_test_ro(10.0));
+    }
+
+    #[test]
+    fn depth_test_ro_boundary() {
+        let s = Sample {
+            height: 18.0,
+            ..Sample::clear_state()
+        };
+        // z = 10.0: height(18) <= 10 + 8 = 18 => true (equal)
+        assert!(s.depth_test_ro(10.0));
+
+        let s2 = Sample {
+            height: 18.01,
+            ..Sample::clear_state()
+        };
+        // z = 10.0: height(18.01) <= 18 => false
+        assert!(!s2.depth_test_ro(10.0));
+    }
+
+    #[test]
+    fn is_mesh_flag() {
+        let with_mesh = Sample::clear_state(); // clear_state sets MESH_FLAG
+        assert!(with_mesh.is_mesh());
+
+        let without_mesh = Sample {
+            spare: 0,
+            ..Sample::clear_state()
+        };
+        assert!(!without_mesh.is_mesh());
+    }
+
+    #[test]
+    fn buffer_default_dimensions() {
+        let buf = SampleBuffer::new(240, 135);
+        assert_eq!(buf.width, 484);
+        assert_eq!(buf.height, 274);
+        assert_eq!(buf.samples.len(), 484 * 274);
+    }
+
+    #[test]
+    fn buffer_clear_restores_all_samples() {
+        let mut buf = SampleBuffer::new(240, 135);
+        // Mutate a sample
+        buf.sample_at_mut(10, 20).visual = 0xBEEF;
+        buf.sample_at_mut(10, 20).height = 999.0;
+        assert_eq!(buf.sample_at(10, 20).visual, 0xBEEF);
+
+        // Clear should restore
+        buf.clear();
+        let s = buf.sample_at(10, 20);
+        assert_eq!(s.visual, Sample::clear_state().visual);
+        assert_eq!(s.height, Sample::CLEAR_HEIGHT);
+    }
+
+    #[test]
+    fn buffer_clear_uses_copy_from_slice_semantics() {
+        // Verify the double-allocation pattern works:
+        // mutate -> clear -> verify restored
+        let mut buf = SampleBuffer::new(4, 4);
+        let original_visual = buf.sample_at(0, 0).visual;
+
+        buf.sample_at_mut(0, 0).visual = 0x1234;
+        buf.sample_at_mut(3, 3).height = 42.0;
+        assert_ne!(buf.sample_at(0, 0).visual, original_visual);
+
+        buf.clear();
+        assert_eq!(buf.sample_at(0, 0).visual, original_visual);
+        assert_eq!(buf.sample_at(3, 3).height, Sample::CLEAR_HEIGHT);
+    }
+
+    #[test]
+    fn corner_access_does_not_panic() {
+        let buf = SampleBuffer::new(240, 135);
+        let _ = buf.sample_at(0, 0);
+        let _ = buf.sample_at(483, 273);
     }
 
     #[test]
     fn sample_at_indexing() {
-        let mut buf = make_buffer(480, 270);
-        buf.sample_at_mut(10, 20).depth = 42.0;
-        assert_eq!(buf.sample_at(10, 20).depth, 42.0);
-        // Adjacent samples are unaffected
-        assert_eq!(buf.sample_at(11, 20).depth, f32::MAX);
+        let mut buf = SampleBuffer::new(240, 135);
+        buf.sample_at_mut(10, 20).height = 42.0;
+        assert_eq!(buf.sample_at(10, 20).height, 42.0);
+        // Adjacent samples are unaffected (still clear_state)
+        assert_eq!(buf.sample_at(11, 20).height, Sample::CLEAR_HEIGHT);
     }
 
     #[test]
-    fn clear_resets_all_samples() {
-        let mut buf = make_buffer(4, 4);
-        buf.sample_at_mut(1, 1).depth = 5.0;
-        buf.sample_at_mut(2, 3).glyph = 65;
-        buf.clear();
-        assert_eq!(buf.sample_at(1, 1).depth, f32::MAX);
-        assert_eq!(buf.sample_at(2, 3).glyph, 0);
-    }
-
-    #[test]
-    fn corner_access() {
-        let buf = make_buffer(480, 270);
-        // Should not panic
-        let _ = buf.sample_at(0, 0);
-        let _ = buf.sample_at(479, 269);
+    fn flat_index_matches_row_major() {
+        let buf = SampleBuffer::new(240, 135);
+        assert_eq!(buf.flat_index(0, 0), 0);
+        assert_eq!(buf.flat_index(1, 0), 1);
+        assert_eq!(buf.flat_index(0, 1), 484);
+        assert_eq!(buf.flat_index(483, 273), (273 * 484 + 483) as usize);
     }
 }

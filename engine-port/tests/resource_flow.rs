@@ -16,14 +16,14 @@ fn sample_buffer_and_grid_coexist() {
 
     let buffer = app.world().resource::<SampleBuffer>();
     assert_eq!(
-        buffer.width, 480,
-        "SampleBuffer width should be 480 (240 * 2)"
+        buffer.width, 484,
+        "SampleBuffer width should be 484 (240 * 2 + 4)"
     );
     assert_eq!(
-        buffer.height, 270,
-        "SampleBuffer height should be 270 (135 * 2)"
+        buffer.height, 274,
+        "SampleBuffer height should be 274 (135 * 2 + 4)"
     );
-    assert_eq!(buffer.samples.len(), 480 * 270);
+    assert_eq!(buffer.samples.len(), 484 * 274);
 
     let grid = app.world().resource::<AsciiCellGrid>();
     assert_eq!(grid.width, 240, "AsciiCellGrid width should be 240");
@@ -35,11 +35,11 @@ fn sample_buffer_and_grid_coexist() {
 fn render_config_controls_dimensions() {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);
-    // Insert custom config before plugins
+    // Insert custom config before plugins -- supersample_factor removed,
+    // dimensions are always 2*ascii+4
     app.insert_resource(RenderConfig {
         ascii_width: 80,
         ascii_height: 40,
-        supersample_factor: 3,
     });
     app.add_plugins((CpuRasterizerPlugin, AsciiOutputPlugin));
 
@@ -47,12 +47,12 @@ fn render_config_controls_dimensions() {
 
     let buffer = app.world().resource::<SampleBuffer>();
     assert_eq!(
-        buffer.width, 240,
-        "SampleBuffer width should be 80 * 3 = 240"
+        buffer.width, 164,
+        "SampleBuffer width should be 80 * 2 + 4 = 164"
     );
     assert_eq!(
-        buffer.height, 120,
-        "SampleBuffer height should be 40 * 3 = 120"
+        buffer.height, 84,
+        "SampleBuffer height should be 40 * 2 + 4 = 84"
     );
 
     let grid = app.world().resource::<AsciiCellGrid>();
@@ -68,11 +68,10 @@ fn write_sample_read_cell_same_frame() {
 
     app.update();
 
-    // Write to SampleBuffer
+    // Write to SampleBuffer using new field names
     let mut buffer = app.world_mut().resource_mut::<SampleBuffer>();
-    buffer.sample_at_mut(100, 50).depth = 10.0;
-    buffer.sample_at_mut(100, 50).glyph = 65;
-    buffer.sample_at_mut(100, 50).color_rgb555 = 0x7FFF;
+    buffer.sample_at_mut(100, 50).height = 10.0;
+    buffer.sample_at_mut(100, 50).visual = 0x7FFF;
 
     // Read from AsciiCellGrid (verify it exists and is accessible in same world)
     let mut grid = app.world_mut().resource_mut::<AsciiCellGrid>();
