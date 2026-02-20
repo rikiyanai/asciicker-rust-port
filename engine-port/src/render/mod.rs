@@ -1,5 +1,7 @@
 pub mod config;
+pub mod material;
 pub mod quantize;
+pub mod rasterizer;
 pub mod sample_buffer;
 pub mod types;
 
