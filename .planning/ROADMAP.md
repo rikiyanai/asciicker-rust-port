@@ -51,7 +51,7 @@ Plans:
 
 Plans:
 - [x] 02-01-PLAN.md -- XP sprite parser with shared error/constants (TDD, wave 1)
-- [ ] 02-02-PLAN.md -- A3D terrain and material table parsers (TDD, wave 1)
+- [x] 02-02-PLAN.md -- A3D terrain and material table parsers (TDD, wave 1)
 - [ ] 02-03-PLAN.md -- A3D world and AKM mesh parsers (TDD, wave 1)
 - [ ] 02-04-PLAN.md -- Bevy AssetLoader integration and golden-file tests (wave 2)
 
@@ -147,7 +147,7 @@ Note: Phases 3 and 4 are independent (both depend only on Phase 1) and can execu
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 0/? | Not started | - |
-| 2. Asset Parsers | 1/4 | In progress | - |
+| 2. Asset Parsers | 2/4 | In progress | - |
 | 3. GPU Output | 0/? | Not started | - |
 | 4. CPU Rasterizer Core | 0/? | Not started | - |
 | 5. Pipeline Integration | 0/? | Not started | - |

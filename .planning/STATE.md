@@ -10,29 +10,29 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 ## Current Position
 
 Phase: 2 of 7 (Asset Parsers)
-Plan: 1 of 4 in current phase
+Plan: 2 of 4 in current phase
 Status: Executing
-Last activity: 2026-02-20 -- Completed 02-01-PLAN.md (XP sprite parser)
+Last activity: 2026-02-20 -- Completed 02-02-PLAN.md (A3D terrain parser)
 
-Progress: [##........] 20%
+Progress: [###.......] 30%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: ~6 min
-- Total execution time: ~0.3 hours
+- Total plans completed: 4
+- Average duration: ~5 min
+- Total execution time: ~0.35 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1 - Foundation | 2 | ~12 min | ~6 min |
-| 2 - Asset Parsers | 1 | 6 min | 6 min |
+| 2 - Asset Parsers | 2 | 10 min | 5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01, 01-02, 02-01
-- Trend: Consistent ~6 min per plan
+- Last 5 plans: 01-01, 01-02, 02-01, 02-02
+- Trend: Consistent ~5 min per plan
 
 *Updated after each plan completion*
 
@@ -49,6 +49,9 @@ Recent decisions affecting current work:
 - 02-01: Used i32 for XP version field (format version is -1)
 - 02-01: Deferred full AverageGlyphTransp to Phase 5; basic swoosh merge (detect + lighten) in Phase 2
 - 02-01: Stored half_block_mask for future Phase 5 per-quadrant blending
+- 02-02: Used HEIGHT_CELLS_PLUS_ONE const for array sizes (Rust requires const in array types)
+- 02-02: Copy from packed FilePatch to owned TerrainPatch to avoid unaligned access UB
+- 02-02: Parse functions return (T, usize) for sequential section offset tracking
 
 ### Pending Todos
 
@@ -63,5 +66,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 02-01-PLAN.md (XP sprite parser)
+Stopped at: Completed 02-02-PLAN.md (A3D terrain parser)
 Resume file: None
