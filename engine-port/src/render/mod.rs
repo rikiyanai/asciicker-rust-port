@@ -1,5 +1,7 @@
 pub mod config;
+pub mod quantize;
 pub mod sample_buffer;
+pub mod types;
 
 use bevy::prelude::*;
 
