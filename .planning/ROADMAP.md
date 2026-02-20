@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Foundation** - Compiling Bevy 0.18 skeleton with plugin-per-subsystem architecture and ECS conventions
 - [x] **Phase 2: Asset Parsers** - XP sprite and A3D world/terrain binary file loaders with golden-file tests
 - [ ] **Phase 3: GPU Output** - Bevy render plugin displaying ASCII glyphs via Mage Core 4-texture WGSL shader
-- [ ] **Phase 4: CPU Rasterizer Core** - SampleBuffer, triangle/line rasterization, materials, color quantization, and RESOLVE stage
+- [x] **Phase 4: CPU Rasterizer Core** - SampleBuffer, triangle/line rasterization, materials, color quantization, and RESOLVE stage
 - [ ] **Phase 5: Pipeline Integration** - Full 6-stage rendering pipeline producing real scene output from .a3d world files
 - [ ] **Phase 6: Physics and Character** - Sphere collision, character state machine, player input, water, and effects
 - [ ] **Phase 7: Game Systems** - Audio, networking, weather, menus, and visual quality polish
@@ -84,10 +84,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 04-01-PLAN.md -- Sample struct, SampleBuffer double-allocation, AnsiCell, color quantization (wave 1)
-- [ ] 04-02-PLAN.md -- MatCell/Material structs, auto_mat LUT generation (wave 2)
-- [ ] 04-03-PLAN.md -- Bresenham line and barycentric triangle rasterization (wave 2)
-- [ ] 04-04-PLAN.md -- RESOLVE stage, pipeline skeleton, performance benchmark (wave 3)
+- [x] 04-01-PLAN.md -- Sample struct, SampleBuffer double-allocation, AnsiCell, color quantization (wave 1)
+- [x] 04-02-PLAN.md -- MatCell/Material structs, auto_mat LUT generation (wave 2)
+- [x] 04-03-PLAN.md -- Bresenham line and barycentric triangle rasterization (wave 2)
+- [x] 04-04-PLAN.md -- RESOLVE stage, pipeline skeleton, performance benchmark (wave 3)
 
 ### Phase 5: Pipeline Integration
 **Goal**: The full 6-stage rendering pipeline connects asset parsers, CPU rasterizer, and GPU output to render a real Asciicker .a3d world file in a window with perspective camera navigation
@@ -135,12 +135,14 @@ Plans:
   3. Weather effects (rain, snow) render as particle systems that are visible in the ASCII output and respond to game state
   4. A main menu loads on startup with navigation to start game, and the game state machine transitions correctly between Loading, Playing, and Paused states
   5. Alex Harri 6D shape-vector glyph matching replaces auto_mat glyph selection at the RESOLVE stage (auto_mat still used for fg/bg color), and all 3 font skins (grey, gold, pink) are available
-**Plans**: TBD
+**Plans**: 5 plans
 
 Plans:
-- [ ] 07-01: TBD
-- [ ] 07-02: TBD
-- [ ] 07-03: TBD
+- [ ] 07-01-PLAN.md -- Audio: bevy_kira_audio 0.25, 16-track DynamicAudioChannels mixer (wave 1)
+- [ ] 07-02-PLAN.md -- Game state machine (Loading/Playing/Paused) and main menu (wave 1)
+- [ ] 07-03-PLAN.md -- Networking: bevy_replicon 0.38, binary protocol, server/client (wave 1)
+- [ ] 07-04-PLAN.md -- Visual quality: Alex Harri 6D shape-vector + Font1 3 skins (TDD, wave 1)
+- [ ] 07-05-PLAN.md -- Weather: ring-buffer particle pool, Perlin wind, snow/rain (TDD, wave 2)
 
 ## Progress
 
@@ -153,7 +155,7 @@ Note: Phases 3 and 4 are independent (both depend only on Phase 1) and can execu
 | 1. Foundation | 2/2 | Complete | 2026-02-20 |
 | 2. Asset Parsers | 4/4 | Complete | 2026-02-20 |
 | 3. GPU Output | 2/3 | In Progress | - |
-| 4. CPU Rasterizer Core | 1/4 | In Progress | - |
+| 4. CPU Rasterizer Core | 4/4 | Complete | 2026-02-20 |
 | 5. Pipeline Integration | 0/5 | Planned | - |
 | 6. Physics and Character | 0/3 | Planned | - |
-| 7. Game Systems | 0/? | Not started | - |
+| 7. Game Systems | 0/5 | Not started | - |
