@@ -5,7 +5,7 @@ pub mod test_pattern;
 
 use bevy::image::ImageLoaderSettings;
 use bevy::prelude::*;
-use bevy::window::WindowResized;
+use bevy::window::{Window, WindowResized};
 
 use ascii_cell_grid::AsciiCellGrid;
 use gpu_types::AsciiRenderConfig;
@@ -59,41 +59,53 @@ impl Plugin for AsciiOutputPlugin {
 /// The ASCII output shader replaces the camera's normal view content,
 /// but a camera entity must exist for the Core2d render graph to execute.
 fn spawn_camera(mut commands: Commands) {
-    commands.spawn(Camera2d);
+    // Msaa::Off disables multisampling — our fullscreen ASCII shader
+    // uses sample_count=1 and doesn't benefit from MSAA on geometry edges.
+    commands.spawn((Camera2d, Msaa::Off));
 }
 
 /// Recalculates `AsciiCellGrid` dimensions when the window is resized.
 ///
-/// New grid dimensions are computed as `window_size / font_size`. Zero-dimension
-/// resizes (window minimized or tiny) are ignored. When dimensions change, all
-/// three cell arrays (char_indices, fg_colors, bg_colors) are reallocated at the
-/// new cell count so the test pattern and rasterizer fill the correct number of cells.
+/// Uses the window's **physical** pixel dimensions (not logical) because the WGSL
+/// shader's `@builtin(position)` operates in physical pixel space. On HiDPI/Retina
+/// displays the physical size is `logical * scale_factor`. Zero-dimension resizes
+/// (window minimized or tiny) are ignored. When dimensions change, all three cell
+/// arrays (char_indices, fg_colors, bg_colors) are reallocated at the new cell count.
 fn handle_window_resize(
     resize_events: Option<MessageReader<WindowResized>>,
     mut grid: ResMut<AsciiCellGrid>,
     config: Res<AsciiRenderConfig>,
+    windows: Query<&Window>,
 ) {
     let Some(mut resize_events) = resize_events else {
         return;
     };
-    for event in resize_events.read() {
-        let Some((new_w, new_h)) = compute_grid_dimensions(
-            event.width,
-            event.height,
-            config.font_width,
-            config.font_height,
-        ) else {
-            continue;
-        };
+    // Drain all resize events; only act if at least one arrived this frame.
+    if resize_events.read().last().is_none() {
+        return;
+    }
 
-        if new_w != grid.width || new_h != grid.height {
-            let cell_count = (new_w * new_h) as usize;
-            grid.width = new_w;
-            grid.height = new_h;
-            grid.char_indices = vec![0; cell_count];
-            grid.fg_colors = vec![[0, 0, 0, 255]; cell_count];
-            grid.bg_colors = vec![[0, 0, 0, 255]; cell_count];
-        }
+    // WindowResized reports logical pixels, but the shader samples in physical
+    // pixel space. Read physical dimensions directly from the Window component.
+    let Some(window) = windows.iter().next() else {
+        return;
+    };
+    let Some((new_w, new_h)) = compute_grid_dimensions(
+        window.physical_width() as f32,
+        window.physical_height() as f32,
+        config.font_width,
+        config.font_height,
+    ) else {
+        return;
+    };
+
+    if new_w != grid.width || new_h != grid.height {
+        let cell_count = (new_w * new_h) as usize;
+        grid.width = new_w;
+        grid.height = new_h;
+        grid.char_indices = vec![0; cell_count];
+        grid.fg_colors = vec![[0, 0, 0, 255]; cell_count];
+        grid.bg_colors = vec![[0, 0, 0, 255]; cell_count];
     }
 }
 
@@ -143,8 +155,24 @@ mod tests {
 
     #[test]
     fn resize_default_2400x2160_with_10x16_font() {
-        // Default window size that produces 240x135
+        // Physical pixel size that produces the default 240x135 grid
         let result = compute_grid_dimensions(2400.0, 2160.0, 10, 16);
         assert_eq!(result, Some((240, 135)));
+    }
+
+    #[test]
+    fn resize_retina_2x_1280x720_logical_with_10x16_font() {
+        // 2x Retina: logical 1280x720 → physical 2560x1440
+        // Physical: 2560 / 10 = 256, 1440 / 16 = 90
+        let result = compute_grid_dimensions(2560.0, 1440.0, 10, 16);
+        assert_eq!(result, Some((256, 90)));
+    }
+
+    #[test]
+    fn resize_retina_1_5x_1280x720_logical_with_10x16_font() {
+        // 1.5x scale: logical 1280x720 → physical 1920x1080
+        // Physical: 1920 / 10 = 192, 1080 / 16 = 67
+        let result = compute_grid_dimensions(1920.0, 1080.0, 10, 16);
+        assert_eq!(result, Some((192, 67)));
     }
 }
