@@ -22,6 +22,7 @@ pub struct AsciiOutputPlugin;
 
 impl Plugin for AsciiOutputPlugin {
     fn build(&self, app: &mut App) {
+        app.add_message::<WindowResized>();
         app.init_resource::<AsciiCellGrid>();
 
         // Load font atlas with is_srgb=false to ensure Rgba8Unorm format (Pitfall 1).
