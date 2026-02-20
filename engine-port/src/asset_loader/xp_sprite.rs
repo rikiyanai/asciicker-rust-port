@@ -78,18 +78,6 @@ fn read_i32_le(data: &[u8], offset: usize) -> Result<i32, AssetError> {
     Ok(i32::from_le_bytes(bytes))
 }
 
-/// Read a little-endian u32 from a byte slice at the given offset.
-fn read_u32_le(data: &[u8], offset: usize) -> Result<u32, AssetError> {
-    let end = offset + 4;
-    if end > data.len() {
-        return Err(AssetError::UnexpectedEof(offset));
-    }
-    let bytes: [u8; 4] = data[offset..end]
-        .try_into()
-        .map_err(|_| AssetError::UnexpectedEof(offset))?;
-    Ok(u32::from_le_bytes(bytes))
-}
-
 /// Read a single XpCell (10 bytes) from the decompressed data at the given offset.
 fn read_cell(data: &[u8], offset: usize) -> Result<XpCell, AssetError> {
     let end = offset + 10;
@@ -139,7 +127,10 @@ pub fn parse_xp(bytes: &[u8]) -> Result<XpSprite, AssetError> {
         return Err(AssetError::TooFewLayers(num_layers));
     }
     if width < 1 || height < 1 {
-        return Err(AssetError::InvalidDimensions(width as usize, height as usize));
+        return Err(AssetError::InvalidDimensions(
+            width as usize,
+            height as usize,
+        ));
     }
 
     let width = width as u32;
@@ -187,17 +178,16 @@ pub fn parse_xp(bytes: &[u8]) -> Result<XpSprite, AssetError> {
 /// '0'-'9' maps to 0-9, 'A'-'Z' maps to 10-35, anything else is SPRITE_HEIGHT_UNDEFINED.
 fn decode_height(glyph: u32) -> u8 {
     match glyph {
-        48..=57 => (glyph - 48) as u8,  // '0'-'9'
-        65..=90 => (glyph - 55) as u8,  // 'A'-'Z' -> 10-35
+        48..=57 => (glyph - 48) as u8, // '0'-'9'
+        65..=90 => (glyph - 55) as u8, // 'A'-'Z' -> 10-35
         _ => SPRITE_HEIGHT_UNDEFINED,
     }
 }
 
 /// Check if a cell is a swoosh cell (cyan fg + half-block glyph).
 fn is_swoosh_cell(cell: &XpCell) -> bool {
-    let fg_is_cyan = cell.fg[0] == SPRITE_CYAN.0
-        && cell.fg[1] == SPRITE_CYAN.1
-        && cell.fg[2] == SPRITE_CYAN.2;
+    let fg_is_cyan =
+        cell.fg[0] == SPRITE_CYAN.0 && cell.fg[1] == SPRITE_CYAN.1 && cell.fg[2] == SPRITE_CYAN.2;
     let is_half_block = matches!(
         cell.glyph,
         SPRITE_GLYPH_HALF_LOWER
@@ -210,8 +200,9 @@ fn is_swoosh_cell(cell: &XpCell) -> bool {
 
 /// Get the quadrant bitmask for a half-block glyph.
 fn half_block_mask(glyph: u32) -> u8 {
-    use super::constants::{SPRITE_MASK_FULL, SPRITE_MASK_LEFT, SPRITE_MASK_LOWER,
-                           SPRITE_MASK_RIGHT, SPRITE_MASK_UPPER};
+    use super::constants::{
+        SPRITE_MASK_FULL, SPRITE_MASK_LEFT, SPRITE_MASK_LOWER, SPRITE_MASK_RIGHT, SPRITE_MASK_UPPER,
+    };
     match glyph {
         SPRITE_GLYPH_HALF_LOWER => SPRITE_MASK_LOWER,
         SPRITE_GLYPH_HALF_LEFT => SPRITE_MASK_LEFT,
@@ -271,17 +262,18 @@ pub fn merge_layers(sprite: &XpSprite) -> Vec<MergedCell> {
     let last_layer_idx = num_layers - 1;
     for layer_idx in 3..last_layer_idx {
         let layer = &sprite.layers[layer_idx];
-        let colorkey_layer = &sprite.layers[0];
-        for i in 0..num_cells {
-            let cell = &layer.cells[i];
-            let colorkey_bg = colorkey_layer.cells[i].bg;
+        let colorkey_cells = &sprite.layers[0].cells;
+        for (merged_cell, (overlay_cell, colorkey_cell)) in merged
+            .iter_mut()
+            .zip(layer.cells.iter().zip(colorkey_cells.iter()))
+        {
             // Overwrite if cell bg differs from colorkey (i.e., cell is not transparent)
-            if cell.bg != colorkey_bg {
-                merged[i] = MergedCell {
-                    glyph: cell.glyph,
-                    fg: cell.fg,
-                    bg: cell.bg,
-                    height: merged[i].height,
+            if overlay_cell.bg != colorkey_cell.bg {
+                *merged_cell = MergedCell {
+                    glyph: overlay_cell.glyph,
+                    fg: overlay_cell.fg,
+                    bg: overlay_cell.bg,
+                    height: merged_cell.height,
                     transparent: false,
                 };
             }
@@ -291,27 +283,27 @@ pub fn merge_layers(sprite: &XpSprite) -> Vec<MergedCell> {
     // Apply last layer with swoosh merge logic (only if there are 4+ layers)
     if num_layers > SPRITE_MIN_LAYERS {
         let last_layer = &sprite.layers[last_layer_idx];
-        let colorkey_layer = &sprite.layers[0];
-        for i in 0..num_cells {
-            let cell = &last_layer.cells[i];
-            let colorkey_bg = colorkey_layer.cells[i].bg;
-
-            if is_swoosh_cell(cell) {
+        let colorkey_cells = &sprite.layers[0].cells;
+        for (merged_cell, (overlay_cell, colorkey_cell)) in merged
+            .iter_mut()
+            .zip(last_layer.cells.iter().zip(colorkey_cells.iter()))
+        {
+            if is_swoosh_cell(overlay_cell) {
                 // Swoosh: lighten the base cell's fg for affected quadrants.
                 // The mask determines which quadrants are affected, but for the
                 // basic implementation we lighten the entire fg color.
-                let _mask = half_block_mask(cell.glyph);
-                merged[i] = MergedCell {
-                    fg: lighten_color(merged[i].fg),
-                    ..merged[i]
+                let _mask = half_block_mask(overlay_cell.glyph);
+                *merged_cell = MergedCell {
+                    fg: lighten_color(merged_cell.fg),
+                    ..*merged_cell
                 };
-            } else if cell.bg != colorkey_bg {
+            } else if overlay_cell.bg != colorkey_cell.bg {
                 // Non-swoosh: simple overwrite
-                merged[i] = MergedCell {
-                    glyph: cell.glyph,
-                    fg: cell.fg,
-                    bg: cell.bg,
-                    height: merged[i].height,
+                *merged_cell = MergedCell {
+                    glyph: overlay_cell.glyph,
+                    fg: overlay_cell.fg,
+                    bg: overlay_cell.bg,
+                    height: merged_cell.height,
                     transparent: false,
                 };
             }

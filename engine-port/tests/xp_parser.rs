@@ -1,27 +1,15 @@
-use asciicker_engine::asset_loader::xp_sprite::{merge_layers, parse_xp, MergedCell, XpSprite};
-use asciicker_engine::asset_loader::constants::{
-    SPRITE_CYAN, SPRITE_GLYPH_HALF_LOWER, SPRITE_GLYPH_HALF_LEFT,
-    SPRITE_GLYPH_HALF_RIGHT, SPRITE_GLYPH_HALF_UPPER, SPRITE_HEIGHT_UNDEFINED,
-    SPRITE_LIGHTEN_AMOUNT,
-};
+use asciicker_engine::asset_loader::constants::{SPRITE_GLYPH_HALF_LOWER, SPRITE_LIGHTEN_AMOUNT};
+use asciicker_engine::asset_loader::xp_sprite::{merge_layers, parse_xp};
 use std::io::Write;
 
 fn load_test_file(name: &str) -> Vec<u8> {
-    let path = format!(
-        "{}/tests/golden/xp/{}",
-        env!("CARGO_MANIFEST_DIR"),
-        name
-    );
+    let path = format!("{}/tests/golden/xp/{}", env!("CARGO_MANIFEST_DIR"), name);
     std::fs::read(&path).unwrap_or_else(|e| panic!("Failed to read {}: {}", path, e))
 }
 
 /// Helper: create a synthetic gzip-compressed XP payload with the given layers.
 /// Each layer is a vec of (glyph, fg, bg) tuples in column-major order.
-fn make_xp_bytes(
-    width: u32,
-    height: u32,
-    layers: &[Vec<(u32, [u8; 3], [u8; 3])>],
-) -> Vec<u8> {
+fn make_xp_bytes(width: u32, height: u32, layers: &[Vec<(u32, [u8; 3], [u8; 3])>]) -> Vec<u8> {
     let mut raw = Vec::new();
 
     // Global header: version, num_layers, width, height (all i32 LE)
@@ -121,14 +109,8 @@ fn test_layer_count_minimum() {
     let apple = parse_xp(&load_test_file("item-apple.xp")).unwrap();
     let water = parse_xp(&load_test_file("grid-water.xp")).unwrap();
 
-    assert!(
-        apple.layers.len() >= 3,
-        "item-apple must have >= 3 layers"
-    );
-    assert!(
-        water.layers.len() >= 3,
-        "grid-water must have >= 3 layers"
-    );
+    assert!(apple.layers.len() >= 3, "item-apple must have >= 3 layers");
+    assert!(water.layers.len() >= 3, "grid-water must have >= 3 layers");
 }
 
 // ---------- Test 5: cell structure ----------
@@ -158,8 +140,7 @@ fn test_cell_structure() {
 fn test_invalid_too_few_bytes() {
     // Fewer than 16 bytes after decompression should fail.
     // Create a gzip containing only 8 bytes.
-    let mut encoder =
-        flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+    let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
     encoder.write_all(&[0u8; 8]).unwrap();
     let compressed = encoder.finish().unwrap();
 
@@ -217,7 +198,7 @@ fn test_swoosh_merge_last_layer() {
     // Layer 2: visual base with known colors
     let layer2 = vec![
         (65u32, [100, 100, 100], [50, 50, 50]), // 'A' with grey colors
-        (66u32, [200, 200, 200], [80, 80, 80]),  // 'B' with lighter colors
+        (66u32, [200, 200, 200], [80, 80, 80]), // 'B' with lighter colors
     ];
 
     // Layer 3 (last): swoosh on cell [0,0], non-swoosh overwrite on cell [1,0]
@@ -255,7 +236,18 @@ fn test_swoosh_merge_last_layer() {
     // Cell [1,0]: non-swoosh overwrite from last layer.
     // Should have the last layer's values directly.
     let cell1 = &merged[1];
-    assert_eq!(cell1.glyph, 88, "non-swoosh cell should use last-layer glyph");
-    assert_eq!(cell1.fg, [255, 128, 0], "non-swoosh cell should use last-layer fg");
-    assert_eq!(cell1.bg, [30, 40, 50], "non-swoosh cell should use last-layer bg");
+    assert_eq!(
+        cell1.glyph, 88,
+        "non-swoosh cell should use last-layer glyph"
+    );
+    assert_eq!(
+        cell1.fg,
+        [255, 128, 0],
+        "non-swoosh cell should use last-layer fg"
+    );
+    assert_eq!(
+        cell1.bg,
+        [30, 40, 50],
+        "non-swoosh cell should use last-layer bg"
+    );
 }
