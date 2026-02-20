@@ -69,7 +69,7 @@ Plans:
 Plans:
 - [x] 03-01-PLAN.md -- Font atlas, WGSL shader, GPU types, test pattern system (wave 1)
 - [x] 03-02-PLAN.md -- Bevy ViewNode render pipeline with Extract/Prepare/Render (wave 2)
-- [ ] 03-03-PLAN.md -- Window resize handling + visual verification checkpoint (wave 3)
+- [x] 03-03-PLAN.md -- Window resize handling + visual verification checkpoint (wave 3)
 
 ### Phase 4: CPU Rasterizer Core
 **Goal**: The CPU rasterizer produces correct AnsiCell output from hard-coded geometry, matching C++ reference output within the 1% cell difference threshold, at 60fps or better at 240x135 ASCII resolution
@@ -99,14 +99,15 @@ Plans:
   3. Terrain quadtree with HEIGHT_CELLS=4 and VISUAL_CELLS=8 renders with frustum culling, and terrain shadows cast correctly via 64-bit bitmask per patch
   4. BSP tree traversal renders world geometry with frustum culling, all 4 node types functional (NODE, NODE_SHARE, LEAF, INST), and instance flags respected
   5. Golden-file CI comparison of full-scene AnsiCell output against C++ reference shows <1% cell difference
-**Plans**: 5 plans
+**Plans**: 6 plans
 
 Plans:
-- [ ] 05-01-PLAN.md -- Terrain quadtree runtime with frustum query (wave 1)
-- [ ] 05-02-PLAN.md -- BSP tree runtime with SAH construction and frustum query (wave 1)
-- [ ] 05-03-PLAN.md -- Perspective camera, Q/E rotation, terrain shadows (wave 1)
-- [ ] 05-04-PLAN.md -- Pipeline orchestrator wiring 6 stages + deferred sprite blit (wave 2)
-- [ ] 05-05-PLAN.md -- Golden-file CI comparison infrastructure (wave 2)
+- [ ] 05-01-PLAN.md -- Terrain quadtree runtime (RuntimePatch, QuadNode, frustum query) (wave 1)
+- [ ] 05-02-PLAN.md -- BSP tree runtime with SAH construction, near-child-first frustum query (wave 1)
+- [ ] 05-03-PLAN.md -- Perspective camera with view matrix, frustum planes, Q/E rotation (wave 1)
+- [ ] 05-04-PLAN.md -- TerrainShader, MeshShader, resolve_to_grid bridge (wave 2)
+- [ ] 05-05-PLAN.md -- A3D assembly system, pipeline orchestrator with per-stage timing (wave 3)
+- [ ] 05-06-PLAN.md -- Terrain shadows, golden-file CI comparison, budget assertion (wave 3)
 
 ### Phase 6: Physics and Character
 **Goal**: A player-controlled character moves through the rendered world with sphere-based collision physics, state-machine animations, and water/effects, producing a playable single-player experience
@@ -154,8 +155,8 @@ Note: Phases 3 and 4 are independent (both depend only on Phase 1) and can execu
 |-------|----------------|--------|-----------|
 | 1. Foundation | 2/2 | Complete | 2026-02-20 |
 | 2. Asset Parsers | 4/4 | Complete | 2026-02-20 |
-| 3. GPU Output | 2/3 | In Progress | - |
+| 3. GPU Output | 3/3 | Complete | 2026-02-20 |
 | 4. CPU Rasterizer Core | 4/4 | Complete | 2026-02-20 |
-| 5. Pipeline Integration | 0/5 | Planned | - |
+| 5. Pipeline Integration | 0/6 | Planned | - |
 | 6. Physics and Character | 0/3 | Planned | - |
 | 7. Game Systems | 0/5 | Planned | - |
