@@ -121,9 +121,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 06-01-PLAN.md -- Physics core: collision algorithm, forces, PhysicsIO, FixedUpdate (TDD, wave 1)
-- [ ] 06-02-PLAN.md -- Character: state machine, equipment, input, animation (TDD, wave 1)
-- [ ] 06-03-PLAN.md -- Water reflection, Perlin ripple, GamePlugin integration (wave 2)
+- [ ] 06-01-PLAN.md -- Physics core: collision, forces, PhysicsIO, FixedUpdate, TerrainGeometrySource + WorldGeometrySource (TDD, wave 1)
+- [ ] 06-02-PLAN.md -- Character: state machine (with Block), equipment, input (Q/E ownership), animation, sprite_query (TDD, wave 1)
+- [ ] 06-03-PLAN.md -- Water reflection (actual geometry re-query), Perlin ripple, GamePlugin (no sub-plugins), torque-to-camera, perf benchmark (wave 2)
 
 ### Phase 7: Game Systems
 **Goal**: Audio, multiplayer networking, weather effects, menus, and visual quality upgrades complete the game for v1 release
