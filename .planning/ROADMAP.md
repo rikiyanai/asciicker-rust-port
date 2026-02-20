@@ -81,12 +81,13 @@ Plans:
   3. The material system (auto_mat LUT, 32KB shade table) produces correct glyph and fg/bg color selection for known input samples
   4. RGB555 to xterm-256 color quantization matches C++ output for all 32768 RGB555 values
   5. RESOLVE stage (2x2 downsample, per-cell glyph/color selection) produces AnsiCell grid matching C++ reference within <1% cell difference on canonical test scenes, at 60fps+ sustained
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 04-01: TBD
-- [ ] 04-02: TBD
-- [ ] 04-03: TBD
+- [ ] 04-01-PLAN.md -- Sample struct, SampleBuffer double-allocation, AnsiCell, color quantization (wave 1)
+- [ ] 04-02-PLAN.md -- MatCell/Material structs, auto_mat LUT generation (wave 2)
+- [ ] 04-03-PLAN.md -- Bresenham line and barycentric triangle rasterization (wave 2)
+- [ ] 04-04-PLAN.md -- RESOLVE stage, pipeline skeleton, performance benchmark (wave 3)
 
 ### Phase 5: Pipeline Integration
 **Goal**: The full 6-stage rendering pipeline connects asset parsers, CPU rasterizer, and GPU output to render a real Asciicker .a3d world file in a window with perspective camera navigation
@@ -150,7 +151,7 @@ Note: Phases 3 and 4 are independent (both depend only on Phase 1) and can execu
 | 1. Foundation | 2/2 | Complete | 2026-02-20 |
 | 2. Asset Parsers | 4/4 | Complete | 2026-02-20 |
 | 3. GPU Output | 0/3 | Planned | - |
-| 4. CPU Rasterizer Core | 0/? | Not started | - |
+| 4. CPU Rasterizer Core | 0/4 | Planned | - |
 | 5. Pipeline Integration | 0/? | Not started | - |
 | 6. Physics and Character | 0/3 | Planned | - |
 | 7. Game Systems | 0/? | Not started | - |
