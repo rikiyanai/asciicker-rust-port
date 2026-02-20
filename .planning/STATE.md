@@ -19,9 +19,9 @@ Progress: [#######...] 68%
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10
+- Total plans completed: 11
 - Average duration: ~5 min
-- Total execution time: ~0.8 hours
+- Total execution time: ~0.9 hours
 
 **By Phase:**
 
@@ -29,11 +29,11 @@ Progress: [#######...] 68%
 |-------|-------|-------|----------|
 | 1 - Foundation | 2 | ~12 min | ~6 min |
 | 2 - Asset Parsers | 4 | 21 min | ~5 min |
-| 3 - GPU Output | 1 | 5 min | 5 min |
+| 3 - GPU Output | 2 | 15 min | ~8 min |
 | 4 - CPU Rasterizer Core | 3 | 22 min | ~7 min |
 
 **Recent Trend:**
-- Last 5 plans: 03-01, 04-01, 04-02, 04-03
+- Last 5 plans: 04-01, 04-02, 04-03, 03-02
 - Trend: Consistent ~6-8 min per plan
 
 *Updated after each plan completion*
@@ -72,6 +72,9 @@ Recent decisions affecting current work:
 - 04-03: Used (1.0 - f32::EPSILON) / area normalizer to match C++ FLT_EPSILON behavior
 - 04-03: Extracted rasterize_ccw and rasterize_cw as separate functions matching C++ branch structure
 - 04-03: RasterShader::blend takes &self for immutable shader state during rasterization
+- 03-02: Guard AsciiGpuPlugin with RenderApp existence check before embedded_asset! (supports MinimalPlugins)
+- 03-02: ExtractedFontAtlasHandle as separate render-world resource for font atlas between extract and prepare
+- 03-02: RenderStartup schedule for pipeline init instead of Plugin::finish (Bevy 0.18 BlitPipeline pattern)
 
 ### Pending Todos
 
@@ -85,5 +88,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 04-03-PLAN.md (Rasterizer core: Bresenham + barycentric triangle)
+Stopped at: Completed 03-02-PLAN.md (GPU render pipeline with ViewNode)
 Resume file: None

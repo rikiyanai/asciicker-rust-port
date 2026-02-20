@@ -39,10 +39,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### GPU Output
 
-- [ ] **GPU-01**: Bevy render plugin displays AsciiCellGrid using Mage Core 4-texture approach (char index, fg, bg, font atlas)
+- [x] **GPU-01**: Bevy render plugin displays AsciiCellGrid using Mage Core 4-texture approach (char index, fg, bg, font atlas)
 - [x] **GPU-02**: WGSL fullscreen shader composites glyphs with correct fg/bg colors
 - [x] **GPU-03**: Font atlas loaded as Bevy PNG asset (CP437 16x16 glyph grid)
-- [ ] **GPU-04**: Correct Extract/Prepare/Render world pipeline with unconditional extraction
+- [x] **GPU-04**: Correct Extract/Prepare/Render world pipeline with unconditional extraction
 - [ ] **GPU-05**: Window resize handled correctly (AsciiCellGrid dimensions update)
 
 ### Terrain System
@@ -157,10 +157,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ASSET-05 | Phase 2 | Complete |
 | ASSET-06 | Phase 2 | Complete |
 | ASSET-07 | Phase 2 | Complete |
-| GPU-01 | Phase 3 | Pending |
+| GPU-01 | Phase 3 | Complete |
 | GPU-02 | Phase 3 | Complete |
 | GPU-03 | Phase 3 | Complete |
-| GPU-04 | Phase 3 | Pending |
+| GPU-04 | Phase 3 | Complete |
 | GPU-05 | Phase 3 | Pending |
 | REND-01 | Phase 4 | Complete |
 | REND-02 | Phase 4 | Complete |
