@@ -100,7 +100,9 @@ fn separate_gpu_arrays_verified() {
 
     // Verify arrays are separate (modifying one doesn't affect others)
     let mut grid = app.world_mut().resource_mut::<AsciiCellGrid>();
+    let fg_before = grid.fg_colors[0];
+    let bg_before = grid.bg_colors[0];
     grid.char_indices[0] = 42;
-    assert_eq!(grid.fg_colors[0], [0, 0, 0, 255]); // unchanged
-    assert_eq!(grid.bg_colors[0], [0, 0, 0, 255]); // unchanged
+    assert_eq!(grid.fg_colors[0], fg_before); // unchanged by char_indices mutation
+    assert_eq!(grid.bg_colors[0], bg_before); // unchanged by char_indices mutation
 }

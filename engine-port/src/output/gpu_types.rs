@@ -63,9 +63,9 @@ pub fn extract_grid_data(grid: &AsciiCellGrid, config: &AsciiRenderConfig) -> Ex
     let mut char_data = Vec::with_capacity(cell_count * 4);
     for &idx in &grid.char_indices {
         char_data.push(idx as u8); // R channel: glyph index (0-255)
-        char_data.push(0);         // G channel: unused
-        char_data.push(0);         // B channel: unused
-        char_data.push(255);       // A channel: opaque
+        char_data.push(0); // G channel: unused
+        char_data.push(0); // B channel: unused
+        char_data.push(255); // A channel: opaque
     }
 
     let mut fg_data = Vec::with_capacity(cell_count * 4);
@@ -115,10 +115,10 @@ mod tests {
     #[test]
     fn extract_2x2_grid_char_data_encoding() {
         let mut grid = make_grid(2, 2);
-        grid.char_indices[0] = 65;  // 'A'
+        grid.char_indices[0] = 65; // 'A'
         grid.char_indices[1] = 0xDB; // Full block (219)
         grid.char_indices[2] = 0xB1; // Medium shade (177)
-        grid.char_indices[3] = 32;   // Space
+        grid.char_indices[3] = 32; // Space
 
         let config = make_config();
         let extracted = extract_grid_data(&grid, &config);
