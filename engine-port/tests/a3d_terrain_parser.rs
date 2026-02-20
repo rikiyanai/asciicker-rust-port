@@ -1,17 +1,11 @@
-use asciicker_engine::asset_loader::a3d_terrain::{
-    parse_material_section, parse_terrain_section, A3dTerrain, MaterialTable,
-};
+use asciicker_engine::asset_loader::a3d_terrain::{parse_material_section, parse_terrain_section};
 use asciicker_engine::asset_loader::constants::{
-    A3D_MAGIC, FILE_PATCH_SIZE, HEIGHT_CELLS, MATERIAL_TABLE_SIZE, VISUAL_CELLS,
+    FILE_PATCH_SIZE, HEIGHT_CELLS, MATERIAL_TABLE_SIZE, VISUAL_CELLS,
 };
-use asciicker_engine::asset_loader::AssetError;
 
 /// Helper: read a golden .a3d file and return its bytes.
 fn load_golden(name: &str) -> Vec<u8> {
-    let path = format!(
-        "{}/tests/golden/a3d/{name}",
-        env!("CARGO_MANIFEST_DIR")
-    );
+    let path = format!("{}/tests/golden/a3d/{name}", env!("CARGO_MANIFEST_DIR"));
     std::fs::read(&path).unwrap_or_else(|e| panic!("failed to read {path}: {e}"))
 }
 
