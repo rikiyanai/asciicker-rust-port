@@ -146,26 +146,6 @@ impl SampleBuffer {
         let idx = self.flat_index(x, y);
         &mut self.samples[idx]
     }
-
-    /// Get a reference to the sample at `(x, y)` without bounds checking.
-    ///
-    /// # Safety
-    /// Caller must ensure `x < width` and `y < height`.
-    #[inline]
-    pub unsafe fn sample_at_unchecked(&self, x: u32, y: u32) -> &Sample {
-        let idx = self.flat_index(x, y);
-        unsafe { self.samples.get_unchecked(idx) }
-    }
-
-    /// Get a mutable reference to the sample at `(x, y)` without bounds checking.
-    ///
-    /// # Safety
-    /// Caller must ensure `x < width` and `y < height`.
-    #[inline]
-    pub unsafe fn sample_at_mut_unchecked(&mut self, x: u32, y: u32) -> &mut Sample {
-        let idx = self.flat_index(x, y);
-        unsafe { self.samples.get_unchecked_mut(idx) }
-    }
 }
 
 #[cfg(test)]
@@ -300,5 +280,56 @@ mod tests {
         assert_eq!(buf.flat_index(1, 0), 1);
         assert_eq!(buf.flat_index(0, 1), 484);
         assert_eq!(buf.flat_index(483, 273), (273 * 484 + 483) as usize);
+    }
+
+    // --- GAP-10 (R43): Boundary tests ---
+
+    #[test]
+    fn test_sample_buffer_zero_size() {
+        // SampleBuffer::new(0, 0) produces dimensions (4, 4) due to
+        // the 2*ascii+4 formula. Verify it doesn't panic.
+        let buf = SampleBuffer::new(0, 0);
+        assert_eq!(buf.width, 4);
+        assert_eq!(buf.height, 4);
+        assert_eq!(buf.samples.len(), 16);
+        // Can access the last valid index
+        let _ = buf.sample_at(3, 3);
+    }
+
+    #[test]
+    fn test_sample_buffer_border_pixels() {
+        // Border is +2 on each side of the 2x-supersampled area.
+        // For ascii 4x4: w=2*4+4=12, h=2*4+4=12
+        let buf = SampleBuffer::new(4, 4);
+        assert_eq!(buf.width, 12);
+        assert_eq!(buf.height, 12);
+
+        // Border pixel (0,0) should be accessible and cleared
+        let s = buf.sample_at(0, 0);
+        assert_eq!(s.height, Sample::CLEAR_HEIGHT);
+
+        // Border pixel (1,0), (0,1) should also be clear
+        assert_eq!(buf.sample_at(1, 0).height, Sample::CLEAR_HEIGHT);
+        assert_eq!(buf.sample_at(0, 1).height, Sample::CLEAR_HEIGHT);
+
+        // Last border pixel (11,11)
+        assert_eq!(buf.sample_at(11, 11).height, Sample::CLEAR_HEIGHT);
+    }
+
+    #[test]
+    fn test_sample_buffer_last_valid_index() {
+        // For ascii 4x4: w=12, h=12. Last valid index is (11, 11).
+        let mut buf = SampleBuffer::new(4, 4);
+        let last_x = buf.width - 1; // 11
+        let last_y = buf.height - 1; // 11
+
+        // Write to last valid sample
+        buf.sample_at_mut(last_x, last_y).visual = 0xABCD;
+        buf.sample_at_mut(last_x, last_y).height = 42.0;
+
+        // Read back
+        let s = buf.sample_at(last_x, last_y);
+        assert_eq!(s.visual, 0xABCD);
+        assert_eq!(s.height, 42.0);
     }
 }

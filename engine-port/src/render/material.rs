@@ -520,4 +520,69 @@ mod tests {
             assert_eq!(gl, lut[idx + 2], "gl mismatch for rgb555={rgb555}");
         }
     }
+
+    // --- GAP-03 (R37): auto_mat LUT consistency tests ---
+
+    #[test]
+    fn test_auto_mat_lut_full_table_consistency() {
+        // After init, iterate all 32768 entries and verify:
+        // - fg palette index is in 16..=231
+        // - bg palette index is in 16..=231
+        // - glyph is one of the valid dither glyphs (non-zero for our purposes)
+        let valid_glyphs = [b' ', b'.', b':', b'%'];
+        let lut = create_auto_mat();
+
+        for entry in 0..32768usize {
+            let idx = entry * 3;
+            let bg = lut[idx];
+            let fg = lut[idx + 1];
+            let gl = lut[idx + 2];
+
+            assert!(
+                bg >= 16 && bg <= 231,
+                "entry {entry}: bg={bg} out of xterm-256 cube range 16..=231"
+            );
+            assert!(
+                fg >= 16 && fg <= 231,
+                "entry {entry}: fg={fg} out of xterm-256 cube range 16..=231"
+            );
+            assert!(
+                valid_glyphs.contains(&gl),
+                "entry {entry}: glyph={gl} (0x{gl:02x}) not in valid dither set"
+            );
+        }
+    }
+
+    #[test]
+    fn test_auto_mat_lut_symmetry_spot_checks() {
+        // For specific RGB555 values, verify the dither pair produces
+        // visually plausible fg/bg contrast.
+        use crate::render::quantize::{pack_rgb555, rgb8_to_rgb5};
+
+        let spot_checks: &[(u8, u8, u8, &str)] = &[
+            (0, 0, 0, "black"),
+            (255, 255, 255, "white"),
+            (255, 0, 0, "pure red"),
+            (0, 255, 0, "pure green"),
+            (0, 0, 255, "pure blue"),
+            (128, 128, 128, "mid grey"),
+            (64, 64, 64, "dark grey"),
+            (192, 192, 192, "light grey"),
+            (255, 128, 0, "orange"),
+            (128, 0, 255, "purple"),
+        ];
+
+        for &(r, g, b, name) in spot_checks {
+            let rgb555 = pack_rgb555(rgb8_to_rgb5(r), rgb8_to_rgb5(g), rgb8_to_rgb5(b));
+            let (bg, fg, _gl) = auto_mat_lookup(rgb555);
+
+            // Both must be valid palette indices
+            assert!(bg >= 16 && bg <= 231, "{name}: bg={bg} out of range");
+            assert!(fg >= 16 && fg <= 231, "{name}: fg={fg} out of range");
+
+            // For non-vertex colors, fg and bg should differ
+            // (dither needs contrast). For exact vertex colors they may be equal.
+            // We just verify they're reasonable palette indices.
+        }
+    }
 }

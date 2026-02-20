@@ -189,4 +189,36 @@ mod tests {
         assert!((g as i16 - 148).unsigned_abs() <= 5, "g: {g}");
         assert!((b as i16 - 197).unsigned_abs() <= 5, "b: {b}");
     }
+
+    // --- GAP-02 (R36): Exhaustive RGB555 range validation ---
+
+    #[test]
+    fn test_rgb2pal_all_32768_values_return_valid_index() {
+        // Validate that rgb2pal returns a valid xterm-256 color cube index
+        // (16..=231) for all 32768 possible RGB555 values.
+        for rgb555 in 0u16..32768 {
+            let (r5, g5, b5) = unpack_rgb555(rgb555);
+            let r8 = rgb5_to_rgb8(r5 as u16);
+            let g8 = rgb5_to_rgb8(g5 as u16);
+            let b8 = rgb5_to_rgb8(b5 as u16);
+            let pal = rgb2pal([r8, g8, b8]);
+            assert!(
+                pal >= 16 && pal <= 231,
+                "rgb555={rgb555} (r5={r5},g5={g5},b5={b5}) -> rgb888=({r8},{g8},{b8}) -> pal={pal} out of range"
+            );
+        }
+    }
+
+    #[test]
+    fn test_rgb555_roundtrip_all_values() {
+        // Verify that rgb888_to_rgb555(rgb555_to_rgb888(v)) == v for all 32768 values.
+        for v in 0u16..32768 {
+            let (r8, g8, b8) = rgb555_to_rgb888(v);
+            let roundtrip = rgb888_to_rgb555(r8, g8, b8);
+            assert_eq!(
+                roundtrip, v,
+                "RGB555 roundtrip failed for {v}: ({r8},{g8},{b8}) -> {roundtrip}"
+            );
+        }
+    }
 }
