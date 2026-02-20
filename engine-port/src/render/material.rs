@@ -70,7 +70,8 @@ fn create_grass_material() -> Material {
             let red_shift = elv * 8;
             mat.shade[elv as usize][dif as usize] = MatCell {
                 fg: [
-                    20u8.saturating_add(red_shift).saturating_add(brightness / 4),
+                    20u8.saturating_add(red_shift)
+                        .saturating_add(brightness / 4),
                     green_base,
                     10u8.saturating_add(brightness / 8),
                 ],
@@ -127,7 +128,8 @@ fn create_water_material() -> Material {
             mat.shade[elv as usize][dif as usize] = MatCell {
                 fg: [
                     20u8.saturating_add(elv_lighten),
-                    40u8.saturating_add(elv_lighten).saturating_add(brightness / 4),
+                    40u8.saturating_add(elv_lighten)
+                        .saturating_add(brightness / 4),
                     blue_base,
                 ],
                 gl: b'~',
@@ -141,6 +143,145 @@ fn create_water_material() -> Material {
         }
     }
     mat
+}
+
+use std::sync::LazyLock;
+
+/// Total byte count of the auto_mat LUT: 32 * 32 * 32 * 3 = 98,304.
+pub const AUTO_MAT_SIZE: usize = 32 * 32 * 32 * 3;
+
+/// Global lazily-initialized auto_mat LUT.
+///
+/// Computed once on first access. Maps every RGB555 color to a
+/// `(bg_palette, fg_palette, dither_glyph)` triple for xterm-256 rendering.
+pub static AUTO_MAT: LazyLock<Box<[u8; AUTO_MAT_SIZE]>> =
+    LazyLock::new(|| Box::new(create_auto_mat()));
+
+/// Generate the auto_mat LUT mapping RGB555 to `{bg_palette, fg_palette, dither_glyph}`.
+///
+/// Follows the exact algorithm from C++ `render.cpp:710-840`:
+/// 1. For each RGB555 `(r, g, b)` in `0..32`, compute floor/remainder in MCV-space (0-5).
+/// 2. Enumerate all pairs of 8 cube vertices on the xterm 6x6x6 color cube.
+/// 3. Find the pair with minimum perpendicular distance to the input color.
+/// 4. Project the input onto the best edge to get a dither shade level (0-11).
+/// 5. Map vertices to xterm-256 palette indices via `16 + 36*r5 + 6*g5 + b5`.
+///
+/// Returns a 98,304-byte array indexed by `3 * (r5 + 32 * g5 + 32 * 32 * b5)`.
+pub fn create_auto_mat() -> [u8; AUTO_MAT_SIZE] {
+    const MCV: i32 = 5;
+
+    // floor(MCV * x / 31) for x in 0..32
+    let flo: [i32; 32] = core::array::from_fn(|x| (MCV * x as i32) / 31);
+    // remainder: MCV*x - 31*flo[x]
+    let rem: [i32; 32] = core::array::from_fn(|x| MCV * x as i32 - 31 * flo[x]);
+
+    let glyph = [b' ', b'.', b'.', b':', b':', b'%'];
+
+    let mcv_to_5 = |mcv: i32| -> i32 { (mcv * 5 + MCV / 2) / MCV };
+
+    let mut mat = [0u8; AUTO_MAT_SIZE];
+
+    for b in 0..32i32 {
+        let pb = rem[b as usize];
+        let b_vals = [flo[b as usize], (flo[b as usize] + 1).min(MCV)];
+
+        for g in 0..32i32 {
+            let pg = rem[g as usize];
+            let g_vals = [flo[g as usize], (flo[g as usize] + 1).min(MCV)];
+
+            for r in 0..32i32 {
+                let pr = rem[r as usize];
+                let r_vals = [flo[r as usize], (flo[r as usize] + 1).min(MCV)];
+                let p = [pr, pg, pb];
+
+                let mut best_sd: f32 = -1.0;
+                let mut best_pr: f32 = 0.0;
+                let mut best_lo: usize = 0;
+                let mut best_hi: usize = 0;
+
+                // Check all pairs of 8 cube vertices
+                for lo in 0..7usize {
+                    let v0 = [r_vals[lo & 1], g_vals[(lo >> 1) & 1], b_vals[(lo >> 2) & 1]];
+                    let pv0 = [
+                        r_vals[0] * 31 + p[0] - v0[0] * 31,
+                        g_vals[0] * 31 + p[1] - v0[1] * 31,
+                        b_vals[0] * 31 + p[2] - v0[2] * 31,
+                    ];
+
+                    for hi in (lo + 1)..8usize {
+                        let v1 = [r_vals[hi & 1], g_vals[(hi >> 1) & 1], b_vals[(hi >> 2) & 1]];
+                        let v10 = [
+                            31 * (v1[0] - v0[0]),
+                            31 * (v1[1] - v0[1]),
+                            31 * (v1[2] - v0[2]),
+                        ];
+                        let v10_sqrlen = v10[0] * v10[0] + v10[1] * v10[1] + v10[2] * v10[2];
+
+                        let projection = if v10_sqrlen != 0 {
+                            (v10[0] * pv0[0] + v10[1] * pv0[1] + v10[2] * pv0[2]) as f32
+                                / v10_sqrlen as f32
+                        } else {
+                            0.0
+                        };
+
+                        let prp = [
+                            v10[0] as f32 * projection,
+                            v10[1] as f32 * projection,
+                            v10[2] as f32 * projection,
+                        ];
+                        let prv = [
+                            pv0[0] as f32 - prp[0],
+                            pv0[1] as f32 - prp[1],
+                            pv0[2] as f32 - prp[2],
+                        ];
+                        let sd = (prv[0] * prv[0] + prv[1] * prv[1] + prv[2] * prv[2]).sqrt();
+
+                        if sd < best_sd || best_sd < 0.0 {
+                            best_sd = sd;
+                            best_pr = projection;
+                            best_lo = lo;
+                            best_hi = hi;
+                        }
+                    }
+                }
+
+                let idx = 3 * (r + 32 * g + 32 * 32 * b) as usize;
+                let shd = ((best_pr * 11.0 + 0.5).floor() as i32).clamp(0, 11);
+
+                let palette_idx = |vert: usize| -> u8 {
+                    (16 + 36 * mcv_to_5(r_vals[vert & 1])
+                        + 6 * mcv_to_5(g_vals[(vert >> 1) & 1])
+                        + mcv_to_5(b_vals[(vert >> 2) & 1])) as u8
+                };
+
+                if shd < 6 {
+                    mat[idx] = palette_idx(best_lo);
+                    mat[idx + 1] = palette_idx(best_hi);
+                    mat[idx + 2] = glyph[shd as usize];
+                } else {
+                    mat[idx] = palette_idx(best_hi);
+                    mat[idx + 1] = palette_idx(best_lo);
+                    mat[idx + 2] = glyph[(11 - shd) as usize];
+                }
+            }
+        }
+    }
+    mat
+}
+
+/// Look up the auto_mat entry for an RGB555 color value.
+///
+/// Returns `(bg_palette, fg_palette, dither_glyph)` where palette indices
+/// are in the xterm-256 range (16-231) and dither_glyph is one of
+/// `b' '`, `b'.'`, `b':'`, or `b'%'`.
+#[inline]
+pub fn auto_mat_lookup(rgb555: u16) -> (u8, u8, u8) {
+    let r5 = (rgb555 & 0x1F) as usize;
+    let g5 = ((rgb555 >> 5) & 0x1F) as usize;
+    let b5 = ((rgb555 >> 10) & 0x1F) as usize;
+    let idx = 3 * (r5 + 32 * g5 + 32 * 32 * b5);
+    let lut = &*AUTO_MAT;
+    (lut[idx], lut[idx + 1], lut[idx + 2])
 }
 
 #[cfg(test)]
@@ -198,7 +339,11 @@ mod tests {
     #[test]
     fn test_materials_returns_at_least_3() {
         let mats = test_materials();
-        assert!(mats.len() >= 3, "expected at least 3 materials, got {}", mats.len());
+        assert!(
+            mats.len() >= 3,
+            "expected at least 3 materials, got {}",
+            mats.len()
+        );
     }
 
     #[test]
@@ -223,10 +368,7 @@ mod tests {
                     break;
                 }
             }
-            assert!(
-                has_non_default,
-                "material {i} has all-default values"
-            );
+            assert!(has_non_default, "material {i} has all-default values");
         }
     }
 
@@ -252,5 +394,130 @@ mod tests {
     fn material_default_has_zero_mode() {
         let mat = Material::default();
         assert_eq!(mat.mode, 0);
+    }
+
+    // --- auto_mat LUT tests ---
+
+    #[test]
+    fn auto_mat_lut_is_98304_bytes() {
+        let lut = create_auto_mat();
+        assert_eq!(lut.len(), 98304);
+        assert_eq!(lut.len(), AUTO_MAT_SIZE);
+    }
+
+    #[test]
+    fn auto_mat_lookup_pure_black() {
+        // RGB555 = (0, 0, 0) => bg should be palette 16 (black in xterm-256).
+        // fg may differ (dither partner) but glyph should be space (no dither visible).
+        let rgb555 = 0u16; // r=0, g=0, b=0
+        let (bg, fg, gl) = auto_mat_lookup(rgb555);
+        assert_eq!(bg, 16, "pure black bg should be palette 16");
+        assert!(
+            fg >= 16 && fg <= 231,
+            "pure black fg={fg} out of xterm range"
+        );
+        // At a cube vertex the projection is 0, so shd=0 => glyph = ' ' (space = no visible dither)
+        assert_eq!(gl, b' ', "pure black should have space glyph (no dither)");
+    }
+
+    #[test]
+    fn auto_mat_lookup_pure_white() {
+        // RGB555 = (31, 31, 31) => palette indices near 231 (white in xterm-256)
+        let rgb555 = 31 | (31 << 5) | (31 << 10); // r=31, g=31, b=31
+        let (bg, fg, _gl) = auto_mat_lookup(rgb555);
+        // white is 16 + 36*5 + 6*5 + 5 = 231
+        assert_eq!(bg, 231, "pure white bg should be palette 231");
+        assert_eq!(fg, 231, "pure white fg should be palette 231");
+    }
+
+    #[test]
+    fn auto_mat_lookup_mid_grey() {
+        // RGB555 = (16, 16, 16) => bg and fg should be adjacent palette colors
+        let rgb555 = 16 | (16 << 5) | (16 << 10);
+        let (bg, fg, _gl) = auto_mat_lookup(rgb555);
+        // Both should be valid xterm-256 indices
+        assert!(bg >= 16 && bg <= 231, "mid-grey bg={bg} out of range");
+        assert!(fg >= 16 && fg <= 231, "mid-grey fg={fg} out of range");
+        // bg and fg should differ by at most one step in each axis
+        // (adjacent cube vertices), or be equal if on a vertex
+        let bg_diff = (bg as i16 - fg as i16).unsigned_abs();
+        assert!(
+            bg_diff <= 43, // max diff = 36+6+1
+            "mid-grey bg={bg} fg={fg} diff={bg_diff} too large"
+        );
+    }
+
+    #[test]
+    fn auto_mat_lookup_pure_red() {
+        // RGB555 = (31, 0, 0) => should be in red column
+        let rgb555 = 31u16; // r=31, g=0, b=0
+        let (bg, fg, _gl) = auto_mat_lookup(rgb555);
+        // Pure red = 16 + 36*5 + 6*0 + 0 = 196
+        assert!(bg >= 16 && bg <= 231, "red bg={bg} out of range");
+        assert!(fg >= 16 && fg <= 231, "red fg={fg} out of range");
+        // At least one of bg/fg should be 196 (pure red in xterm-256)
+        assert!(
+            bg == 196 || fg == 196,
+            "pure red: expected at least one palette index = 196, got bg={bg} fg={fg}"
+        );
+    }
+
+    #[test]
+    fn auto_mat_all_entries_valid_palette_range() {
+        let lut = create_auto_mat();
+        for i in (0..AUTO_MAT_SIZE).step_by(3) {
+            let bg = lut[i];
+            let fg = lut[i + 1];
+            assert!(
+                bg >= 16 && bg <= 231,
+                "entry {}: bg={bg} out of xterm-256 cube range",
+                i / 3
+            );
+            assert!(
+                fg >= 16 && fg <= 231,
+                "entry {}: fg={fg} out of xterm-256 cube range",
+                i / 3
+            );
+        }
+    }
+
+    #[test]
+    fn auto_mat_all_glyphs_valid() {
+        let valid_glyphs = [b' ', b'.', b':', b'%'];
+        let lut = create_auto_mat();
+        for i in (0..AUTO_MAT_SIZE).step_by(3) {
+            let gl = lut[i + 2];
+            assert!(
+                valid_glyphs.contains(&gl),
+                "entry {}: glyph={gl} (0x{gl:02x}) not in valid set",
+                i / 3
+            );
+        }
+    }
+
+    #[test]
+    fn auto_mat_lazy_lock_works() {
+        // Force initialization of the LazyLock
+        let lut = &*AUTO_MAT;
+        assert_eq!(lut.len(), AUTO_MAT_SIZE);
+        // Verify it returns the same data as the function
+        let direct = create_auto_mat();
+        assert_eq!(&lut[..], &direct[..]);
+    }
+
+    #[test]
+    fn auto_mat_lookup_accessor_matches_direct() {
+        let lut = create_auto_mat();
+        // Test a handful of known RGB555 values
+        for rgb555 in [0u16, 100, 1000, 10000, 32767] {
+            let r5 = (rgb555 & 0x1F) as usize;
+            let g5 = ((rgb555 >> 5) & 0x1F) as usize;
+            let b5 = ((rgb555 >> 10) & 0x1F) as usize;
+            let idx = 3 * (r5 + 32 * g5 + 32 * 32 * b5);
+            let (bg, fg, gl) = auto_mat_lookup(rgb555);
+            assert_eq!(bg, lut[idx], "bg mismatch for rgb555={rgb555}");
+            assert_eq!(fg, lut[idx + 1], "fg mismatch for rgb555={rgb555}");
+            assert_eq!(gl, lut[idx + 2], "gl mismatch for rgb555={rgb555}");
+        }
     }
 }
