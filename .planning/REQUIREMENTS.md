@@ -16,8 +16,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Asset Loading
 
-- [ ] **ASSET-01**: XP sprite files load correctly (gzip decompression, CP437 glyphs, column-major layout, 3+ layer semantics)
-- [ ] **ASSET-02**: XP layer semantics preserved (L0=colorkey/metadata, L1=height, L2+=visual, last layer swoosh merge)
+- [x] **ASSET-01**: XP sprite files load correctly (gzip decompression, CP437 glyphs, column-major layout, 3+ layer semantics)
+- [x] **ASSET-02**: XP layer semantics preserved (L0=colorkey/metadata, L1=height, L2+=visual, last layer swoosh merge)
 - [ ] **ASSET-03**: A3D terrain files load correctly (AS3D magic 0x44335341, 188-byte FilePatch, HEIGHT_SCALE=16)
 - [ ] **ASSET-04**: A3D world files load correctly (format version detection, 3 instance variants, LoadWorld/UpdateMesh/RebuildWorld order)
 - [ ] **ASSET-05**: AKM mesh files load correctly (Blender export format)

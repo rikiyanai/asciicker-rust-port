@@ -5,33 +5,34 @@
 See: .planning/PROJECT.md (updated 2026-02-20)
 
 **Core value:** The CPU rasterizer must produce visually identical output to the C++ engine -- same glyphs, same colors, same depth ordering -- so that existing Asciicker worlds render correctly in the Rust port.
-**Current focus:** Phase 1: Foundation
+**Current focus:** Phase 2: Asset Parsers
 
 ## Current Position
 
-Phase: 1 of 7 (Foundation)
-Plan: 0 of ? in current phase
-Status: Ready to plan
-Last activity: 2026-02-20 -- Roadmap created
+Phase: 2 of 7 (Asset Parsers)
+Plan: 1 of 4 in current phase
+Status: Executing
+Last activity: 2026-02-20 -- Completed 02-01-PLAN.md (XP sprite parser)
 
-Progress: [..........] 0%
+Progress: [##........] 20%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0
-- Average duration: -
-- Total execution time: 0 hours
+- Total plans completed: 3
+- Average duration: ~6 min
+- Total execution time: ~0.3 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 1 - Foundation | 2 | ~12 min | ~6 min |
+| 2 - Asset Parsers | 1 | 6 min | 6 min |
 
 **Recent Trend:**
-- Last 5 plans: -
-- Trend: -
+- Last 5 plans: 01-01, 01-02, 02-01
+- Trend: Consistent ~6 min per plan
 
 *Updated after each plan completion*
 
@@ -45,6 +46,9 @@ Recent decisions affecting current work:
 - D001: Use Bevy 0.18 engine (ECS, input, audio, windowing)
 - D003: CPU rasterizer first, GPU only for final ASCII output
 - D010: Keep auto_mat initially, upgrade to Alex Harri 6D shape vectors later
+- 02-01: Used i32 for XP version field (format version is -1)
+- 02-01: Deferred full AverageGlyphTransp to Phase 5; basic swoosh merge (detect + lighten) in Phase 2
+- 02-01: Stored half_block_mask for future Phase 5 per-quadrant blending
 
 ### Pending Todos
 
@@ -59,5 +63,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Roadmap created, ready to plan Phase 1
+Stopped at: Completed 02-01-PLAN.md (XP sprite parser)
 Resume file: None
