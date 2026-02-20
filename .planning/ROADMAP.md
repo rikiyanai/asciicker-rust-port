@@ -114,12 +114,12 @@ Plans:
   3. The character renders with the correct equipment sprite (5D lookup: action x weapon x shield x helmet x armor x mount) and frame animation timing
   4. Water surfaces render with reflections (reflection stage re-runs terrain+world below water plane) and Perlin Z-perturbation ripple effect
   5. Physics runs at 15ms fixed timestep via Bevy FixedUpdate with max 10 substeps, maintaining 60fps with character + full scene
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 06-01: TBD
-- [ ] 06-02: TBD
-- [ ] 06-03: TBD
+- [ ] 06-01-PLAN.md -- Physics core: collision algorithm, forces, PhysicsIO, FixedUpdate (TDD, wave 1)
+- [ ] 06-02-PLAN.md -- Character: state machine, equipment, input, animation (TDD, wave 1)
+- [ ] 06-03-PLAN.md -- Water reflection, Perlin ripple, GamePlugin integration (wave 2)
 
 ### Phase 7: Game Systems
 **Goal**: Audio, multiplayer networking, weather effects, menus, and visual quality upgrades complete the game for v1 release
@@ -151,5 +151,5 @@ Note: Phases 3 and 4 are independent (both depend only on Phase 1) and can execu
 | 3. GPU Output | 0/? | Not started | - |
 | 4. CPU Rasterizer Core | 0/? | Not started | - |
 | 5. Pipeline Integration | 0/? | Not started | - |
-| 6. Physics and Character | 0/? | Not started | - |
+| 6. Physics and Character | 0/3 | Planned | - |
 | 7. Game Systems | 0/? | Not started | - |
