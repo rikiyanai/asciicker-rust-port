@@ -64,11 +64,12 @@ Plans:
   2. The font atlas (CP437 16x16 glyph grid) loads as a Bevy PNG asset and every glyph renders with correct proportions
   3. The render plugin uses Bevy's Extract/Prepare/Render pipeline with unconditional extraction of AsciiCellGrid from Main World to Render World every frame (no stale data)
   4. Resizing the window updates the AsciiCellGrid dimensions and the display adjusts without artifacts or crashes
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
+- [ ] 03-01-PLAN.md -- Font atlas, WGSL shader, GPU types, test pattern system (wave 1)
+- [ ] 03-02-PLAN.md -- Bevy ViewNode render pipeline with Extract/Prepare/Render (wave 2)
+- [ ] 03-03-PLAN.md -- Window resize handling + visual verification checkpoint (wave 3)
 
 ### Phase 4: CPU Rasterizer Core
 **Goal**: The CPU rasterizer produces correct AnsiCell output from hard-coded geometry, matching C++ reference output within the 1% cell difference threshold, at 60fps or better at 240x135 ASCII resolution
@@ -148,7 +149,7 @@ Note: Phases 3 and 4 are independent (both depend only on Phase 1) and can execu
 |-------|----------------|--------|-----------|
 | 1. Foundation | 2/2 | Complete | 2026-02-20 |
 | 2. Asset Parsers | 4/4 | Complete | 2026-02-20 |
-| 3. GPU Output | 0/? | Not started | - |
+| 3. GPU Output | 0/3 | Planned | - |
 | 4. CPU Rasterizer Core | 0/? | Not started | - |
 | 5. Pipeline Integration | 0/? | Not started | - |
 | 6. Physics and Character | 0/3 | Planned | - |
