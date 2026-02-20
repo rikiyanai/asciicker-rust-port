@@ -153,7 +153,7 @@ Note: Phases 3 and 4 are independent (both depend only on Phase 1) and can execu
 | 1. Foundation | 2/2 | Complete | 2026-02-20 |
 | 2. Asset Parsers | 4/4 | Complete | 2026-02-20 |
 | 3. GPU Output | 0/3 | Planned | - |
-| 4. CPU Rasterizer Core | 0/4 | Planned | - |
+| 4. CPU Rasterizer Core | 1/4 | In Progress | - |
 | 5. Pipeline Integration | 0/5 | Planned | - |
 | 6. Physics and Character | 0/3 | Planned | - |
 | 7. Game Systems | 0/? | Not started | - |

@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-20)
 
 **Core value:** The CPU rasterizer must produce visually identical output to the C++ engine -- same glyphs, same colors, same depth ordering -- so that existing Asciicker worlds render correctly in the Rust port.
-**Current focus:** Phase 2: Asset Parsers
+**Current focus:** Phase 4: CPU Rasterizer Core
 
 ## Current Position
 
-Phase: 2 of 7 (Asset Parsers) -- COMPLETE
-Plan: 4 of 4 in current phase (all plans complete)
-Status: Phase Complete
-Last activity: 2026-02-20 -- Completed 02-04-PLAN.md (Bevy asset integration + golden-file tests)
+Phase: 4 of 7 (CPU Rasterizer Core)
+Plan: 1 of 4 in current phase
+Status: Executing
+Last activity: 2026-02-20 -- Completed 04-01-PLAN.md (Sample/SampleBuffer rework + color quantization)
 
 Progress: [######....] 60%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
+- Total plans completed: 8
 - Average duration: ~5 min
-- Total execution time: ~0.5 hours
+- Total execution time: ~0.6 hours
 
 **By Phase:**
 
@@ -29,10 +29,12 @@ Progress: [######....] 60%
 |-------|-------|-------|----------|
 | 1 - Foundation | 2 | ~12 min | ~6 min |
 | 2 - Asset Parsers | 4 | 21 min | ~5 min |
+| 3 - GPU Output | 1 | 5 min | 5 min |
+| 4 - CPU Rasterizer Core | 1 | 6 min | 6 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-02, 02-01, 02-02, 02-03, 02-04
-- Trend: Consistent ~5 min per plan
+- Last 5 plans: 02-03, 02-04, 03-01, 04-01
+- Trend: Consistent ~5-6 min per plan
 
 *Updated after each plan completion*
 
@@ -58,6 +60,9 @@ Recent decisions affecting current work:
 - 02-04: TypePath derive required on loader structs (not just asset types) for Bevy 0.18 AssetLoader
 - 02-04: add_labeled_asset for A3D composite sub-assets (synchronous within async load)
 - 02-04: Bevy integration tests use MinimalPlugins + AssetPlugin with file_path for golden directory
+- 04-01: Sample clear state uses sky-blue RGB555 (0x6D8C) with MESH_FLAG, matching C++ init
+- 04-01: Removed supersample_factor; dimensions always 2*ascii+4 (implicit 2x + border)
+- 04-01: Used unsafe blocks in unsafe fn for Rust 2024 edition compliance
 
 ### Pending Todos
 
@@ -65,12 +70,11 @@ None yet.
 
 ### Blockers/Concerns
 
-- Existing skeleton has structural problems (wrong crate type, wrong audio version, no plugin architecture) -- Phase 1 must decide salvage vs restructure vs restart
 - bevy_kira_audio must be 0.25 (not 0.24) for Bevy 0.18 compatibility
 - lightyear 0.24.x Bevy 0.18 compatibility unverified (Phase 7 concern, not blocking now)
 
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 02-04-PLAN.md (Bevy asset integration + golden-file tests) -- Phase 2 complete
+Stopped at: Completed 04-01-PLAN.md (Sample/SampleBuffer rework + color quantization)
 Resume file: None
