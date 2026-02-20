@@ -45,6 +45,12 @@ pub struct AsciiGpuPlugin;
 
 impl Plugin for AsciiGpuPlugin {
     fn build(&self, app: &mut App) {
+        // Guard: only register GPU pipeline when RenderApp and AssetPlugin exist.
+        // MinimalPlugins (used in tests) have neither, so we skip gracefully.
+        if app.get_sub_app(RenderApp).is_none() {
+            return;
+        }
+
         // Embed the WGSL shader so it can be loaded from the render app.
         embedded_asset!(app, "shader.wgsl");
 
