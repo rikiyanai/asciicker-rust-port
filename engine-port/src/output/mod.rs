@@ -5,6 +5,7 @@ pub mod test_pattern;
 
 use bevy::image::ImageLoaderSettings;
 use bevy::prelude::*;
+use bevy::window::WindowResized;
 
 use ascii_cell_grid::AsciiCellGrid;
 use gpu_types::AsciiRenderConfig;
@@ -45,7 +46,10 @@ impl Plugin for AsciiOutputPlugin {
 
         app.add_plugins(gpu_plugin::AsciiGpuPlugin);
         app.add_systems(Startup, spawn_camera);
-        app.add_systems(Update, test_pattern::test_pattern_system);
+        app.add_systems(
+            Update,
+            (handle_window_resize, test_pattern::test_pattern_system).chain(),
+        );
     }
 }
 
@@ -55,4 +59,91 @@ impl Plugin for AsciiOutputPlugin {
 /// but a camera entity must exist for the Core2d render graph to execute.
 fn spawn_camera(mut commands: Commands) {
     commands.spawn(Camera2d);
+}
+
+/// Recalculates `AsciiCellGrid` dimensions when the window is resized.
+///
+/// New grid dimensions are computed as `window_size / font_size`. Zero-dimension
+/// resizes (window minimized or tiny) are ignored. When dimensions change, all
+/// three cell arrays (char_indices, fg_colors, bg_colors) are reallocated at the
+/// new cell count so the test pattern and rasterizer fill the correct number of cells.
+fn handle_window_resize(
+    resize_events: Option<MessageReader<WindowResized>>,
+    mut grid: ResMut<AsciiCellGrid>,
+    config: Res<AsciiRenderConfig>,
+) {
+    let Some(mut resize_events) = resize_events else {
+        return;
+    };
+    for event in resize_events.read() {
+        let Some((new_w, new_h)) = compute_grid_dimensions(
+            event.width,
+            event.height,
+            config.font_width,
+            config.font_height,
+        ) else {
+            continue;
+        };
+
+        if new_w != grid.width || new_h != grid.height {
+            let cell_count = (new_w * new_h) as usize;
+            grid.width = new_w;
+            grid.height = new_h;
+            grid.char_indices = vec![0; cell_count];
+            grid.fg_colors = vec![[0, 0, 0, 255]; cell_count];
+            grid.bg_colors = vec![[0, 0, 0, 255]; cell_count];
+        }
+    }
+}
+
+/// Compute new grid dimensions from window pixel size and font glyph dimensions.
+///
+/// Returns `None` if either dimension would be zero (e.g., minimized window).
+fn compute_grid_dimensions(
+    window_width: f32,
+    window_height: f32,
+    font_width: u32,
+    font_height: u32,
+) -> Option<(u32, u32)> {
+    let w = window_width as u32 / font_width;
+    let h = window_height as u32 / font_height;
+    if w == 0 || h == 0 { None } else { Some((w, h)) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resize_1280x720_with_10x16_font() {
+        // 1280 / 10 = 128, 720 / 16 = 45
+        let result = compute_grid_dimensions(1280.0, 720.0, 10, 16);
+        assert_eq!(result, Some((128, 45)));
+    }
+
+    #[test]
+    fn resize_1920x1080_with_10x16_font() {
+        // 1920 / 10 = 192, 1080 / 16 = 67
+        let result = compute_grid_dimensions(1920.0, 1080.0, 10, 16);
+        assert_eq!(result, Some((192, 67)));
+    }
+
+    #[test]
+    fn resize_zero_width_returns_none() {
+        let result = compute_grid_dimensions(5.0, 720.0, 10, 16);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn resize_zero_height_returns_none() {
+        let result = compute_grid_dimensions(1280.0, 10.0, 10, 16);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn resize_default_2400x2160_with_10x16_font() {
+        // Default window size that produces 240x135
+        let result = compute_grid_dimensions(2400.0, 2160.0, 10, 16);
+        assert_eq!(result, Some((240, 135)));
+    }
 }
