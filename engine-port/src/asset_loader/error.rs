@@ -35,6 +35,9 @@ pub enum AssetError {
     #[error("unexpected end of file at offset {0}")]
     UnexpectedEof(usize),
 
+    #[error("invalid transform matrix at instance {0} (NaN or Inf)")]
+    InvalidTransform(usize),
+
     #[error("parse error: {0}")]
     Parse(String),
 }

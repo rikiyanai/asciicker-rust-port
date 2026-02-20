@@ -135,7 +135,12 @@ pub fn parse_xp(bytes: &[u8]) -> Result<XpSprite, AssetError> {
 
     let width = width as u32;
     let height = height as u32;
-    let cells_per_layer = (width * height) as usize;
+    let cells_per_layer = width
+        .checked_mul(height)
+        .ok_or(AssetError::InvalidDimensions(
+            width as usize,
+            height as usize,
+        ))? as usize;
 
     let mut layers = Vec::with_capacity(num_layers);
     let mut offset: usize = 16; // Start after global header
@@ -369,6 +374,33 @@ mod tests {
     fn test_lighten_color() {
         assert_eq!(lighten_color([100, 100, 100]), [151, 151, 151]);
         assert_eq!(lighten_color([250, 200, 0]), [255, 251, 51]);
+    }
+
+    #[test]
+    fn test_checked_mul_overflow_dimensions() {
+        // Build a minimal valid gzip-compressed XP header with 65536x65536 dims.
+        // That overflows u32 (65536 * 65536 = 2^32, wraps to 0).
+        use flate2::write::GzEncoder;
+        use flate2::Compression;
+        use std::io::Write;
+
+        let mut header = Vec::new();
+        header.extend_from_slice(&(-1i32).to_le_bytes()); // version = -1
+        header.extend_from_slice(&3i32.to_le_bytes()); // num_layers = 3
+        header.extend_from_slice(&65536i32.to_le_bytes()); // width = 65536
+        header.extend_from_slice(&65536i32.to_le_bytes()); // height = 65536
+
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::fast());
+        encoder.write_all(&header).unwrap();
+        let compressed = encoder.finish().unwrap();
+
+        let result = parse_xp(&compressed);
+        assert!(result.is_err(), "65536x65536 should fail with overflow");
+        let err = result.unwrap_err();
+        match err {
+            AssetError::InvalidDimensions(_, _) => {} // Expected
+            other => panic!("Expected InvalidDimensions, got: {other}"),
+        }
     }
 
     #[test]

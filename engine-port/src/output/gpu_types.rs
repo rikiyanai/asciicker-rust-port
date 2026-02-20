@@ -62,6 +62,7 @@ pub fn extract_grid_data(grid: &AsciiCellGrid, config: &AsciiRenderConfig) -> Ex
 
     let mut char_data = Vec::with_capacity(cell_count * 4);
     for &idx in &grid.char_indices {
+        debug_assert!(idx <= 255, "Glyph index {idx} exceeds u8 range (0-255)");
         char_data.push(idx as u8); // R channel: glyph index (0-255)
         char_data.push(0); // G channel: unused
         char_data.push(0); // B channel: unused

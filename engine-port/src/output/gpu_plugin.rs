@@ -21,7 +21,7 @@ use bevy::render::{
         ColorTargetState, ColorWrites, Extent3d, FragmentState, PipelineCache,
         RenderPassDescriptor, RenderPipelineDescriptor, ShaderStages, TexelCopyBufferLayout,
         Texture, TextureDescriptor, TextureDimension, TextureFormat, TextureSampleType,
-        TextureUsages, TextureViewDescriptor,
+        TextureUsages, TextureView, TextureViewDescriptor,
         binding_types::{texture_2d, uniform_buffer_sized},
     },
     renderer::{RenderContext, RenderDevice, RenderQueue},
@@ -185,6 +185,12 @@ struct AsciiGpuTextures {
     back_texture: Option<Texture>,
     /// GPU texture for character indices (Rgba8Unorm, R channel = glyph index).
     text_texture: Option<Texture>,
+    /// Persistent TextureView for foreground texture (AUDIT-01: outlives BindGroup).
+    fore_view: Option<TextureView>,
+    /// Persistent TextureView for background texture (AUDIT-01: outlives BindGroup).
+    back_view: Option<TextureView>,
+    /// Persistent TextureView for text/glyph texture (AUDIT-01: outlives BindGroup).
+    text_view: Option<TextureView>,
     /// Uniform buffer for AsciiUniforms.
     uniform_buffer: Option<Buffer>,
     /// Bind group for textures (group 0).
@@ -223,6 +229,7 @@ fn prepare_ascii_textures(
 
     // Check if font atlas GpuImage is ready (Pitfall 4: async loading).
     let Some(font_gpu_image) = gpu_images.get(&font_handle.0) else {
+        warn!("ASCII GPU: font atlas not ready, skipping frame");
         return;
     };
 
@@ -246,9 +253,16 @@ fn prepare_ascii_textures(
             view_formats: &[],
         };
 
-        textures.fore_texture = Some(render_device.create_texture(&desc));
-        textures.back_texture = Some(render_device.create_texture(&desc));
-        textures.text_texture = Some(render_device.create_texture(&desc));
+        let fore_tex = render_device.create_texture(&desc);
+        let back_tex = render_device.create_texture(&desc);
+        let text_tex = render_device.create_texture(&desc);
+        let view_desc = TextureViewDescriptor::default();
+        textures.fore_view = Some(fore_tex.create_view(&view_desc));
+        textures.back_view = Some(back_tex.create_view(&view_desc));
+        textures.text_view = Some(text_tex.create_view(&view_desc));
+        textures.fore_texture = Some(fore_tex);
+        textures.back_texture = Some(back_tex);
+        textures.text_texture = Some(text_tex);
         textures.last_width = width;
         textures.last_height = height;
     }
@@ -309,23 +323,18 @@ fn prepare_ascii_textures(
     let texture_layout = pipeline_cache.get_bind_group_layout(&pipeline.texture_layout);
     let uniform_layout = pipeline_cache.get_bind_group_layout(&pipeline.uniform_layout);
 
-    if let (Some(fore_tex), Some(back_tex), Some(text_tex)) = (
-        &textures.fore_texture,
-        &textures.back_texture,
-        &textures.text_texture,
+    if let (Some(fore_view), Some(back_view), Some(text_view)) = (
+        &textures.fore_view,
+        &textures.back_view,
+        &textures.text_view,
     ) {
-        let view_desc = TextureViewDescriptor::default();
-        let fore_view = fore_tex.create_view(&view_desc);
-        let back_view = back_tex.create_view(&view_desc);
-        let text_view = text_tex.create_view(&view_desc);
-
         let texture_bind_group = render_device.create_bind_group(
             Some("ascii_texture_bind_group"),
             &texture_layout,
             &BindGroupEntries::sequential((
-                &fore_view,
-                &back_view,
-                &text_view,
+                fore_view,
+                back_view,
+                text_view,
                 &font_gpu_image.texture_view,
             )),
         );
