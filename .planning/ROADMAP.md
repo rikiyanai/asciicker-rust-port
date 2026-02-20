@@ -31,11 +31,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Running the binary opens a Bevy window and each plugin (AssetLoader, World, CpuRasterizer, AsciiOutput, Physics, Character, Game) registers without error
   3. Coordinate system convention (Z is UP) is enforced via a documented constant and compile-time type alias, not just comments
   4. SampleBuffer and AsciiCellGrid exist as Bevy Resources; a test system can write to SampleBuffer and read from AsciiCellGrid within the same frame
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
+- [ ] 01-01-PLAN.md -- Project setup, Z-up coordinates, 8 stub plugins
+- [ ] 01-02-PLAN.md -- ECS resources (SampleBuffer, AsciiCellGrid) with TDD
 
 ### Phase 2: Asset Parsers
 **Goal**: All original Asciicker binary asset formats (.xp sprites, .a3d terrain, .a3d world, .akm meshes) load correctly through Bevy's async asset system, validated by golden-file tests against known C++ reference output
