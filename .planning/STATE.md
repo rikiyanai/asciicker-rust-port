@@ -63,6 +63,9 @@ Recent decisions affecting current work:
 - 04-01: Sample clear state uses sky-blue RGB555 (0x6D8C) with MESH_FLAG, matching C++ init
 - 04-01: Removed supersample_factor; dimensions always 2*ascii+4 (implicit 2x + border)
 - 04-01: Used unsafe blocks in unsafe fn for Rust 2024 edition compliance
+- 03-01: Used Mage Core font1.png (10x16 per glyph) directly as CP437 atlas
+- 03-01: Graceful AssetServer fallback via get_resource (supports MinimalPlugins in tests)
+- 03-01: Shader imports Bevy fullscreen vertex output instead of custom vertex stage
 
 ### Pending Todos
 
