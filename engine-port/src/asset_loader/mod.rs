@@ -1,6 +1,8 @@
 use bevy::prelude::*;
 
 pub mod a3d_terrain;
+pub mod a3d_world;
+pub mod akm_mesh;
 pub mod constants;
 pub mod error;
 pub mod xp_sprite;
