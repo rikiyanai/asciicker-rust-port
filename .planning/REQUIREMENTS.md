@@ -205,10 +205,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | VIS-03 | Phase 7 | Pending |
 
 **Coverage:**
-- v1 requirements: 53 total
-- Mapped to phases: 53
+- v1 requirements: 57 total
+- Mapped to phases: 57
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-20*
-*Last updated: 2026-02-20 after initial definition*
+*Last updated: 2026-02-20 after roadmap creation*
