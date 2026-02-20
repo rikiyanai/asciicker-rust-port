@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 ## Current Position
 
 Phase: 4 of 7 (CPU Rasterizer Core)
-Plan: 1 of 4 in current phase
+Plan: 2 of 4 in current phase
 Status: Executing
-Last activity: 2026-02-20 -- Completed 04-01-PLAN.md (Sample/SampleBuffer rework + color quantization)
+Last activity: 2026-02-20 -- Completed 04-02-PLAN.md (Material system and auto_mat LUT)
 
-Progress: [######....] 60%
+Progress: [######....] 64%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
+- Total plans completed: 9
 - Average duration: ~5 min
-- Total execution time: ~0.6 hours
+- Total execution time: ~0.7 hours
 
 **By Phase:**
 
@@ -30,11 +30,11 @@ Progress: [######....] 60%
 | 1 - Foundation | 2 | ~12 min | ~6 min |
 | 2 - Asset Parsers | 4 | 21 min | ~5 min |
 | 3 - GPU Output | 1 | 5 min | 5 min |
-| 4 - CPU Rasterizer Core | 1 | 6 min | 6 min |
+| 4 - CPU Rasterizer Core | 2 | 14 min | 7 min |
 
 **Recent Trend:**
-- Last 5 plans: 02-03, 02-04, 03-01, 04-01
-- Trend: Consistent ~5-6 min per plan
+- Last 5 plans: 02-04, 03-01, 04-01, 04-02
+- Trend: Consistent ~5-8 min per plan
 
 *Updated after each plan completion*
 
@@ -66,6 +66,9 @@ Recent decisions affecting current work:
 - 03-01: Used Mage Core font1.png (10x16 per glyph) directly as CP437 atlas
 - 03-01: Graceful AssetServer fallback via get_resource (supports MinimalPlugins in tests)
 - 03-01: Shader imports Bevy fullscreen vertex output instead of custom vertex stage
+- 04-02: auto_mat uses Box<[u8; 98304]> + LazyLock to avoid 98KB stack allocation
+- 04-02: Pure black (0,0,0) correctly gets fg=52 dither partner with space glyph (invisible dither)
+- 04-02: mcv_to_5 formula (mcv*5+2)/5 matches C++ integer rounding for MCV-to-palette conversion
 
 ### Pending Todos
 
@@ -79,5 +82,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 04-01-PLAN.md (Sample/SampleBuffer rework + color quantization)
+Stopped at: Completed 04-02-PLAN.md (Material system and auto_mat LUT)
 Resume file: None
