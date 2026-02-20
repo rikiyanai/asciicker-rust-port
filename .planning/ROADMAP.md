@@ -99,12 +99,14 @@ Plans:
   3. Terrain quadtree with HEIGHT_CELLS=4 and VISUAL_CELLS=8 renders with frustum culling, and terrain shadows cast correctly via 64-bit bitmask per patch
   4. BSP tree traversal renders world geometry with frustum culling, all 4 node types functional (NODE, NODE_SHARE, LEAF, INST), and instance flags respected
   5. Golden-file CI comparison of full-scene AnsiCell output against C++ reference shows <1% cell difference
-**Plans**: TBD
+**Plans**: 5 plans
 
 Plans:
-- [ ] 05-01: TBD
-- [ ] 05-02: TBD
-- [ ] 05-03: TBD
+- [ ] 05-01-PLAN.md -- Terrain quadtree runtime with frustum query (wave 1)
+- [ ] 05-02-PLAN.md -- BSP tree runtime with SAH construction and frustum query (wave 1)
+- [ ] 05-03-PLAN.md -- Perspective camera, Q/E rotation, terrain shadows (wave 1)
+- [ ] 05-04-PLAN.md -- Pipeline orchestrator wiring 6 stages + deferred sprite blit (wave 2)
+- [ ] 05-05-PLAN.md -- Golden-file CI comparison infrastructure (wave 2)
 
 ### Phase 6: Physics and Character
 **Goal**: A player-controlled character moves through the rendered world with sphere-based collision physics, state-machine animations, and water/effects, producing a playable single-player experience
@@ -152,6 +154,6 @@ Note: Phases 3 and 4 are independent (both depend only on Phase 1) and can execu
 | 2. Asset Parsers | 4/4 | Complete | 2026-02-20 |
 | 3. GPU Output | 0/3 | Planned | - |
 | 4. CPU Rasterizer Core | 0/4 | Planned | - |
-| 5. Pipeline Integration | 0/? | Not started | - |
+| 5. Pipeline Integration | 0/5 | Planned | - |
 | 6. Physics and Character | 0/3 | Planned | - |
 | 7. Game Systems | 0/? | Not started | - |
