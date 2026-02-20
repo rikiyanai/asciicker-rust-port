@@ -158,4 +158,4 @@ Note: Phases 3 and 4 are independent (both depend only on Phase 1) and can execu
 | 4. CPU Rasterizer Core | 4/4 | Complete | 2026-02-20 |
 | 5. Pipeline Integration | 0/5 | Planned | - |
 | 6. Physics and Character | 0/3 | Planned | - |
-| 7. Game Systems | 0/5 | Not started | - |
+| 7. Game Systems | 0/5 | Planned | - |

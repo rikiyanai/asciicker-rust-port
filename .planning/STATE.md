@@ -5,16 +5,18 @@
 See: .planning/PROJECT.md (updated 2026-02-20)
 
 **Core value:** The CPU rasterizer must produce visually identical output to the C++ engine -- same glyphs, same colors, same depth ordering -- so that existing Asciicker worlds render correctly in the Rust port.
-**Current focus:** Phase 4: CPU Rasterizer Core
+**Current focus:** Phase 3: GPU Output (03-03 Task 2 human checkpoint pending)
 
 ## Current Position
 
-Phase: 4 of 7 (CPU Rasterizer Core) -- COMPLETE
-Plan: 4 of 4 in current phase
-Status: Phase Complete
-Last activity: 2026-02-20 -- Completed 04-04-PLAN.md (RESOLVE stage and pipeline skeleton)
+Phase: 3 of 7 (GPU Output) -- IN PROGRESS (Task 2 human checkpoint pending)
+Plan: 3 of 3 in current phase (03-03-PLAN.md Task 1 committed, Task 2 pending human verification)
+Status: Phase 4 complete (commit `0cdfc24`), Phase 3 awaiting human visual verification checkpoint
+Last activity: 2026-02-20 -- Applied MSAA fix (F005), committed resize handler (03-03 Task 1)
 
 Progress: [########..] 76%
+
+**Note:** Phase 4 completed in parallel with Phase 3 (both depend only on Phase 1). Phase 3 is blocked on human visual verification (03-03 Task 2). Three uncommitted changes exist: Msaa::Off fix on Camera2d, STATE.md decision entries, config.json trailing newline.
 
 ## Performance Metrics
 
@@ -33,8 +35,9 @@ Progress: [########..] 76%
 | 4 - CPU Rasterizer Core | 4 | 30 min | ~8 min |
 
 **Recent Trend:**
-- Last 5 plans: 04-01, 04-02, 04-03, 04-04
+- Last 5 plans: 03-02, 04-03, 04-04, 03-03 (Task 1 only)
 - Trend: Consistent ~7-8 min per plan
+- Note: 03-03 Task 2 is a human checkpoint (not automated)
 
 *Updated after each plan completion*
 
@@ -75,6 +78,8 @@ Recent decisions affecting current work:
 - 03-02: Guard AsciiGpuPlugin with RenderApp existence check before embedded_asset! (supports MinimalPlugins)
 - 03-02: ExtractedFontAtlasHandle as separate render-world resource for font atlas between extract and prepare
 - 03-02: RenderStartup schedule for pipeline init instead of Plugin::finish (Bevy 0.18 BlitPipeline pattern)
+- 03-03: Msaa::Off as Component on Camera2d (Bevy 0.18 moved MSAA from Resource to per-camera Component)
+- 03-03: Bevy 0.18 renamed EventReader to MessageReader (events are now "Messages")
 - 04-04: MaterialResolveCtx struct to group resolve parameters (clippy too-many-arguments)
 - 04-04: Mesh flag in combined spare OR determines mesh vs material path (matches C++ behavior)
 - 04-04: Elevation thresholds 0.5/2.0/5.0 for height-difference to 0-3 mapping
@@ -82,7 +87,10 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+- [ ] Phase 3 plan 03-03 Task 2: Human visual verification checkpoint (run `cargo run` from engine-port/, verify checkerboard renders, test window resize)
+- [ ] Commit uncommitted Msaa::Off fix on Camera2d in `engine-port/src/output/mod.rs` (F005 resolution)
+- [ ] Phase 4 REND-10: Release-mode performance benchmark not yet executed (human-verification item from 04-VERIFICATION.md)
+- [ ] Commit STATE.md and config.json uncommitted changes
 
 ### Blockers/Concerns
 
@@ -92,5 +100,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 04-04-PLAN.md (RESOLVE stage and pipeline skeleton) -- Phase 4 complete
+Stopped at: Phase 4 complete (commit `0cdfc24`). Phase 3 plan 03-03 Task 1 committed (`0dfe33d`), Task 2 (human visual checkpoint) pending. Three uncommitted changes: Msaa::Off fix, STATE.md updates, config.json trailing newline.
 Resume file: None
