@@ -45,7 +45,7 @@ pub enum WorldInstance {
 }
 
 /// Parsed world section from an .a3d file.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, bevy::asset::Asset, bevy::reflect::TypePath)]
 pub struct A3dWorld {
     pub format_version: u32,
     pub instances: Vec<WorldInstance>,

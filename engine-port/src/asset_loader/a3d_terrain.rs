@@ -72,7 +72,7 @@ pub struct TerrainPatch {
 }
 
 /// Collection of all terrain patches from the A3D terrain section.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, bevy::asset::Asset, bevy::reflect::TypePath)]
 pub struct A3dTerrain {
     pub patches: Vec<TerrainPatch>,
 }
@@ -92,7 +92,7 @@ const _ASSERT_MAT_CELL_SIZE: () = assert!(
 );
 
 /// Material lookup table: 256 materials, each with 4 elevations x 16 diffuse levels.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, bevy::asset::Asset, bevy::reflect::TypePath)]
 pub struct MaterialTable {
     pub materials: Vec<[[MatCell; 16]; 4]>,
 }

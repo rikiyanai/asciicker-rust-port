@@ -37,7 +37,7 @@ pub struct AkmEdge {
 }
 
 /// Parsed AKM mesh (ASCII PLY format from Blender export).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, bevy::asset::Asset, bevy::reflect::TypePath)]
 pub struct AkmMesh {
     pub vertices: Vec<AkmVertex>,
     pub faces: Vec<AkmFace>,

@@ -38,7 +38,7 @@ pub struct XpLayer {
 }
 
 /// A parsed XP sprite with all layers.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, bevy::asset::Asset, bevy::reflect::TypePath)]
 pub struct XpSprite {
     /// Format version (typically -1).
     pub version: i32,
