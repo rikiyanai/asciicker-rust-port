@@ -9,10 +9,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Foundation
 
-- [ ] **FOUND-01**: Project compiles with Bevy 0.18 using `default-features = false` and custom feature set
-- [ ] **FOUND-02**: Plugin-per-subsystem architecture established (AssetLoader, World, CpuRasterizer, AsciiOutput, Physics, Character, Game)
-- [ ] **FOUND-03**: Coordinate system convention documented and enforced (Z is UP)
-- [ ] **FOUND-04**: ECS resource/entity mapping defined (SampleBuffer and AsciiCellGrid as Resources, instances as Entities)
+- [x] **FOUND-01**: Project compiles with Bevy 0.18 using `default-features = false` and custom feature set
+- [x] **FOUND-02**: Plugin-per-subsystem architecture established (AssetLoader, World, CpuRasterizer, AsciiOutput, Physics, Character, Game)
+- [x] **FOUND-03**: Coordinate system convention documented and enforced (Z is UP)
+- [x] **FOUND-04**: ECS resource/entity mapping defined (SampleBuffer and AsciiCellGrid as Resources, instances as Entities)
 
 ### Asset Loading
 
@@ -21,8 +21,8 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **ASSET-03**: A3D terrain files load correctly (AS3D magic 0x44335341, 188-byte FilePatch, HEIGHT_SCALE=16)
 - [x] **ASSET-04**: A3D world files load correctly (format version detection, 3 instance variants, LoadWorld/UpdateMesh/RebuildWorld order)
 - [x] **ASSET-05**: AKM mesh files load correctly (Blender export format)
-- [ ] **ASSET-06**: Asset loaders integrate with Bevy AssetServer (async loading, Handle-based references)
-- [ ] **ASSET-07**: Golden-file tests validate parser output against known C++ reference data
+- [x] **ASSET-06**: Asset loaders integrate with Bevy AssetServer (async loading, Handle-based references)
+- [x] **ASSET-07**: Golden-file tests validate parser output against known C++ reference data
 
 ### Rendering Pipeline
 
@@ -146,17 +146,17 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUND-01 | Phase 1 | Pending |
-| FOUND-02 | Phase 1 | Pending |
-| FOUND-03 | Phase 1 | Pending |
-| FOUND-04 | Phase 1 | Pending |
-| ASSET-01 | Phase 2 | Pending |
-| ASSET-02 | Phase 2 | Pending |
+| FOUND-01 | Phase 1 | Complete |
+| FOUND-02 | Phase 1 | Complete |
+| FOUND-03 | Phase 1 | Complete |
+| FOUND-04 | Phase 1 | Complete |
+| ASSET-01 | Phase 2 | Complete |
+| ASSET-02 | Phase 2 | Complete |
 | ASSET-03 | Phase 2 | Complete |
 | ASSET-04 | Phase 2 | Complete |
 | ASSET-05 | Phase 2 | Complete |
-| ASSET-06 | Phase 2 | Pending |
-| ASSET-07 | Phase 2 | Pending |
+| ASSET-06 | Phase 2 | Complete |
+| ASSET-07 | Phase 2 | Complete |
 | GPU-01 | Phase 3 | Pending |
 | GPU-02 | Phase 3 | Pending |
 | GPU-03 | Phase 3 | Pending |

@@ -9,29 +9,29 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 
 ## Current Position
 
-Phase: 2 of 7 (Asset Parsers)
-Plan: 3 of 4 in current phase
-Status: Executing
-Last activity: 2026-02-20 -- Completed 02-03-PLAN.md (A3D world + AKM mesh parsers)
+Phase: 2 of 7 (Asset Parsers) -- COMPLETE
+Plan: 4 of 4 in current phase (all plans complete)
+Status: Phase Complete
+Last activity: 2026-02-20 -- Completed 02-04-PLAN.md (Bevy asset integration + golden-file tests)
 
-Progress: [####......] 40%
+Progress: [######....] 60%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
+- Total plans completed: 6
 - Average duration: ~5 min
-- Total execution time: ~0.4 hours
+- Total execution time: ~0.5 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1 - Foundation | 2 | ~12 min | ~6 min |
-| 2 - Asset Parsers | 3 | 16 min | ~5 min |
+| 2 - Asset Parsers | 4 | 21 min | ~5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01, 01-02, 02-01, 02-02, 02-03
+- Last 5 plans: 01-02, 02-01, 02-02, 02-03, 02-04
 - Trend: Consistent ~5 min per plan
 
 *Updated after each plan completion*
@@ -55,6 +55,9 @@ Recent decisions affecting current work:
 - 02-03: Cursor-based binary parsing with read helpers for variable-length world section
 - 02-03: Hand-rolled PLY parser with property_code mapping instead of ply-rs
 - 02-03: Default alpha=255 when PLY file lacks alpha property
+- 02-04: TypePath derive required on loader structs (not just asset types) for Bevy 0.18 AssetLoader
+- 02-04: add_labeled_asset for A3D composite sub-assets (synchronous within async load)
+- 02-04: Bevy integration tests use MinimalPlugins + AssetPlugin with file_path for golden directory
 
 ### Pending Todos
 
@@ -69,5 +72,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 02-03-PLAN.md (A3D world + AKM mesh parsers)
+Stopped at: Completed 02-04-PLAN.md (Bevy asset integration + golden-file tests) -- Phase 2 complete
 Resume file: None

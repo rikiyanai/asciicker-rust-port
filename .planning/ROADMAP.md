@@ -12,8 +12,8 @@ This roadmap takes the Asciicker C++ game engine (82K lines, custom CPU software
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundation** - Compiling Bevy 0.18 skeleton with plugin-per-subsystem architecture and ECS conventions
-- [ ] **Phase 2: Asset Parsers** - XP sprite and A3D world/terrain binary file loaders with golden-file tests
+- [x] **Phase 1: Foundation** - Compiling Bevy 0.18 skeleton with plugin-per-subsystem architecture and ECS conventions
+- [x] **Phase 2: Asset Parsers** - XP sprite and A3D world/terrain binary file loaders with golden-file tests
 - [ ] **Phase 3: GPU Output** - Bevy render plugin displaying ASCII glyphs via Mage Core 4-texture WGSL shader
 - [ ] **Phase 4: CPU Rasterizer Core** - SampleBuffer, triangle/line rasterization, materials, color quantization, and RESOLVE stage
 - [ ] **Phase 5: Pipeline Integration** - Full 6-stage rendering pipeline producing real scene output from .a3d world files
@@ -34,8 +34,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 2 plans
 
 Plans:
-- [ ] 01-01-PLAN.md -- Project setup, Z-up coordinates, 8 stub plugins
-- [ ] 01-02-PLAN.md -- ECS resources (SampleBuffer, AsciiCellGrid) with TDD
+- [x] 01-01-PLAN.md -- Project setup, Z-up coordinates, 8 stub plugins
+- [x] 01-02-PLAN.md -- ECS resources (SampleBuffer, AsciiCellGrid) with TDD
 
 ### Phase 2: Asset Parsers
 **Goal**: All original Asciicker binary asset formats (.xp sprites, .a3d terrain, .a3d world, .akm meshes) load correctly through Bevy's async asset system, validated by golden-file tests against known C++ reference output
@@ -53,7 +53,7 @@ Plans:
 - [x] 02-01-PLAN.md -- XP sprite parser with shared error/constants (TDD, wave 1)
 - [x] 02-02-PLAN.md -- A3D terrain and material table parsers (TDD, wave 1)
 - [x] 02-03-PLAN.md -- A3D world and AKM mesh parsers (TDD, wave 1)
-- [ ] 02-04-PLAN.md -- Bevy AssetLoader integration and golden-file tests (wave 2)
+- [x] 02-04-PLAN.md -- Bevy AssetLoader integration and golden-file tests (wave 2)
 
 ### Phase 3: GPU Output
 **Goal**: A Bevy render plugin displays an AsciiCellGrid as colored CP437 glyphs in a window using the Mage Core 4-texture WGSL shader approach, independent of the CPU rasterizer
@@ -146,8 +146,8 @@ Note: Phases 3 and 4 are independent (both depend only on Phase 1) and can execu
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/? | Not started | - |
-| 2. Asset Parsers | 3/4 | In progress | - |
+| 1. Foundation | 2/2 | Complete | 2026-02-20 |
+| 2. Asset Parsers | 4/4 | Complete | 2026-02-20 |
 | 3. GPU Output | 0/? | Not started | - |
 | 4. CPU Rasterizer Core | 0/? | Not started | - |
 | 5. Pipeline Integration | 0/? | Not started | - |
