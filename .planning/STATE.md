@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 
 ## Current Position
 
-Phase: 4 of 7 (CPU Rasterizer Core)
-Plan: 3 of 4 in current phase
-Status: Executing
-Last activity: 2026-02-20 -- Completed 04-03-PLAN.md (Rasterizer core: Bresenham + barycentric triangle)
+Phase: 4 of 7 (CPU Rasterizer Core) -- COMPLETE
+Plan: 4 of 4 in current phase
+Status: Phase Complete
+Last activity: 2026-02-20 -- Completed 04-04-PLAN.md (RESOLVE stage and pipeline skeleton)
 
-Progress: [#######...] 68%
+Progress: [########..] 76%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11
+- Total plans completed: 12
 - Average duration: ~5 min
-- Total execution time: ~0.9 hours
+- Total execution time: ~1.0 hours
 
 **By Phase:**
 
@@ -30,11 +30,11 @@ Progress: [#######...] 68%
 | 1 - Foundation | 2 | ~12 min | ~6 min |
 | 2 - Asset Parsers | 4 | 21 min | ~5 min |
 | 3 - GPU Output | 2 | 15 min | ~8 min |
-| 4 - CPU Rasterizer Core | 3 | 22 min | ~7 min |
+| 4 - CPU Rasterizer Core | 4 | 30 min | ~8 min |
 
 **Recent Trend:**
-- Last 5 plans: 04-01, 04-02, 04-03, 03-02
-- Trend: Consistent ~6-8 min per plan
+- Last 5 plans: 04-01, 04-02, 04-03, 04-04
+- Trend: Consistent ~7-8 min per plan
 
 *Updated after each plan completion*
 
@@ -75,6 +75,10 @@ Recent decisions affecting current work:
 - 03-02: Guard AsciiGpuPlugin with RenderApp existence check before embedded_asset! (supports MinimalPlugins)
 - 03-02: ExtractedFontAtlasHandle as separate render-world resource for font atlas between extract and prepare
 - 03-02: RenderStartup schedule for pipeline init instead of Plugin::finish (Bevy 0.18 BlitPipeline pattern)
+- 04-04: MaterialResolveCtx struct to group resolve parameters (clippy too-many-arguments)
+- 04-04: Mesh flag in combined spare OR determines mesh vs material path (matches C++ behavior)
+- 04-04: Elevation thresholds 0.5/2.0/5.0 for height-difference to 0-3 mapping
+- 04-04: Grid overlay uses positional parity for +/-/| selection (simplified for Phase 4)
 
 ### Pending Todos
 
@@ -88,5 +92,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 03-02-PLAN.md (GPU render pipeline with ViewNode)
+Stopped at: Completed 04-04-PLAN.md (RESOLVE stage and pipeline skeleton) -- Phase 4 complete
 Resume file: None
