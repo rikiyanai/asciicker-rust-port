@@ -21,7 +21,7 @@ The existing `AsciiCellGrid` resource (already in `src/output/ascii_cell_grid.rs
 | GPU-02 | WGSL fullscreen shader composites glyphs with correct fg/bg colors | Mage Core shader.wgsl analyzed (83 lines); font lookup math verified; adaptation to Bevy's fullscreen vertex shader documented |
 | GPU-03 | Font atlas loaded as Bevy PNG asset (CP437 16x16 glyph grid) | Two reference atlases found (Mage Core 10x16px/glyph, Godot 12x12px/glyph); Bevy AssetServer PNG loading verified; font dimensions passed as uniforms |
 | GPU-04 | Correct Extract/Prepare/Render world pipeline with unconditional extraction | Bevy Extract/Prepare/Queue/Render stage architecture researched; ExtractResource pattern for AsciiCellGrid documented; unconditional extraction strategy defined |
-| GPU-05 | Window resize handled correctly (AsciiCellGrid dimensions update) | WindowResized event + EventReader pattern documented; texture recreation on resize (from Mage Core resize()) analyzed; grid dimension recalculation approach defined |
+| GPU-05 | Window resize handled correctly (AsciiCellGrid dimensions update) | WindowResized event + MessageReader pattern documented (R10-L01 FIX: EventReader renamed to MessageReader in Bevy 0.18); texture recreation on resize (from Mage Core resize()) analyzed; grid dimension recalculation approach defined |
 </phase_requirements>
 
 ## Standard Stack
