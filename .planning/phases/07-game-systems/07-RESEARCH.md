@@ -44,7 +44,7 @@ The audio subsystem is the most straightforward: bevy_kira_audio 0.25 provides B
 
 | Library | Version | Purpose | When to Use |
 |---------|---------|---------|-------------|
-| bevy_replicon_renet | latest | Transport bridge between bevy_replicon and renet | Required to connect bevy_replicon's replication layer to actual network I/O |
+| bevy_replicon_renet2 | 0.13 | Transport bridge between bevy_replicon and renet2 | Required to connect bevy_replicon's replication layer to actual network I/O. **P7-213 FIX (LOW):** Old name `bevy_replicon_renet` (without "2") does NOT support Bevy 0.18 — per MEMORY.md and P7-109 FIX in 07-03, the correct crate is `bevy_replicon_renet2 = "0.13"`. |
 | serde + bincode | latest | Binary serialization for network protocol | If adapting C++ binary protocol to Rust; bincode for compact binary encoding |
 | tungstenite | latest | WebSocket framing (optional) | Only if browser client compatibility is required for NET-02 |
 
@@ -63,6 +63,8 @@ The audio subsystem is the most straightforward: bevy_kira_audio 0.25 provides B
 bevy_kira_audio = "0.25"
 bevy_replicon = "0.38"
 bevy_replicon_renet = { version = "*" }  # match bevy_replicon 0.38
+# **P7-060 FIX:** INVALID: Wildcard `version = "*"` is prohibited by crates.io. Use a specific
+# version, determined at execution time via `cargo search bevy_replicon_renet`.
 kiddo = "5.2"
 noise = "0.9"
 serde = { version = "1", features = ["derive"] }
@@ -133,7 +135,9 @@ fn play_footstep(
 ) {
     let channel = dynamic_channels.create_channel("track_0");
     channel.play(asset_server.load("samples/footsteps.ogg"))
-        .with_volume(Volume::new(0.5));
+        .with_volume(Volume::Amplitude(0.5_f64));
+        // **P7-110 FIX (HIGH):** Code updated from stale `Volume::new(0.5)` to correct Bevy 0.18
+        // API `Volume::Amplitude(0.5_f64)`. `Volume::new()` does not exist in bevy_kira_audio 0.25.
 }
 ```
 
@@ -144,11 +148,15 @@ fn play_footstep(
 ```rust
 use kiddo::KdTree;
 
+// **P7-119 FIX (LOW):** Code updated to show correct LruCache type (was stale HashMap).
+// LruCache is required to bound memory at 8192 entries (R61 FIX). HashMap grows without limit.
 struct ShapeVectorMatcher {
-    tree: KdTree<f32, 6>,           // 6D k-d tree of character vectors
-    cache: HashMap<u32, u8>,         // quantized 30-bit key -> CP437 glyph
+    tree: KdTree<f32, 6>,            // 6D k-d tree of character vectors
+    cache: LruCache<u32, u8>,        // quantized 30-bit key -> CP437 glyph (bounded: 8192 entries)
     characters: Vec<CharacterEntry>, // glyph + 6D vector pairs
 }
+// Note: use lru::LruCache with capacity NonZeroUsize::new(8192).unwrap()
+// Do NOT use HashMap here — unbounded growth causes memory issues in complex scenes (R61).
 
 impl ShapeVectorMatcher {
     fn find_glyph(&mut self, sampling_vector: [f32; 6]) -> u8 {
@@ -163,10 +171,12 @@ impl ShapeVectorMatcher {
     }
 }
 
+// P7-001 FIX: Use 5-bit quantization (32 levels) to match "5 bits per component, 30-bit key".
+// Previous code used *8.0/.min(7) (3-bit, 8 levels) but shifted by 5 bits, wasting 2 bits per slot.
 fn quantize_to_key(vector: &[f32; 6]) -> u32 {
     let mut key: u32 = 0;
     for &v in vector {
-        let quantized = ((v * 8.0).floor() as u32).min(7);
+        let quantized = ((v * 32.0).floor() as u32).min(31); // 5 bits: 0-31
         key = (key << 5) | quantized;
     }
     key
@@ -292,7 +302,10 @@ fn play_sound_effect(
     let track_name = format!("track_{}", mixer.track_round_robin);
     let channel = dynamic_channels.create_channel(&track_name);
     channel.play(asset_server.load("samples/footsteps.ogg"))
-        .with_volume(Volume::new(mixer.volume as f64));
+        .with_volume(Volume::Amplitude(mixer.volume as f64));
+        // **P7-110 FIX (HIGH):** Code updated from stale `Volume::new(mixer.volume as f64)` to
+        // correct Bevy 0.18 API `Volume::Amplitude(mixer.volume as f64)`.
+        // `Volume::new()` does not exist in bevy_kira_audio 0.25.
     mixer.track_round_robin = (mixer.track_round_robin + 1) % PLY_TRACKS;
 }
 ```
@@ -341,12 +354,16 @@ const SAMPLING_POINTS: [[f32; 2]; 6] = [
 
 fn sample_cell_vector(
     buffer: &SampleBuffer,
+    materials: &[Material],  // P7-003 FIX: required for terrain lightness path
     cell_x: usize,
     cell_y: usize,
 ) -> [f32; 6] {
     let mut vector = [0.0f32; 6];
     // Each ASCII cell corresponds to a 2x2 block in the supersampled buffer
-    let sx = cell_x * 2 + 2; // +2 for border offset
+    // **P7-214 NOTE (LOW):** `+2` is the 2-pixel left/top border of SampleBuffer (matches
+    // resolve.rs lines 50-51: `let sx = 2 + 2 * cx`). The total border is 4px (2 each side),
+    // and this `+2` correctly offsets to the first valid sample cell. Comment is accurate.
+    let sx = cell_x * 2 + 2; // +2 for border offset (2px on each side; left/top adds 2)
     let sy = cell_y * 2 + 2;
 
     for (i, [px, py]) in SAMPLING_POINTS.iter().enumerate() {
@@ -354,16 +371,49 @@ fn sample_cell_vector(
         let sample_x = sx as f32 + px * 2.0;
         let sample_y = sy as f32 + py * 2.0;
 
-        // Bilinear sample the SampleBuffer for lightness
-        let sample = buffer.get_sample(sample_x as usize, sample_y as usize);
-        vector[i] = sample_to_lightness(sample);
+        // **P7-202 FIX (CRITICAL):** `buffer.get_sample(usize, usize)` does NOT exist.
+        // The correct API is `SampleBuffer::sample_at(x: u32, y: u32) -> &Sample`.
+        // Also: the code below originally did point sampling (truncating to integer), but
+        // P7-057 FIX (AUTHORITATIVE) requires BILINEAR interpolation (circleRadius=0.19375
+        // normalised → 0.3875 buffer pixels, sub-pixel — bilinear captures this correctly).
+        // Correct bilinear sampling across 4 integer-coordinate samples:
+        let x0 = sample_x.floor() as u32;
+        let y0 = sample_y.floor() as u32;
+        let x1 = x0 + 1;
+        let y1 = y0 + 1;
+        let tx = sample_x - sample_x.floor();
+        let ty = sample_y - sample_y.floor();
+        // All four sample_at calls use u32 (NOT usize):
+        let s00 = sample_to_lightness(buffer.sample_at(x0, y0), materials);
+        let s10 = sample_to_lightness(buffer.sample_at(x1, y0), materials);
+        let s01 = sample_to_lightness(buffer.sample_at(x0, y1), materials);
+        let s11 = sample_to_lightness(buffer.sample_at(x1, y1), materials);
+        vector[i] = s00 * (1.0 - tx) * (1.0 - ty)
+                  + s10 * tx * (1.0 - ty)
+                  + s01 * (1.0 - tx) * ty
+                  + s11 * tx * ty;
     }
     vector
 }
 
-fn sample_to_lightness(sample: &Sample) -> f32 {
-    // Convert RGB555 or material color to perceptual lightness [0, 1]
-    let (r, g, b) = sample.to_rgb888();
+// **P7-202 FIX (CRITICAL) / P7-047 FIX:** `sample.to_rgb888()` does NOT exist on `Sample`.
+// Use the dual-path implementation from P7-002/P7-003 FIX.
+// Signature updated to accept `materials` parameter for terrain lightness.
+fn sample_to_lightness(sample: &Sample, materials: &[Material]) -> f32 {
+    // Convert RGB555 (mesh) or material index (terrain) to perceptual lightness [0, 1]
+    let (r, g, b) = if sample.spare & MESH_FLAG != 0 {
+        // Mesh path: visual is RGB555 — expand to RGB888
+        rgb555_to_rgb888(sample.visual)
+    } else {
+        // Terrain path: visual is a material index — look up the shade table fg color
+        let mat_idx = sample.visual as usize;
+        if mat_idx < materials.len() {
+            let mat = &materials[mat_idx];
+            (mat.shade_table[0][0], mat.shade_table[0][1], mat.shade_table[0][2])
+        } else {
+            (0u8, 0u8, 0u8)
+        }
+    };
     (0.2126 * r as f32 + 0.7152 * g as f32 + 0.0722 * b as f32) / 255.0
 }
 ```
@@ -373,6 +423,8 @@ fn sample_to_lightness(sample: &Sample) -> f32 {
 // Source: C++ weather.cpp ParticlePool + weather state machine
 use noise::{NoiseFn, Perlin};
 
+// **P7-056 FIX:** STALE: Plan 07-05 uses `lifetime_remaining: f32` (simpler countdown) instead
+// of `birth_us: u64`/`lifetime_us: u64` from this C++ design.
 #[derive(Clone, Copy, Default)]
 struct WeatherParticle {
     pos: [f32; 3],

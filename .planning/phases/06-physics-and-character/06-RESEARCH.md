@@ -8,7 +8,7 @@
 
 Phase 6 ports three tightly coupled C++ subsystems to Rust/Bevy: (1) the sphere-based TOI sweep collision engine from `physics.cpp` (~2350 lines), (2) the character state machine, equipment system, and animation timing from `game.cpp`/`game.h` (~600 lines of relevant code), and (3) the water reflection/Perlin ripple effect from `render.cpp` Stage 5 + resolve pass. The physics system is self-contained with a clean PhysicsIO boundary pattern that decouples game logic from collision internals. The character system maps naturally to Bevy ECS with components for state, equipment, and animation. Water rendering extends the existing Stage 5 reflection pass (which should exist from Phase 5) with Perlin Z-perturbation in the resolve stage.
 
-The core complexity is in the collision sweep algorithm (face/edge/vertex tests against triangle soup in sphere-space), which is pure math with no external dependencies. Bevy's `FixedUpdate` schedule directly replaces the C++ 15ms fixed timestep loop, with the default being 15625us (~64Hz) which is close enough to the C++ 15000us (~66Hz) -- configurable via `Time::<Fixed>::from_hz()`. The PhysicsIO input/output pattern translates cleanly to Bevy resources.
+The core complexity is in the collision sweep algorithm (face/edge/vertex tests against triangle soup in sphere-space), which is pure math with no external dependencies. Bevy's `FixedUpdate` schedule directly replaces the C++ 15ms fixed timestep loop, with the default being 15625us (~64Hz) -- **P6-128 FIX (LOW): NOT close enough: 64Hz vs 66.667Hz is a 4% difference. The Bevy default (64Hz) MUST be overridden with `Time::<Fixed>::from_hz(66.667)`. Failing to do so causes a 4% physics speed mismatch.** Configurable via `Time::<Fixed>::from_hz()`. The PhysicsIO input/output pattern translates cleanly to Bevy resources.
 
 **Primary recommendation:** Port physics as a standalone math module with trait-based geometry queries, character as ECS components with a state machine system, and water as an extension to the existing render pipeline. Use Bevy `FixedUpdate` at 66Hz to match C++ timestep exactly. Use the `noise` crate (v0.9+) for Perlin noise.
 
@@ -110,7 +110,10 @@ pub struct PhysicsIO {
 ### Pattern 2: Character State Machine as ECS Component
 **What:** Character action state stored as a Bevy component with enum variants and transition guards.
 **When to use:** Every character entity (player and NPCs).
-**Example:**
+
+**P6-116 FIX (HIGH) STALE:** Plan 06-02 extends to 6 variants (adding `Block`). This RESEARCH example shows the C++ baseline only (5 variants). Do not use this example as the authoritative state machine — use Plan 06-02's Task 1 definition.
+
+**Example (C++ baseline only — see Plan 06-02 for the full 6-variant Rust definition):**
 ```rust
 // Source: game.h ACTION enum + SetAction* methods (verified from C++ source)
 #[derive(Component, Default, Clone, Copy, PartialEq, Eq)]
@@ -121,6 +124,7 @@ pub enum ActionState {
     Fall,
     Dead,
     Stand,    // standing up from fall
+    // NOTE: Block variant added in Plan 06-02 per CHAR-01 requirement
 }
 
 impl ActionState {
@@ -131,12 +135,43 @@ impl ActionState {
             (ActionState::Dead, ActionState::Fall) => false,
             (ActionState::Fall | ActionState::Dead, ActionState::Stand) => {
                 // Stand only from Fall or Dead
+                // P6-117 FIX (HIGH) BUG: This arm `(Fall|Dead, Stand)` with body
+                // `self==Fall || self==Dead` is always true — the pattern already filtered.
+                // The wildcard `_ => true` then incorrectly allows `Attack->Stand`,
+                // `None->Stand`. Fix: change pattern to `(_, Stand) => self==Fall || self==Dead`
+                // to correctly block transitions from other states. This example is
+                // INCORRECT as written below:
                 *self == ActionState::Fall || *self == ActionState::Dead
             },
             _ => true,
         }
     }
 }
+
+// **P6-311 FIX (LOW):** The P6-117 FIX description above says "change pattern to `(_, Stand) =>
+// self==Fall || self==Dead`". The `==` form is valid (ActionState derives PartialEq) but the
+// idiomatic Rust form uses `matches!`. The precise corrected expression is:
+//   `(_, ActionState::Stand) => matches!(self, ActionState::Fall | ActionState::Dead)`
+// Confirm `ActionState` derives `PartialEq` (already present in this example via derive).
+
+// **P6-305 FIX (HIGH):** The code block above STILL CONTAINS the buggy `can_transition_to`
+// logic despite the P6-117 FIX note explaining the bug. An implementer copying this verbatim
+// gets a broken state machine where `Attack->Stand` and `None->Stand` are incorrectly allowed
+// by the `_ => true` arm that becomes reachable when Stand is unmatched.
+// CORRECTED match arm (replaces the two buggy arms above for the Stand case):
+```rust
+// CORRECTED can_transition_to for Stand (P6-305 FIX — replaces P6-117 buggy arms):
+(_, ActionState::Stand) => matches!(self, ActionState::Fall | ActionState::Dead),
+// REMOVE the old `(ActionState::Fall | ActionState::Dead, ActionState::Stand) => { ... }` arm.
+// REMOVE the `_ => true` fallback that follows it (which made Attack->Stand possible).
+// The full corrected match should end with a correct final arm for remaining cases.
+```
+// Add to Plan 06-02 Task 1 test list: `test_stand_only_from_fall_or_dead` that asserts:
+//   - `None.can_transition_to(Stand)` returns false
+//   - `Attack.can_transition_to(Stand)` returns false
+//   - `Fall.can_transition_to(Stand)` returns true
+//   - `Dead.can_transition_to(Stand)` returns true
+// Do NOT use this RESEARCH.md code as the authoritative implementation — use Plan 06-02 Task 1.
 ```
 
 ### Pattern 3: Bevy FixedUpdate for Physics
@@ -239,13 +274,22 @@ pub trait PhysicsGeometrySource {
 ## Code Examples
 
 ### CheckCollision - Face Test (Core Algorithm)
+
+**P6-203 FIX (CRITICAL) — WARNING: PARTIAL ILLUSTRATION ONLY. DO NOT USE AS-IS:**
+- `todo!()` at the bottom of this function will PANIC at runtime (`todo!()` calls `panic!()`). Replace with the complete barycentric + edge/vertex logic from C++ source physics.cpp:461-624.
+- `contact_pos: &mut [f32; 3]` is a STALE out-parameter. The Rust port uses `CollisionResult::Hit { toi: f32, contact: [f32; 3] }` as the return value (per Plan 06-01 Task 1). Using this out-parameter instead creates dual output paths. Use the return value only.
+- **Logic bug in embedded branch:** The embedded case sets `contact_pos` at lines ~282-284, then the code at line ~292 OVERWRITES `contact_pos` with `col[i] + plane_t * sphere_vel[i]` where `plane_t=0.0`. The overwrite discards the embedded contact position. Fix in port: do NOT fall through to the overwrite when in the embedded branch.
+- This example is provided for algorithmic orientation only. The authoritative implementation source is C++ physics.cpp:461-624.
+
 ```rust
 // Source: physics.cpp:461-624 (verified line-by-line from C++ source)
+// WARNING: PARTIAL ILLUSTRATION — see P6-203 FIX above before using
 pub fn check_collision(
     tri: &[[f32; 3]; 3],     // triangle vertices in sphere space
     nrm: &[f32; 4],          // plane equation [nx, ny, nz, d]
     sphere_pos: &[f32; 3],
     sphere_vel: &[f32; 3],
+    // STALE: contact_pos out-param — use CollisionResult::Hit { contact } return value instead
     contact_pos: &mut [f32; 3],
 ) -> CollisionResult {
     // Point on sphere surface closest to plane at t=0

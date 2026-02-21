@@ -23,7 +23,8 @@ A compiling Bevy 0.18 project with the correct plugin architecture, coordinate c
   - Resources for shared data singletons (SampleBuffer, AsciiCellGrid)
 
 ### Plugin architecture
-- Register all 7 plugins as stubs in Phase 1: AssetLoaderPlugin, WorldPlugin, TerrainPlugin, CpuRasterizerPlugin, AsciiOutputPlugin, PhysicsPlugin, CharacterPlugin, GamePlugin
+- Register all 8 plugins as stubs in Phase 1: AssetLoaderPlugin, WorldPlugin, TerrainPlugin, CpuRasterizerPlugin, AsciiOutputPlugin, PhysicsPlugin, CharacterPlugin, GamePlugin
+<!-- **P1-001 FIX:** Changed "7 plugins" to "8 plugins" — the list has always contained 8 entries. -->
 - Terrain is a SEPARATE plugin from World (separate data owners that couple only during rendering)
 - Plugin communication: Resources + explicit system ordering (.before/.after) — not events for data flow
 - Each plugin is a Bevy Plugin struct implementing the Plugin trait
@@ -37,6 +38,7 @@ A compiling Bevy 0.18 project with the correct plugin architecture, coordinate c
 ### ECS resource design
 - SampleBuffer dimensions configurable via a RenderConfig resource (not hardcoded)
 - Default resolution: 240x135 ASCII (SampleBuffer = 480x270 at 2x supersampling)
+<!-- **P1-005 FIX:** Actual SampleBuffer dimensions are 484x274 (formula: `2*ascii+4`), not 480x270. Plan text above is superseded by Phase 4 implementation. -->
 - SampleBuffer: flat Vec<Sample> with index methods (sample_at/sample_at_mut) — match C++ layout for performance
 - AsciiCellGrid: GPU-ready from start — structure data for Mage Core's 4-texture approach (separate char_index, fg, bg arrays) to avoid restructuring in Phase 3
 - Testing: both unit tests (Bevy World directly, fast CI) AND integration tests (full Bevy App, end-to-end resource flow)
@@ -71,6 +73,8 @@ None — discussion stayed within phase scope
 </deferred>
 
 ---
+
+<!-- **XP-048 FIX:** 8 initial plugins; Phase 7 adds AsciickerAudioPlugin as 9th. The "8 plugins" count above will become stale after Phase 7 is integrated. -->
 
 *Phase: 01-foundation*
 *Context gathered: 2026-02-20*

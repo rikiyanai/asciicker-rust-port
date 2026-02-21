@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation** - Compiling Bevy 0.18 skeleton with plugin-per-subsystem architecture and ECS conventions
 - [x] **Phase 2: Asset Parsers** - XP sprite and A3D world/terrain binary file loaders with golden-file tests
-- [ ] **Phase 3: GPU Output** - Bevy render plugin displaying ASCII glyphs via Mage Core 4-texture WGSL shader
+- [x] **Phase 3: GPU Output** - Bevy render plugin displaying ASCII glyphs via Mage Core 4-texture WGSL shader
 - [x] **Phase 3.1: Audit Remediation** - Fix Critical/High severity code-level risks from Phases 1-3 audit before Phase 5 integration (INSERTED)
 - [x] **Phase 4: CPU Rasterizer Core** - SampleBuffer, triangle/line rasterization, materials, color quantization, and RESOLVE stage
 - [ ] **Phase 5: Pipeline Integration** - Full 6-stage rendering pipeline producing real scene output from .a3d world files

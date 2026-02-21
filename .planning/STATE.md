@@ -99,7 +99,7 @@ Recent decisions affecting current work:
 ### Blockers/Concerns
 
 - bevy_kira_audio must be 0.25 (not 0.24) for Bevy 0.18 compatibility
-- lightyear 0.24.x Bevy 0.18 compatibility unverified (Phase 7 concern, not blocking now)
+- bevy_replicon_renet2 must be 0.13 for Bevy 0.18 compatibility (Phase 7, not blocking now)
 
 ## Session Continuity
 

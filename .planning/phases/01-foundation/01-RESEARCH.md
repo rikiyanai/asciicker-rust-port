@@ -154,6 +154,9 @@ impl Plugin for CpuRasterizerPlugin {
 ### Pattern 2: ECS Resource with Default
 **What:** Global singleton data accessed by systems
 **When to use:** SampleBuffer, AsciiCellGrid, RenderConfig
+<!-- **P1-004 FIX:** The entire code example below is SUPERSEDED by Phase 4 implementation.
+Actual formula is `2 * config.ascii_width + 4`. RenderConfig has no `supersample_factor` field.
+See Phase 4 implementation for the authoritative API. -->
 **Example:**
 ```rust
 // Source: Context7 - Bevy Resource derive
@@ -163,7 +166,7 @@ use bevy::prelude::*;
 pub struct RenderConfig {
     pub ascii_width: u32,
     pub ascii_height: u32,
-    pub supersample_factor: u32,
+    pub supersample_factor: u32,  // NOTE: field does not exist in actual impl — see P1-004 FIX
 }
 
 impl Default for RenderConfig {
@@ -195,6 +198,10 @@ impl FromWorld for SampleBuffer {
         }
     }
 }
+// **P1-004 FIX:** SUPERSEDED: Actual formula is `2 * config.ascii_width + 4`.
+// RenderConfig has no `supersample_factor` field. See Phase 4 implementation.
+// The code example above is for planning reference only and does not reflect
+// the implemented API.
 ```
 
 ### Pattern 3: Coordinate Convention Module

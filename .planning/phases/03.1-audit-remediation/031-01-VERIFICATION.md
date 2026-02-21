@@ -84,6 +84,8 @@ Commit hashes verified in git log:
 
 **Note on GAP-11:** The reflection path test correctly documents that for terrain (material) samples, `diffuse_divisor` is computed but only applied in the mesh branch. The test verifies both terrain-reflection and mesh path cells are rendered with valid palette indices. The code comment in `test_resolve_material_reflection_path` accurately describes this architectural detail.
 
+**P31-005 FIX:** Clarification on terrain material path: the terrain/material path ignores `diffuse_divisor` entirely; only the mesh path applies reflection darkening (divisor 400 vs 255). This is an explicit Phase 4 scope limitation, not a bug. The note above about "diffuse_divisor is computed but only applied in the mesh branch" is accurate — terrain uses shade table lookup directly without the divisor adjustment.
+
 **Requirements coverage: 10/10 — All Phase 3.1 requirements satisfied. No orphaned requirements.**
 
 REQUIREMENTS.md Traceability table shows all AUDIT-01 through AUDIT-05 as "Complete" for Phase 3.1. GAP-02/03/06/10/11 are tracked via RISK-ASSESSMENT.md (R36/R37/R40/R43/R41) and all addressed.

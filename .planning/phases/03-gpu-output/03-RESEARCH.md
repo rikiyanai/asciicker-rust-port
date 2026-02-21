@@ -319,6 +319,13 @@ fn generate_test_pattern(mut grid: ResMut<AsciiCellGrid>) {
             } else {
                 [64, 0, 0, 255]     // dark red
             };
+            // M-04 FIX: set_cell() was planned but NOT implemented. AsciiCellGrid uses
+            // direct field mutation — see P3-H01 FIX in 03-01-PLAN.md. Actual pattern:
+            //   let idx = (y * grid.width + x) as usize;
+            //   grid.char_indices[idx] = glyph;
+            //   grid.fg_colors[idx] = fg;
+            //   grid.bg_colors[idx] = bg;
+            // The set_cell() call below is a documentation artifact; it will not compile.
             grid.set_cell(x, y, glyph, fg, bg);
         }
     }
@@ -345,6 +352,8 @@ fn generate_test_pattern(mut grid: ResMut<AsciiCellGrid>) {
 ### 1. Font Atlas Source
 Use the Mage Core font1.png (160x256, 10x16 per glyph) as a starting point. It is a standard CP437 16x16 glyph grid with white-on-black rendering. The Godot project also has a 192x192 font (12x12 per glyph). Either works, but 8x8 glyphs are most common for ASCII games and produce the best grid density at 1080p (240x135 grid = 1920/8 x 1080/8). **The planner should use or create an 8x8 CP437 atlas** to match the default RenderConfig (240x135 ASCII resolution at 1080p).
 
+**P3-004 FIX:** OVERRIDDEN — Implementation uses the 10x16 Mage Core font (cp437_10x16.png), not an 8x8 atlas. Grid resolution is font-dependent: at 1080p with 10x16 glyphs the grid is 192x67 (1920/10 x 1080/16), not 240x135. The 8x8 recommendation above was not followed.
+
 ### 2. Camera Requirement
 The ViewNode pattern requires a Camera entity to function (it runs per-view). A 2D camera with no clear color (or black clear) should be spawned. The ASCII output replaces whatever the camera would normally show.
 
@@ -358,6 +367,8 @@ Three approaches exist for updating CPU data textures every frame:
 
 ### 4. Render Graph Placement
 Insert the ASCII render node in the `Core2d` subgraph, after `Node2d::MainPass` and before `Node2d::EndMainPass`. This runs after the 2D camera clears the screen and before UI, giving clean fullscreen control.
+
+**I-01 NOTE (Round 4) — SUPERSEDED:** Implementation uses edge AFTER `Node2d::EndMainPass`, not between `MainPass` and `EndMainPass`. See P3-009 FIX in 03-02-PLAN.md for the corrected graph edge. The placement advice above was not followed at implementation time.
 
 ## Open Questions
 

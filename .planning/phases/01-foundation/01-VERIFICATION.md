@@ -33,6 +33,7 @@ A compiling Bevy 0.18 project with the correct plugin architecture, coordinate c
 
 ### 4. SampleBuffer and AsciiCellGrid exist as Bevy Resources; test system can write/read in same frame
 **Status: PASSED**
+<!-- **XP-030 FIX:** SUPERSEDED by Phase 4: actual dimensions are 484x274 (formula `2*ascii+4`). resource_flow.rs tests updated to assert 484x274. The "480x270" figure recorded below was correct at initial verification but the implementation diverged in Phase 4. -->
 - SampleBuffer: `#[derive(Resource)]`, 480x270 at 2x supersample, flat Vec<Sample> with sample_at methods
 - AsciiCellGrid: `#[derive(Resource)]`, 240x135 with separate char_indices/fg_colors/bg_colors arrays (GPU-ready)
 - RenderConfig resource controls dimensions (FromWorld reads it)

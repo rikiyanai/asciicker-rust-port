@@ -22,6 +22,7 @@ The C++ source (`render.cpp` ~4400 lines) is thoroughly documented in `docs/arch
 | REND-03 | Barycentric triangle rasterization with duck-typed shader support | Rasterize template (Sec: Barycentric Rasterize), edge function math, shader trait (Sec: Shader Trait), BC_A/BC_P macros |
 | REND-04 | 6-stage pipeline skeleton | Pipeline stages (Sec: Architecture), CLEAR->TERRAIN->WORLD->SHADOW->REFLECTION->RESOLVE ordering; Phase 4 implements stages 1+6, stubs 2-5 |
 | REND-05 | Material system with auto_mat LUT (32KB) | auto_mat algorithm (Sec: auto_mat LUT), Material/MatCell structs (Sec: Material System), shade[4][16] lookup |
+<!-- P4-008 FIX: INCORRECT SIZE — auto_mat LUT is 32×32×32×3 = 98,304 bytes (96KB), not 32KB. The "32KB" figure above is wrong. The comment at the top of the create_auto_mat code example also says "98,304 bytes" which is correct. -->
 | REND-06 | RGB555->xterm-256 color quantization | RGB2PAL formula (Sec: Color Quantization), RGB888->RGB555 conversion (r5 = (r8 * 249 + 1014) >> 11), auto_mat cube projection |
 | REND-07 | RESOLVE stage with 2x2 downsample | Resolve pass detail (Sec: RESOLVE Stage), elevation detection, material vs mesh branching, half-block error analysis, grid/silhouette glyphs |
 | REND-10 | 60fps at 240x135 ASCII resolution | Performance targets (Sec: Performance), copy_from_slice for clear, flat buffer layout, release mode LTO |
@@ -40,6 +41,7 @@ The C++ source (`render.cpp` ~4400 lines) is thoroughly documented in `docs/arch
 |---------|---------|---------|-------------|
 | bytemuck | 1.x (already in Cargo.toml) | Pod/Zeroable derives for Sample struct (safe transmute for copy_from_slice) | SampleBuffer double-allocation memcpy |
 | criterion | 0.5 | Benchmarking clear time, rasterize throughput | Performance validation for REND-10 |
+<!-- P4-010 FIX: DEVIATION — criterion was NOT added as a dependency. Performance benchmarks use std::time::Instant with #[ignore] attribute instead. The criterion recommendation above was not implemented. -->
 
 ### Alternatives Considered
 | Instead of | Could Use | Tradeoff |
@@ -62,7 +64,8 @@ src/render/
   config.rs             # RenderConfig (EXISTS - 240x135, supersample=2)
   sample_buffer.rs      # Sample struct, SampleBuffer with double-allocation clear
   rasterizer.rs         # Bresenham line + barycentric triangle rasterize (generic over Shader trait)
-  quantize.rs           # auto_mat LUT (32KB), RGB2PAL, RGB888<->RGB555 conversions
+  quantize.rs           # RGB2PAL, RGB888<->RGB555 conversions (auto_mat LUT is in material.rs)
+  <!-- M-02 FIX: The original description listed auto_mat LUT here, but the actual implementation places the auto_mat LUT in material.rs (not quantize.rs). The "32KB" size was also incorrect — the actual size is 96KB / 98,304 bytes (tagged P4-008). quantize.rs contains only: rgb8_to_rgb5, rgb5_to_rgb8, pack/unpack_rgb555, rgb2pal. -->
   material.rs           # MatCell, Material structs, material library type
   resolve.rs            # RESOLVE stage: 2x2 downsample -> AnsiCell grid
   types.rs              # AnsiCell struct (or use output module's existing AsciiCellGrid)
@@ -221,6 +224,7 @@ pub struct AnsiCell {
 - **Trait objects for shaders:** Do NOT use `dyn RasterShader`. The C++ uses templates for zero-cost dispatch. Use `impl RasterShader` (static dispatch / monomorphization) to match C++ inlining behavior.
 
 - **Bounds checking in inner loop:** The rasterizer inner loop (per-pixel in triangle bbox) must NOT do bounds checks. Use the border (+4 in dimensions) and pre-clamp the bbox to buffer bounds, then use `unsafe get_unchecked` or flat index arithmetic within the clamped region.
+  - **P4-005 FIX:** DEVIATION — Implementation uses bounds-checked access (no `unsafe`). Border pre-clamping ensures indices are always valid. LLVM is expected to eliminate bounds checks in release builds due to the pre-clamp guarantees. The `unsafe get_unchecked` recommendation was not followed; Phase 3.1 confirmed zero `unsafe` blocks remain in `engine-port/src`.
 
 ## Don't Hand-Roll
 
@@ -304,6 +308,10 @@ pub fn create_auto_mat() -> [u8; 32 * 32 * 32 * 3] {
 
     let mut mat = [0u8; 32 * 32 * 32 * 3];
 
+    // P4-003 FIX: BUG IN EXAMPLE — `b_hi` evaluates to `b_lo` (both if-branches return 0)
+    // and is never used. The actual implementation in `material.rs` correctly uses
+    // `b_vals = [flo[b], (flo[b]+1).min(MCV)]`. This research example code is NOT used
+    // in the implementation; `material.rs` is the authoritative source.
     for b in 0..32i32 {
         let pb = rem[b as usize];
         let b_lo = flo[b as usize];

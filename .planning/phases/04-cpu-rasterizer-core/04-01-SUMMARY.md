@@ -40,6 +40,7 @@ patterns-established:
   - "repr(C) + Pod + Zeroable for all GPU/rasterizer data structs"
   - "Double-allocation clear: cached template vec + copy_from_slice for O(n) memcpy clear"
   - "Unchecked accessor pairs for hot-path inner loops"
+  # P3-003/P4-001 FIX: REMOVED — "Unchecked accessor pairs for hot-path inner loops" were added then removed in Phase 3.1 (GAP-06) as dead unsafe code. They do not exist in the final codebase. Zero unsafe blocks remain in engine-port/src after Phase 3.1.
 
 requirements-completed: [REND-01, REND-06]
 
@@ -71,7 +72,8 @@ completed: 2026-02-20
 
 Each task was committed atomically:
 
-1. **Task 1: Rework Sample struct and SampleBuffer** - `6c9fc43` (feat)
+1. **Task 1: Rework Sample struct and SampleBuffer** - `3ed3114` (feat)
+   - **P4-007-R4 FIX:** CORRECTED — was incorrectly recorded as `6c9fc43` (a Phase 3 commit: "feat(03-01): add font atlas, WGSL shader, and GPU types"). Actual Phase 4 Task 1 commit is `3ed3114` per 04-VERIFICATION.md lines 107-108. The wrong hash was transcribed at summary-write time. Do not use `6c9fc43` for Phase 4 traceability.
 2. **Task 2: Add AnsiCell type and RGB color conversions** - `c1ecb00` (feat)
 
 ## Files Created/Modified
@@ -97,7 +99,7 @@ Each task was committed atomically:
 - **Fix:** Updated all assertions to use new field names (height, visual), new dimensions (484x274, 164x84), and new RenderConfig without supersample_factor
 - **Files modified:** engine-port/tests/resource_flow.rs
 - **Verification:** `cargo test --test resource_flow` passes all 4 tests
-- **Committed in:** 6c9fc43 (Task 1 commit)
+- **Committed in:** 3ed3114 (Task 1 commit — corrected per P4-007-R4 FIX above)
 
 **2. [Rule 1 - Bug] Fixed unsafe_op_in_unsafe_fn warnings for Rust 2024**
 - **Found during:** Task 1
@@ -105,7 +107,7 @@ Each task was committed atomically:
 - **Fix:** Wrapped calls in `unsafe { }` blocks within the unsafe functions
 - **Files modified:** engine-port/src/render/sample_buffer.rs
 - **Verification:** `cargo clippy -- -D warnings` passes clean
-- **Committed in:** 6c9fc43 (Task 1 commit)
+- **Committed in:** 3ed3114 (Task 1 commit — corrected per P4-007-R4 FIX above)
 
 ---
 
