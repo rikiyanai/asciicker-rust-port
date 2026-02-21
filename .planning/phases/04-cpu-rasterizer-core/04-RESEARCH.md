@@ -21,7 +21,7 @@ The C++ source (`render.cpp` ~4400 lines) is thoroughly documented in `docs/arch
 | REND-02 | Bresenham line rasterization matches C++ output | Bresenham algorithm detail (Sec: Bresenham), step-by-2 in horizontal mode, DepthTest_RO, spare bit OR |
 | REND-03 | Barycentric triangle rasterization with duck-typed shader support | Rasterize template (Sec: Barycentric Rasterize), edge function math, shader trait (Sec: Shader Trait), BC_A/BC_P macros |
 | REND-04 | 6-stage pipeline skeleton | Pipeline stages (Sec: Architecture), CLEAR->TERRAIN->WORLD->SHADOW->REFLECTION->RESOLVE ordering; Phase 4 implements stages 1+6, stubs 2-5 |
-| REND-05 | Material system with auto_mat LUT (32KB) | auto_mat algorithm (Sec: auto_mat LUT), Material/MatCell structs (Sec: Material System), shade[4][16] lookup |
+| REND-05 | Material system with auto_mat LUT (96KB) | auto_mat algorithm (Sec: auto_mat LUT), Material/MatCell structs (Sec: Material System), shade[4][16] lookup |
 <!-- P4-008 FIX: INCORRECT SIZE — auto_mat LUT is 32×32×32×3 = 98,304 bytes (96KB), not 32KB. The "32KB" figure above is wrong. The comment at the top of the create_auto_mat code example also says "98,304 bytes" which is correct. -->
 | REND-06 | RGB555->xterm-256 color quantization | RGB2PAL formula (Sec: Color Quantization), RGB888->RGB555 conversion (r5 = (r8 * 249 + 1014) >> 11), auto_mat cube projection |
 | REND-07 | RESOLVE stage with 2x2 downsample | Resolve pass detail (Sec: RESOLVE Stage), elevation detection, material vs mesh branching, half-block error analysis, grid/silhouette glyphs |

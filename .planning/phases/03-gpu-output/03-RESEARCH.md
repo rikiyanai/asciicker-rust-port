@@ -290,19 +290,19 @@ fn handle_window_resize(
 ) {
     // R7-M01 FIX: Must unwrap the Option before calling .read() — Option has no .read() method.
     if let Some(mut reader) = resize_events {
-        for event in reader.read() {
-            let font_width = 8;  // from font atlas
-            let font_height = 8;
-            let new_w = event.width as u32 / font_width;
-            let new_h = event.height as u32 / font_height;
-            if new_w != grid.width || new_h != grid.height {
-                // Resize the grid (allocate new arrays)
-                let cell_count = (new_w * new_h) as usize;
-                grid.width = new_w;
-                grid.height = new_h;
-                grid.char_indices = vec![0; cell_count];
-                grid.fg_colors = vec![[0, 0, 0, 255]; cell_count];
-                grid.bg_colors = vec![[0, 0, 0, 255]; cell_count];
+        for _event in reader.read() {
+            if let Ok(window) = windows.get_single() {
+                let new_w = window.physical_width() / config.font_width;
+                let new_h = window.physical_height() / config.font_height;
+                if new_w != grid.width || new_h != grid.height {
+                    // Resize the grid (allocate new arrays)
+                    let cell_count = (new_w * new_h) as usize;
+                    grid.width = new_w;
+                    grid.height = new_h;
+                    grid.char_indices = vec![0; cell_count];
+                    grid.fg_colors = vec![[0, 0, 0, 255]; cell_count];
+                    grid.bg_colors = vec![[0, 0, 0, 255]; cell_count];
+                }
             }
         }
     }
@@ -328,7 +328,7 @@ fn generate_test_pattern(mut grid: ResMut<AsciiCellGrid>) {
                 [64, 0, 0, 255]     // dark red
             };
             // R8-M01 FIX: AsciiCellGrid uses separate flat arrays, not a cells[] struct array.
-            let idx = y * grid.width + x;
+            let idx = (y * grid.width + x) as usize;
             grid.char_indices[idx] = glyph as u16;
             grid.fg_colors[idx] = fg;
             grid.bg_colors[idx] = bg;
