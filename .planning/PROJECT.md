@@ -18,6 +18,10 @@ The CPU rasterizer must produce visually identical output to the C++ engine — 
 
 ### Active
 
+<!-- L3-AUDIT-FIX: Formal requirement IDs (AUD-01, AUD-02, NET-01, NET-02, GAME-01, GAME-02,
+     GAME-03, VIS-01, VIS-03, etc.) are defined in ROADMAP.md Phase Details sections.
+     See ROADMAP.md as the formal requirement ID registry for cross-referencing with plan files. -->
+
 - [ ] Load and parse .xp sprite files (gzip compressed, CP437 glyphs, 3+ layers: colorkey/height/visual)
 - [ ] Load and parse .a3d world files (header "AS3D" 0x44335341 LE, mesh library + terrain patches + instances + BSP)
 - [ ] Implement 6-stage rendering pipeline: CLEAR -> TERRAIN -> WORLD -> SHADOW -> REFLECTION -> RESOLVE
@@ -106,13 +110,13 @@ The CPU rasterizer must produce visually identical output to the C++ engine — 
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| D001: Use Bevy Engine | Provides ECS, input, audio, UI — avoids building from scratch | -- Pending |
-| D003: CPU rasterizer first | Matches C++ fidelity; GPU only for final ASCII output | -- Pending |
-| D004-D005: Perspective required | Q/E rotation and toggle features depend on it | -- Pending |
-| D010: Keep auto_mat initially | Speed to first render; hybrid with k-d tree added later | -- Pending |
-| D012: Shape-match within RESOLVE | Alex Harri k-d tree replaces auto_mat glyph selection at RESOLVE stage | -- Pending |
-| D040: 2D vs 6D vectors | Pending — needs performance data after initial implementation | -- Pending |
-| D041: Ancestor cleanup | Pending — needs research on C++ behavior | -- Pending |
+| D001: Use Bevy Engine | Provides ECS, input, audio, UI — avoids building from scratch | Accepted |
+| D003: CPU rasterizer first | Matches C++ fidelity; GPU only for final ASCII output | Accepted |
+| D004-D005: Perspective required | Q/E rotation and toggle features depend on it | Accepted |
+| D010: Keep auto_mat initially | Speed to first render; hybrid with k-d tree added later | Accepted |
+| D012: Shape-match within RESOLVE | Alex Harri k-d tree replaces auto_mat glyph selection at RESOLVE stage | Accepted |
+| D040: 2D vs 6D vectors | Pending — needs performance data after initial implementation | Pending (Phase 7) |
+| D041: Ancestor cleanup | Pending — needs research on C++ behavior | Pending |
 
 ---
 *Last updated: 2026-02-20 after initialization*

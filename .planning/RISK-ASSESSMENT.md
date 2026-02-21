@@ -1,4 +1,4 @@
-# Risk Assessment: Phases 1-4 + Phase 7
+# Risk Assessment: All Phases (R01-R65)
 
 **Audit date:** 2026-02-20
 **Audited by:** Parallel agents (Phase 1, 2, 3, 7 independent audits) + Phase 4 UAT
@@ -13,8 +13,8 @@
 | R03 | 3 | ROADMAP doc drift (Phase 3 marked incomplete) | MEDIUM | FIXED - ROADMAP.md updated |
 | R04 | 3 | TextureView use-after-free in BindGroup | MEDIUM | PLANNED - Phase 3.1 AUDIT-01 (must also fix resize path from 03-03 Task 1 commit `0dfe33d`) |
 | R05 | 2 | Parse-time structs != Runtime structs (no converter) | HIGH | PLANNED - Phase 5 Plans 01 (RuntimeTerrain) + 02 (RuntimeWorld) define converters |
-| R06 | 3 | 1-frame render latency undocumented | MEDIUM | Open - Phase 5 must document |
-| R07 | 3 | No integration test for test_pattern -> rasterizer switch | MEDIUM | Open - Phase 5 must add |
+| R06 | 3 | 1-frame render latency undocumented | MEDIUM | PLANNED - Phase 5 Plan 05-05 documents as standard Bevy behavior (P5-316 FIX) |
+| R07 | 3 | No integration test for test_pattern -> rasterizer switch | MEDIUM | PLANNED - Phase 5 Plan 05-05 gates test_pattern behind cfg feature flag (R52 FIX) |
 | R08 | 1 | GameVec3 type alias provides no type safety | MEDIUM | PLANNED - Phase 3.1 AUDIT-02 replaces with newtype |
 | R09 | 1 | Plugin order implicit (AsciiCellGrid depends on RenderConfig) | MEDIUM | PLANNED - Phase 3.1 AUDIT-05 adds integration test |
 | R10 | 2 | Integer overflow in sprite dimension multiplication | MEDIUM | PLANNED - Phase 3.1 AUDIT-03 adds checked_mul |
@@ -152,8 +152,8 @@ The `#[ignore]` performance benchmark was never executed in release mode. The "<
 | ID | Category | Risk | Severity | Status |
 |----|----------|------|----------|--------|
 | R20 | 7-Deps | bevy_kira_audio 0.25 version unverified for Bevy 0.18 | HIGH | Open - verify Day 1 |
-| R21 | 7-Deps | bevy_replicon 0.38 + bevy_replicon_renet 0.14 compat unknown | MEDIUM | Open - verify Day 1 |
-| R22 | 7-Integration | Phase 6 dependency: Character entities don't exist yet | CRITICAL | Open - Plan 03 blocked |
+| R21 | 7-Deps | bevy_replicon 0.38 + bevy_replicon_renet2 0.13 compat unknown | MEDIUM | Open - verify Day 1 |
+| R22 | 7-Integration | Phase 6 dependency: Character entities don't exist yet | CRITICAL | PLANNED - Plan 07-03 depends_on includes "06-02"; SpawnNetworkedPlayer calls spawn_character_world() from Phase 6 |
 | R23 | 7-Integration | RESOLVE stage API change for shape-vector breaks golden-files | MEDIUM | Open - regression test needed |
 | R24 | 7-Integration | Game state machine vs Phase 6 pause logic conflict | MEDIUM | Open - define scope |
 | R25 | 7-Perf | Combined load: audio + network + weather + shape-vector | HIGH | Open - budget target needed |
@@ -172,7 +172,7 @@ The `#[ignore]` performance benchmark was never executed in release mode. The "<
 #### R22: Phase 6 Dependency — Character Entities Not Yet Ported
 Plan 03 (Networking) requires Character entities with Transform and PoseUpdate components from Phase 6. If Phase 6 hasn't shipped, networking cannot test entity replication. **Blocker for Plan 03 Task 2.**
 
-**Fix:** Either ensure Phase 6 ships first, or define stub Character component in Phase 7 for testing. Document as explicit dependency.
+**Fix:** Plan 07-03 now has `"06-02"` in `depends_on`. `SpawnNetworkedPlayer` calls `spawn_character_world()` from Phase 6's character module, ensuring networked players get the full character archetype. The stub `NetworkTestMarker` fallback has been superseded.
 
 #### R20: bevy_kira_audio 0.25 Version Mismatch
 Plan 01 pins bevy_kira_audio 0.25 for Bevy 0.18 compatibility. Version not verified at runtime. Legacy skeleton has 0.24 (Bevy 0.17 only).
@@ -198,7 +198,7 @@ Plan 02 defines Loading stages (3..0 countdown) but doesn't wire asset loading t
 
 ### Medium (Phase 7)
 
-- R21: bevy_replicon version coupling — verify on Day 1
+- R21: bevy_replicon 0.38 + bevy_replicon_renet2 0.13 version coupling — verify on Day 1
 - R24: Pause scope (rendering only? or physics too?) — coordinate with Phase 6
 - R28: 16-track mixer concurrent test — add to Plan 01
 - R29: Weather particle compositing order — document: Resolve -> Sprite -> Weather -> Font
@@ -216,6 +216,12 @@ Plan 02 defines Loading stages (3..0 countdown) but doesn't wire asset loading t
 3. Plan 03 (Networking) — requires Phase 6 character entities
 4. Plan 04 (Shape Vector + Font) — modifies RESOLVE, regression risk
 5. Plan 05 (Weather) — depends on Plan 02, integrates with pipeline
+
+**I1-AUDIT-NOTE:** This recommended sequential order is stricter than the wave system (wave 1:
+01/02/03 in parallel, wave 2: 04/05 in parallel). The sequential order is preferred due to
+XP-007 FIX constraints (shared Cargo.toml/main.rs/lib.rs). The wave assignments remain valid
+for logical dependency analysis, but actual execution should follow this sequential order to
+avoid file conflicts. See individual plan Consistency Diff sections for detailed conflict analysis.
 
 ### Phase 7 Success Criteria (Additions)
 
@@ -291,9 +297,15 @@ All must be fixed in Phase 6 plans before execution.
 
 Phase 7 Plan 04 adds ShapeVectorMatcher to resolve(). Current signature is fixed. Adding a `GlyphSelector` trait now (Phase 5 Plan 04) avoids a breaking API change later.
 
+**H3-AUDIT-FIX:** Signature below updated to match the canonical form from Plan 05-04
+(resolve_bridge.rs). The previous version (`&self`, `&[&Sample; 4]`, `-> u8`) was stale.
+The canonical form uses `&mut self` (needed for LRU cache in Phase 7), `&SampleBuffer`
+(more flexible), and `Option<u8>` (enables fallback to auto_mat). Plans 05-04 and 07-04
+are already aligned on this signature.
+
 ```rust
 pub trait GlyphSelector {
-    fn select_glyph(&self, samples: &[&Sample; 4], cx: i32, cy: i32) -> u8;
+    fn select_glyph(&mut self, sample_buffer: &SampleBuffer, cell_x: usize, cell_y: usize) -> Option<u8>;
 }
 ```
 

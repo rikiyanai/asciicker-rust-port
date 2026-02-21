@@ -38,9 +38,9 @@ impl Sample {
     /// Depth value used to represent a cleared (empty/sky) sample.
     pub const CLEAR_HEIGHT: f32 = -1_000_000.0;
 
-    /// Half of the C++ HEIGHT_SCALE constant (16.0 / 2 = 8.0).
+    /// Half of the C++ HEIGHT_SCALE constant, derived from the canonical constant.
     /// Used as the depth-test epsilon.
-    const HALF_HEIGHT_SCALE: f32 = 8.0;
+    const HALF_HEIGHT_SCALE: f32 = (crate::asset_loader::constants::HEIGHT_SCALE as f32) / 2.0;
 
     /// Returns the canonical clear state for a sample.
     ///

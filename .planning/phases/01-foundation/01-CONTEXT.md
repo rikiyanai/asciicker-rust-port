@@ -37,8 +37,7 @@ A compiling Bevy 0.18 project with the correct plugin architecture, coordinate c
 
 ### ECS resource design
 - SampleBuffer dimensions configurable via a RenderConfig resource (not hardcoded)
-- Default resolution: 240x135 ASCII (SampleBuffer = 480x270 at 2x supersampling)
-<!-- **P1-005 FIX:** Actual SampleBuffer dimensions are 484x274 (formula: `2*ascii+4`), not 480x270. Plan text above is superseded by Phase 4 implementation. -->
+- Default resolution: 240x135 ASCII (SampleBuffer = 484x274, formula: `2*ascii_width+4` x `2*ascii_height+4`)
 - SampleBuffer: flat Vec<Sample> with index methods (sample_at/sample_at_mut) — match C++ layout for performance
 - AsciiCellGrid: GPU-ready from start — structure data for Mage Core's 4-texture approach (separate char_index, fg, bg arrays) to avoid restructuring in Phase 3
 - Testing: both unit tests (Bevy World directly, fast CI) AND integration tests (full Bevy App, end-to-end resource flow)

@@ -27,14 +27,13 @@ A compiling Bevy 0.18 project with the correct plugin architecture, coordinate c
 ### 3. Coordinate system convention (Z is UP) enforced via constant and type alias
 **Status: PASSED**
 - `pub const UP: Vec3 = Vec3::Z` in src/core/coords.rs
-- `pub type GameVec3 = Vec3` type alias for documentation intent
+- `pub struct GameVec3(pub Vec3)` newtype wrapper with `Deref<Target=Vec3>` for compile-time safety
 - `game_to_bevy` and `bevy_to_game` conversion functions with roundtrip tests
 - 7 unit tests verify convention: UP==Z, roundtrip identity, game_to_bevy(UP)==Y
 
 ### 4. SampleBuffer and AsciiCellGrid exist as Bevy Resources; test system can write/read in same frame
 **Status: PASSED**
-<!-- **XP-030 FIX:** SUPERSEDED by Phase 4: actual dimensions are 484x274 (formula `2*ascii+4`). resource_flow.rs tests updated to assert 484x274. The "480x270" figure recorded below was correct at initial verification but the implementation diverged in Phase 4. -->
-- SampleBuffer: `#[derive(Resource)]`, 480x270 at 2x supersample, flat Vec<Sample> with sample_at methods
+- SampleBuffer: `#[derive(Resource)]`, 484x274 at 2x+4 supersample (formula: `2*ascii+4`), flat Vec<Sample> with sample_at methods
 - AsciiCellGrid: `#[derive(Resource)]`, 240x135 with separate char_indices/fg_colors/bg_colors arrays (GPU-ready)
 - RenderConfig resource controls dimensions (FromWorld reads it)
 - Integration test `write_sample_read_cell_same_frame` verifies both accessible in same Bevy App frame
@@ -46,7 +45,7 @@ A compiling Bevy 0.18 project with the correct plugin architecture, coordinate c
 |-------------|--------|----------|
 | FOUND-01 | PASSED | Cargo.toml verified, cargo build succeeds |
 | FOUND-02 | PASSED | 8 plugins compile with Plugin trait |
-| FOUND-03 | PASSED | const UP, GameVec3 type alias, 7 coord tests |
+| FOUND-03 | PASSED | const UP, GameVec3 newtype struct, 7 coord tests |
 | FOUND-04 | PASSED | Both resources exist, 4 integration tests |
 
 ## Test Summary

@@ -163,7 +163,7 @@ Plans:
 - [ ] 07-01-PLAN.md -- Audio: bevy_kira_audio 0.25, 16-track DynamicAudioChannels mixer (wave 1)
 - [ ] 07-02-PLAN.md -- Game state machine (Loading/Playing/Paused) and main menu (wave 1)
 - [ ] 07-03-PLAN.md -- Networking: bevy_replicon 0.38, binary protocol, server/client (wave 1)
-- [ ] 07-04-PLAN.md -- Visual quality: Alex Harri 6D shape-vector + Font1 3 skins (TDD, wave 1)
+- [ ] 07-04-PLAN.md -- Visual quality: Alex Harri 6D shape-vector + Font1 3 skins (TDD, wave 2)
 - [ ] 07-05-PLAN.md -- Weather: ring-buffer particle pool, Perlin wind, snow/rain (TDD, wave 2)
 
 ## Progress
@@ -192,7 +192,7 @@ Fast compile times are critical for maintaining development velocity across Phas
 **Active now:**
 - **Selective Bevy features:** `default-features = false` with only 6 features (avoids pulling in 3D rendering, UI, physics plugins that add compile time)
 - **Dynamic linking feature:** `cargo run --features dev` enables `bevy/dynamic_linking` for ~10x faster incremental link times during development
-- **Linker configuration:** `.cargo/config.toml` documents fast linker setup for macOS (lld via Homebrew LLVM)
+- **Linker configuration:** `engine-port/.cargo/config.toml` documents fast linker setup for macOS (lld via Homebrew LLVM)
 - **Zero proc macros:** No custom derive macros; all derives are standard Bevy/serde (cached by compiler)
 
 **Planned (evaluate before Phase 7):**

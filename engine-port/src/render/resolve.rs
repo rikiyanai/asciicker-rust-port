@@ -222,12 +222,11 @@ fn resolve_material(visual: u16, avg_diffuse: u32, ctx: &MaterialResolveCtx<'_>)
     // Compute elevation from row above
     let elevation = compute_elevation(ctx.samples, ctx.dw, ctx.sx, ctx.sy, ctx.avg_height);
 
-    // Diffuse level: avg_diffuse / 17, clamped to 0-15
-    let diffuse_level = (avg_diffuse / 17).min(15) as u8;
-
     // Look up material shade table
+    // Pass raw avg_diffuse to lookup() — it handles the /17 division internally.
+    // Do NOT pre-divide; that causes a double-divide bug (P4-H03 FIX contract).
     if mat_idx < ctx.materials.len() {
-        let mat_cell = ctx.materials[mat_idx].lookup(elevation, diffuse_level * 17);
+        let mat_cell = ctx.materials[mat_idx].lookup(elevation, avg_diffuse as u8);
         let fg_pal = rgb2pal(mat_cell.fg);
         let bg_pal = rgb2pal(mat_cell.bg);
         ResolvedCell {

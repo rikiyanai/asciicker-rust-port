@@ -97,8 +97,9 @@ The physics `animate` function runs in Bevy's `FixedUpdate` schedule (default 64
 
 **Schedule placement:**
 ```
-Update         -> Input accumulation (apply_torque_to_camera writes PhysicsIO.yaw)
+PreUpdate      -> Input accumulation (accumulate_player_input writes PhysicsIO forces)
 FixedUpdate    -> animate() system (reads forces, runs collision, writes pos/vel/grounded)
+Update         -> apply_torque_to_camera (writes PhysicsIO.yaw from GameCamera.yaw)
 PostUpdate     -> Sync positions to Transform components, then render
 ```
 
