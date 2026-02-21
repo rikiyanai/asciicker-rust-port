@@ -380,8 +380,8 @@ mod tests {
     fn test_checked_mul_overflow_dimensions() {
         // Build a minimal valid gzip-compressed XP header with 65536x65536 dims.
         // That overflows u32 (65536 * 65536 = 2^32, wraps to 0).
-        use flate2::write::GzEncoder;
         use flate2::Compression;
+        use flate2::write::GzEncoder;
         use std::io::Write;
 
         let mut header = Vec::new();
