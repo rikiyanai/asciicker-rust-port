@@ -62,9 +62,9 @@ The audio subsystem is the most straightforward: bevy_kira_audio 0.25 provides B
 [dependencies]
 bevy_kira_audio = "0.25"
 bevy_replicon = "0.38"
-bevy_replicon_renet = { version = "*" }  # match bevy_replicon 0.38
-# **P7-060 FIX:** INVALID: Wildcard `version = "*"` is prohibited by crates.io. Use a specific
-# version, determined at execution time via `cargo search bevy_replicon_renet`.
+bevy_replicon_renet2 = "0.13"  # P7-109: correct crate name (not bevy_replicon_renet); version per MEMORY.md
+# **R6-H01 FIX:** Replaced wildcard `version = "*"` (prohibited by crates.io) and wrong crate
+# name `bevy_replicon_renet` with correct `bevy_replicon_renet2 = "0.13"` per MEMORY.md and P7-109.
 kiddo = "5.2"
 noise = "0.9"
 serde = { version = "1", features = ["derive"] }
@@ -436,8 +436,9 @@ struct WeatherParticle {
     fg: [u8; 3],
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
 enum WeatherState {
+    #[default]
     Clear = 0,
     LightSnow = 1,
     HeavySnow = 2,
@@ -454,6 +455,7 @@ struct Weather {
     state: WeatherState,
     intensity: f32,
     target_intensity: f32,
+    precipitation: PrecipitationType,
     wind: [f32; 2],
     perlin: Perlin,
     perlin_time: f64,

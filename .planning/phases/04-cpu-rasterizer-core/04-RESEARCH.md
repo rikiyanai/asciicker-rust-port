@@ -430,11 +430,12 @@ pub fn rgb5_to_rgb8(c5: u16) -> u8 {
 /// Bresenham line rasterization in sample-buffer space.
 /// Writes spare bit flags (e.g., 0x04 for grid lines) without changing color/depth.
 /// Steps by 2 in horizontal domain due to 2x supersampling.
+// R6-C01 FIX: Parameters are by-value [i32;3], matching 04-03-PLAN.md authoritative spec
 pub fn bresenham(
     buf: &mut [Sample],
     w: i32, h: i32,
-    from: &mut [i32; 3],
-    to: &mut [i32; 3],
+    from: [i32; 3],
+    to: [i32; 3],
     or_bits: u8,
 ) {
     let sx = to[0] - from[0];
@@ -556,7 +557,7 @@ fn bc_p(a: &[i32; 4], b: &[i32; 4], cx: i32, cy: i32) -> i32 {
 
 ## Performance Considerations (REND-10)
 
-**Target:** 240x135 ASCII = 480x270 sample buffer = 129,600 samples.
+**Target:** 240x135 ASCII = 484x274 sample buffer = 132,616 samples (formula: (2*240+4) x (2*135+4), per Pitfall 2 border requirement).
 
 **Clear time budget:** The C++ memcpy clears `(484 * 274) * 8 bytes` = ~1MB in well under 0.5ms. Rust's `copy_from_slice` compiles to the same memcpy intrinsic. At modern memory bandwidth (>40 GB/s), 1MB copy takes ~0.025ms. This is trivially within budget.
 

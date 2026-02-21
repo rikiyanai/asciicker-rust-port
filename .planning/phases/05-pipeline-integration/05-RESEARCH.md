@@ -481,6 +481,10 @@ pub fn update_camera(camera: &mut GameCamera, dw: f64, dh: f64) {
 // `world` parameter deferred to Phase 6. `for_each_patch_mut` approach
 // replaced by two-pass index-based approach (P5-058 FIX borrow conflict).
 //
+// R6-002 FIX: THIS ENTIRE CODE BLOCK IS STALE. The function body below uses the OLD 3-parameter
+// signature (with `world` parameter and raycast calls). See 05-06-PLAN.md Task 1 for the
+// CORRECT 2-parameter signature: update_terrain_dark(terrain: &mut RuntimeTerrain, light_dir: [f64; 3])
+//
 // Source: C++ terrain.cpp:1714-1765 (DarkUpdater)
 pub fn update_terrain_dark(
     terrain: &mut RuntimeTerrain,

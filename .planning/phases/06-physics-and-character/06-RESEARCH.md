@@ -193,6 +193,9 @@ app.insert_resource(Time::<Fixed>::from_hz(66.667))
 **When to use:** Triangle soup collection during collision sweep.
 **Example:**
 ```rust
+// STALE — see P6-120 FIX in 06-01-PLAN.md. This trait uses frustum-plane interface
+// (clip_planes: &[[f64; 4]; 4]) which is WRONG. Actual implementation uses center+radius
+// spatial proximity query, NOT camera-frustum planes.
 pub trait PhysicsGeometrySource {
     fn collect_triangles(
         &self,

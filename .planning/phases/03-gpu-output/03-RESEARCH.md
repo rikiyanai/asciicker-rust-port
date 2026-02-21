@@ -118,7 +118,7 @@ AsciiCellGrid (Main World Resource)
 | GPU texture creation from CPU data | Manual wgpu::Texture + write_texture | `Bevy Image` + `Assets<Image>` + `RenderAssets<GpuImage>` | Bevy's asset system handles format conversion, GPU upload, and lifecycle |
 | Render pipeline caching | Manual HashMap of pipelines | `bevy::render::render_resource::CachedRenderPipelineId` + `PipelineCache` | Bevy's pipeline cache handles async compilation and caching |
 | Font atlas PNG decoding | Manual image crate usage | `AssetServer::load::<Image>("fonts/cp437.png")` | Bevy's image loader handles PNG decoding with correct settings |
-| Window size change detection | Manual size tracking | `EventReader<WindowResized>` | Bevy's event system provides reliable resize notifications |
+| Window size change detection | Manual size tracking | `Option<MessageReader<WindowResized>>` (Bevy 0.18 API; see P3-007/P3-H03 FIX in 03-03-PLAN.md) | Bevy's event system provides reliable resize notifications |
 
 **Key insight:** Bevy provides all the GPU resource management primitives needed. The custom work is limited to: (1) the WGSL shader, (2) the extract/prepare systems, (3) the render node, and (4) the bind group layout.
 
@@ -181,6 +181,9 @@ struct Uniforms {
     font_width: u32,
     font_height: u32,
 }
+// R6-M01 NOTE: Rust-side AsciiUniforms includes `_padding: [u32; 2]` for 16-byte GPU alignment.
+// WGSL does NOT need matching padding fields — it only reads the first 8 bytes (font_width + font_height).
+// The padding ensures the uniform buffer meets GPU alignment requirements on the Rust side.
 
 @group(1) @binding(0) var<uniform> uniforms: Uniforms;
 
@@ -278,9 +281,9 @@ fn create_data_texture(width: u32, height: u32, data: &[u8]) -> Image {
 ### Resize Handling Pattern
 ```rust
 // Source: Mage Core render.rs resize(), adapted for Bevy
-// WARNING: EventReader is Bevy pre-0.18 API. Actual implementation uses Option<MessageReader<WindowResized>> per P3-007/P3-H03 FIX in 03-03-PLAN.md.
+// R6-H01 FIX: CORRECTED to Bevy 0.18 API (was EventReader, now MessageReader wrapped in Option)
 fn handle_window_resize(
-    mut resize_events: EventReader<WindowResized>,
+    mut resize_events: Option<MessageReader<WindowResized>>,
     mut grid: ResMut<AsciiCellGrid>,
     config: Res<RenderConfig>,
 ) {

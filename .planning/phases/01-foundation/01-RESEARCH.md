@@ -159,49 +159,20 @@ Actual formula is `2 * config.ascii_width + 4`. RenderConfig has no `supersample
 See Phase 4 implementation for the authoritative API. -->
 **Example:**
 ```rust
-// Source: Context7 - Bevy Resource derive
-use bevy::prelude::*;
-
+// P1-004 FIX: SUPERSEDED — this code block shows the CORRECT implementation (original removed)
 #[derive(Resource)]
 pub struct RenderConfig {
     pub ascii_width: u32,
     pub ascii_height: u32,
-    pub supersample_factor: u32,  // NOTE: field does not exist in actual impl — see P1-004 FIX
-}
-
-impl Default for RenderConfig {
-    fn default() -> Self {
-        Self {
-            ascii_width: 240,
-            ascii_height: 135,
-            supersample_factor: 2,
-        }
-    }
-}
-
-#[derive(Resource)]
-pub struct SampleBuffer {
-    pub width: u32,
-    pub height: u32,
-    pub samples: Vec<Sample>,
 }
 
 impl FromWorld for SampleBuffer {
     fn from_world(world: &mut World) -> Self {
         let config = world.resource::<RenderConfig>();
-        let w = config.ascii_width * config.supersample_factor;
-        let h = config.ascii_height * config.supersample_factor;
-        Self {
-            width: w,
-            height: h,
-            samples: vec![Sample::default(); (w * h) as usize],
-        }
+        Self::new(config.ascii_width, config.ascii_height)
+        // SampleBuffer::new internally computes: width = 2*ascii_width+4, height = 2*ascii_height+4
     }
 }
-// **P1-004 FIX:** SUPERSEDED: Actual formula is `2 * config.ascii_width + 4`.
-// RenderConfig has no `supersample_factor` field. See Phase 4 implementation.
-// The code example above is for planning reference only and does not reflect
-// the implemented API.
 ```
 
 ### Pattern 3: Coordinate Convention Module
@@ -210,27 +181,17 @@ impl FromWorld for SampleBuffer {
 <!-- ~~SUPERSEDED by P1-101 FIX in 01-01-PLAN.md~~: Use newtype struct, not type alias. Actual: pub struct GameVec3(pub Vec3) with Deref<Target=Vec3>. -->
 **Example:**
 ```rust
-use bevy::math::Vec3;
+// P1-101 FIX: SUPERSEDED — this code block shows the CORRECT implementation (original removed)
+pub struct GameVec3(pub Vec3);
 
-/// Asciicker uses Z-up coordinate system.
-/// Bevy uses Y-up. Convert at render boundary.
-pub const UP: Vec3 = Vec3::Z;
-pub const FORWARD: Vec3 = Vec3::Y;  // In Asciicker Z-up: forward is +Y
-pub const RIGHT: Vec3 = Vec3::X;
-
-/// Type alias for documentation: marks a Vec3 as being in game-space (Z-up)
-pub type GameVec3 = Vec3;
-
-/// Convert from game space (Z-up) to Bevy render space (Y-up)
-#[inline]
-pub fn game_to_bevy(v: Vec3) -> Vec3 {
-    Vec3::new(v.x, v.z, -v.y)
+impl Deref for GameVec3 {
+    type Target = Vec3;
+    fn deref(&self) -> &Vec3 { &self.0 }
 }
 
-/// Convert from Bevy render space (Y-up) to game space (Z-up)
-#[inline]
-pub fn bevy_to_game(v: Vec3) -> Vec3 {
-    Vec3::new(v.x, -v.z, v.y)
+impl GameVec3 {
+    pub fn to_bevy(self) -> Vec3 { Vec3::new(self.0.x, self.0.y, self.0.z) }
+    pub fn from_bevy(v: Vec3) -> Self { Self(Vec3::new(v.x, v.y, v.z)) }
 }
 ```
 
@@ -261,7 +222,7 @@ pub fn bevy_to_game(v: Vec3) -> Vec3 {
 ### Pitfall 2: Coordinate System Confusion
 **What goes wrong:** Z-up game data rendered with Y-up Bevy transforms produces rotated/inverted scenes.
 **Why it happens:** Bevy is Y-up, C++ Asciicker is Z-up, easy to forget conversion.
-**How to avoid:** Central `coords.rs` module with conversion functions. Use `GameVec3` type alias to mark game-space vectors. Convert at render boundary only.
+**How to avoid:** Central `coords.rs` module with conversion functions. Use `GameVec3` newtype struct to mark game-space vectors. Convert at render boundary only.
 **Warning signs:** Objects appearing sideways, camera looking at ground, terrain rotated 90 degrees.
 
 ### Pitfall 3: Resource Initialization Order
@@ -336,8 +297,8 @@ fn sample_buffer_and_ascii_grid_coexist() {
     let buffer = app.world().resource::<SampleBuffer>();
     let grid = app.world().resource::<AsciiCellGrid>();
 
-    assert_eq!(buffer.width, 480);  // 240 * 2
-    assert_eq!(buffer.height, 270); // 135 * 2
+    assert_eq!(buffer.width, 484);   // 2*240+4
+    assert_eq!(buffer.height, 274);  // 2*135+4
     assert_eq!(grid.width, 240);
     assert_eq!(grid.height, 135);
 }
