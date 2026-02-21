@@ -153,19 +153,17 @@ impl ActionState {
 // idiomatic Rust form uses `matches!`. The precise corrected expression is:
 //   `(_, ActionState::Stand) => matches!(self, ActionState::Fall | ActionState::Dead)`
 // Confirm `ActionState` derives `PartialEq` (already present in this example via derive).
+// (Informational only — both == and matches! are correct. No code change required.)
 
 // **P6-305 FIX (HIGH):** The code block above STILL CONTAINS the buggy `can_transition_to`
 // logic despite the P6-117 FIX note explaining the bug. An implementer copying this verbatim
 // gets a broken state machine where `Attack->Stand` and `None->Stand` are incorrectly allowed
 // by the `_ => true` arm that becomes reachable when Stand is unmatched.
 // CORRECTED match arm (replaces the two buggy arms above for the Stand case):
-```rust
-// CORRECTED can_transition_to for Stand (P6-305 FIX — replaces P6-117 buggy arms):
-(_, ActionState::Stand) => matches!(self, ActionState::Fall | ActionState::Dead),
+//   (_, ActionState::Stand) => matches!(self, ActionState::Fall | ActionState::Dead),
 // REMOVE the old `(ActionState::Fall | ActionState::Dead, ActionState::Stand) => { ... }` arm.
 // REMOVE the `_ => true` fallback that follows it (which made Attack->Stand possible).
 // The full corrected match should end with a correct final arm for remaining cases.
-```
 // Add to Plan 06-02 Task 1 test list: `test_stand_only_from_fall_or_dead` that asserts:
 //   - `None.can_transition_to(Stand)` returns false
 //   - `Attack.can_transition_to(Stand)` returns false
@@ -414,6 +412,8 @@ pub struct SpriteReq {
 use noise::{NoiseFn, Perlin, Fbm};
 
 // In resolve pass, for cells containing reflection (spare & 0x3 == 3):
+// STALE — see P6-303 FIX in 06-03-PLAN.md. Use struct-literal:
+// Fbm::<Perlin> { octaves: 4, ..Default::default() }. The new(0) call gives 6 octaves (default), not 4.
 let fbm = Fbm::<Perlin>::new(0);
 // Configure: 4 octaves to match C++ octaveNoise0_1(..., 4)
 
@@ -430,6 +430,8 @@ let id = id.clamp(-2, 2);
 
 ### Bevy Input to PhysicsIO
 ```rust
+// STALE — missing field resets per XP-113 FIX in Plan 06-02. Must zero x_force, y_force, torque
+// at start of function before reading keys. Also missing Res<GameCamera> for camera-relative WASD.
 // Source: game.cpp:5721-5781 (verified from C++ source)
 fn accumulate_player_input(
     keyboard: Res<ButtonInput<KeyCode>>,

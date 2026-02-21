@@ -31,7 +31,7 @@ Bevy uses Y-up internally (right-handed, +Y up, -Z forward). The C++ Asciicker e
 - Use glam types directly (Vec3, Mat4, Quat) -- no thin wrappers
 - Success criteria require `const UP: Vec3 = Vec3::Z` and a compile-time type alias at minimum
 - SampleBuffer dimensions configurable via a RenderConfig resource
-- Default resolution: 240x135 ASCII (SampleBuffer = 480x270 at 2x supersampling)
+- Default resolution: 240x135 ASCII (SampleBuffer = 484x274 (formula: 2*ascii_width+4 x 2*ascii_height+4))
 - SampleBuffer: flat Vec<Sample> with index methods -- match C++ layout
 - AsciiCellGrid: GPU-ready from start (separate char_index, fg, bg arrays for Mage Core 4-texture approach)
 - Both unit tests AND integration tests required
@@ -207,6 +207,7 @@ impl FromWorld for SampleBuffer {
 ### Pattern 3: Coordinate Convention Module
 **What:** Central place for Z-up convention and Bevy Y-up conversion
 **When to use:** All spatial data in the engine
+<!-- ~~SUPERSEDED by P1-101 FIX in 01-01-PLAN.md~~: Use newtype struct, not type alias. Actual: pub struct GameVec3(pub Vec3) with Deref<Target=Vec3>. -->
 **Example:**
 ```rust
 use bevy::math::Vec3;

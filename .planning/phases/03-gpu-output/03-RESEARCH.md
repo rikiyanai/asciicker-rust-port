@@ -278,6 +278,7 @@ fn create_data_texture(width: u32, height: u32, data: &[u8]) -> Image {
 ### Resize Handling Pattern
 ```rust
 // Source: Mage Core render.rs resize(), adapted for Bevy
+// WARNING: EventReader is Bevy pre-0.18 API. Actual implementation uses Option<MessageReader<WindowResized>> per P3-007/P3-H03 FIX in 03-03-PLAN.md.
 fn handle_window_resize(
     mut resize_events: EventReader<WindowResized>,
     mut grid: ResMut<AsciiCellGrid>,
@@ -366,7 +367,7 @@ Three approaches exist for updating CPU data textures every frame:
 **Recommendation:** Approach 2 (Extract + manual write). Create the GPU textures once in the render world. Each frame, the extract system copies grid data into a render-world resource, and the prepare system calls `write_texture` on existing GPU textures. This avoids the `get_mut` frame-skip issue and gives full control over the GPU upload path.
 
 ### 4. Render Graph Placement
-Insert the ASCII render node in the `Core2d` subgraph, after `Node2d::MainPass` and before `Node2d::EndMainPass`. This runs after the 2D camera clears the screen and before UI, giving clean fullscreen control.
+[WRONG — see I-01 NOTE below] ~~Insert the ASCII render node in the `Core2d` subgraph, after `Node2d::MainPass` and before `Node2d::EndMainPass`. This runs after the 2D camera clears the screen and before UI, giving clean fullscreen control.~~
 
 **I-01 NOTE (Round 4) — SUPERSEDED:** Implementation uses edge AFTER `Node2d::EndMainPass`, not between `MainPass` and `EndMainPass`. See P3-009 FIX in 03-02-PLAN.md for the corrected graph edge. The placement advice above was not followed at implementation time.
 

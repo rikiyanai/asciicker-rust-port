@@ -412,7 +412,9 @@ pub fn build_bsp(instances: &mut [BspItem]) -> BspNode {
     BspNode::Node {
         children: [Some(Box::new(left_node)), Some(Box::new(right_node))],
         bbox: combined_bbox(&instances),
-        split_plane: 0.0,  // stored for future use
+        // ~~split_plane: 0.0~~  WRONG placeholder — see P5-074 FIX in 05-02-PLAN.md
+        // Correct: split_plane = (items[best_split-1].centroid[best_axis] + items[best_split].centroid[best_axis]) / 2.0
+        split_plane: (items[best_split - 1].centroid[best_axis] + items[best_split].centroid[best_axis]) / 2.0,
         split_axis: best_axis as u8,
     }
 }
@@ -474,6 +476,11 @@ pub fn update_camera(camera: &mut GameCamera, dw: f64, dh: f64) {
 
 ### Terrain Shadow (UpdateTerrainDark)
 ```rust
+// ~~SUPERSEDED by Plan 05-06 Task 1~~
+// Phase 5 signature: update_terrain_dark(terrain: &mut RuntimeTerrain, light_dir: [f64; 3])
+// `world` parameter deferred to Phase 6. `for_each_patch_mut` approach
+// replaced by two-pass index-based approach (P5-058 FIX borrow conflict).
+//
 // Source: C++ terrain.cpp:1714-1765 (DarkUpdater)
 pub fn update_terrain_dark(
     terrain: &mut RuntimeTerrain,
@@ -525,7 +532,8 @@ pub fn compare_ansi_grids(
     expected_bk: &[u8],
     expected_gl: &[u8],
 ) -> (usize, usize, f64) {
-    let total = actual.cells_count();
+    // Use `grid.width * grid.height` — `cells_count()` is not a confirmed method on AsciiCellGrid.
+    let total = actual.width as usize * actual.height as usize;
     let mut diff = 0;
 
     for i in 0..total {

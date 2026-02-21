@@ -39,7 +39,7 @@ key-decisions:
 patterns-established:
   - "repr(C) + Pod + Zeroable for all GPU/rasterizer data structs"
   - "Double-allocation clear: cached template vec + copy_from_slice for O(n) memcpy clear"
-  - "Unchecked accessor pairs for hot-path inner loops"
+  # REMOVED: "Unchecked accessor pairs for hot-path inner loops"
   # P3-003/P4-001 FIX: REMOVED — "Unchecked accessor pairs for hot-path inner loops" were added then removed in Phase 3.1 (GAP-06) as dead unsafe code. They do not exist in the final codebase. Zero unsafe blocks remain in engine-port/src after Phase 3.1.
 
 requirements-completed: [REND-01, REND-06]

@@ -165,6 +165,8 @@ impl ShapeVectorMatcher {
             return glyph;
         }
         let nearest = self.tree.nearest_one::<SquaredEuclidean>(&sampling_vector);
+        // nearest.item: u64 (KdTree<f32,6> alias stores u64 items; cast to usize for indexing).
+        // When adding: tree.add(&entry.vector, idx as u64).
         let glyph = self.characters[nearest.item as usize].glyph;
         self.cache.insert(key, glyph);
         glyph
@@ -423,14 +425,13 @@ fn sample_to_lightness(sample: &Sample, materials: &[Material]) -> f32 {
 // Source: C++ weather.cpp ParticlePool + weather state machine
 use noise::{NoiseFn, Perlin};
 
-// **P7-056 FIX:** STALE: Plan 07-05 uses `lifetime_remaining: f32` (simpler countdown) instead
-// of `birth_us: u64`/`lifetime_us: u64` from this C++ design.
+// **P7-056 FIX:** Plan 07-05 uses `lifetime_remaining: f32` (simpler countdown) instead
+// of `birth_us: u64`/`lifetime_us: u64` from C++ design. Struct below is authoritative.
 #[derive(Clone, Copy, Default)]
 struct WeatherParticle {
     pos: [f32; 3],
     vel: [f32; 3],
-    birth_us: u64,
-    lifetime_us: u64,
+    lifetime_remaining: f32,  // P7-056: replaces birth_us/lifetime_us from C++ design
     glyph: u8,
     fg: [u8; 3],
 }
@@ -457,6 +458,7 @@ struct Weather {
     perlin: Perlin,
     perlin_time: f64,
     pool: ParticlePool,
+    spawn_accumulator: f32, // particle spawn accumulator (fractional count from previous frame)
 }
 ```
 
