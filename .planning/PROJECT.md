@@ -99,7 +99,7 @@ The CPU rasterizer must produce visually identical output to the C++ engine — 
 - **Visual Fidelity**: CPU rasterizer output must match C++ engine pixel-for-pixel where possible
 - **Binary Compatibility**: Must load original .xp sprites and .a3d world files unchanged
 - **Performance**: Target 60 FPS at 1080p with full scene (terrain + world + sprites + effects)
-- **Architecture**: ECS-first design; map C++ DOD structs to Bevy components
+- **Architecture**: ECS where it adds value; plain Rust where it doesn't. Use ECS for spatial entities (characters, NPCs, projectiles, terrain patches). Use plain Rust for algorithms (pathfinding, collision math), data tables (equipment lookup, material tables), state machines (character FSM, game FSM).
 - **Rendering Pipeline**: CPU rasterizer -> SampleBuffer -> RESOLVE (glyph/color selection) -> GPU output (Mage Core style)
 
 ## Key Decisions

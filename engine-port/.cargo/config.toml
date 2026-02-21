@@ -1,0 +1,34 @@
+# Iteration speed configuration for macOS (darwin)
+#
+# Fast linker: On macOS, the default Apple linker is reasonably fast.
+# If you install lld via Homebrew (`brew install llvm`), uncomment the
+# linker line below for faster link times (~2-3x improvement).
+#
+# To install: brew install llvm
+# Then uncomment the [target] section below.
+#
+# On Linux, use mold instead: [target.x86_64-unknown-linux-gnu]
+#                              linker = "clang"
+#                              rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+
+# Uncomment after `brew install llvm`:
+# [target.aarch64-apple-darwin]
+# rustflags = [
+#     "-C", "link-arg=-fuse-ld=/opt/homebrew/opt/llvm/bin/ld64.lld",
+# ]
+
+# Nightly-only: share generics across crates for faster incremental builds.
+# Uncomment if using nightly toolchain:
+# [unstable]
+# share-generics = true
+
+# Environment variables for all cargo invocations
+[env]
+# Bevy uses multi-threaded asset loading; this is the default but explicit
+CARGO_INCREMENTAL = "1"
+
+# Build configuration
+[build]
+# Increase codegen units for faster debug builds (less optimization, faster compile)
+# This is already the default for dev profile but explicit for clarity
+# jobs = 8  # Uncomment to limit parallel jobs if memory-constrained

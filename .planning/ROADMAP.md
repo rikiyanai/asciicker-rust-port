@@ -182,3 +182,31 @@ Note: Phases 3 and 4 are independent (both depend only on Phase 1) and can execu
 | 5. Pipeline Integration | 0/6 | Planned | - |
 | 6. Physics and Character | 0/3 | Planned | - |
 | 7. Game Systems | 0/5 | Planned | - |
+
+## Developer Experience
+
+### Iteration Speed Strategy
+
+Fast compile times are critical for maintaining development velocity across Phases 5-7. The project uses a layered approach:
+
+**Active now:**
+- **Selective Bevy features:** `default-features = false` with only 6 features (avoids pulling in 3D rendering, UI, physics plugins that add compile time)
+- **Dynamic linking feature:** `cargo run --features dev` enables `bevy/dynamic_linking` for ~10x faster incremental link times during development
+- **Linker configuration:** `.cargo/config.toml` documents fast linker setup for macOS (lld via Homebrew LLVM)
+- **Zero proc macros:** No custom derive macros; all derives are standard Bevy/serde (cached by compiler)
+
+**Planned (evaluate before Phase 7):**
+- **Crate splitting:** If incremental compile time exceeds 10 seconds, split into workspace:
+  - `asciicker-core`: types, constants, math, asset parsers (no Bevy dependency)
+  - `asciicker-render`: CPU rasterizer, materials, quantization, resolve
+  - `asciicker-game`: top-level binary, Bevy plugins, game systems
+- **Parallel test runner:** `cargo-nextest` for faster test execution
+- **Compile time tracking:** Monitor incremental build times at each phase boundary
+
+**Risk:** R64 in RISK-ASSESSMENT.md tracks compile time degradation.
+
+### Version Pinning
+
+All work through Phase 7 targets **Bevy 0.18.0**. No Bevy version upgrades during active development. Third-party plugin versions (bevy_kira_audio, bevy_replicon, bevy_replicon_renet2) are verified at Day 1 of their respective phases.
+
+**Risk:** R65 in RISK-ASSESSMENT.md tracks Bevy version migration risk.
