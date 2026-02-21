@@ -416,7 +416,11 @@ use noise::{NoiseFn, Perlin, Fbm};
 
 // In resolve pass, for cells containing reflection (spare & 0x3 == 3):
 // STALE — see P6-303 FIX in 06-03-PLAN.md. Use struct-literal:
-// Fbm::<Perlin> { octaves: 4, ..Default::default() }. The new(0) call gives 6 octaves (default), not 4.
+// Fbm::<Perlin> { octaves: 4, ..Default::default() }
+// **R7-009 FIX:** `Fbm::<Perlin>::new(0)` constructs with the noise crate's default octave count
+// (6 in noise 0.9), not 4. The `0` argument is a SEED, not an octave count. To get exactly
+// 4 octaves, use the struct-literal pattern: `Fbm::<Perlin> { octaves: 4, ..Default::default() }`
+// (see P6-303 FIX).
 let fbm = Fbm::<Perlin>::new(0);
 // Configure: 4 octaves to match C++ octaveNoise0_1(..., 4)
 
@@ -433,6 +437,9 @@ let id = id.clamp(-2, 2);
 
 ### Bevy Input to PhysicsIO
 ```rust
+// **R7-006 FIX: DO NOT USE THIS CODE BLOCK** — see Plan 06-02 Task 2 for the authoritative
+// `accumulate_player_input` implementation with: (a) field resets at function start per XP-113 FIX,
+// (b) `Res<GameCamera>` parameter for camera-relative WASD, (c) correct key mappings.
 // STALE — missing field resets per XP-113 FIX in Plan 06-02. Must zero x_force, y_force, torque
 // at start of function before reading keys. Also missing Res<GameCamera> for camera-relative WASD.
 // Source: game.cpp:5721-5781 (verified from C++ source)

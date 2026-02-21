@@ -287,19 +287,22 @@ fn handle_window_resize(
     mut grid: ResMut<AsciiCellGrid>,
     config: Res<RenderConfig>,
 ) {
-    for event in resize_events.read() {
-        let font_width = 8;  // from font atlas
-        let font_height = 8;
-        let new_w = event.width as u32 / font_width;
-        let new_h = event.height as u32 / font_height;
-        if new_w != grid.width || new_h != grid.height {
-            // Resize the grid (allocate new arrays)
-            let cell_count = (new_w * new_h) as usize;
-            grid.width = new_w;
-            grid.height = new_h;
-            grid.char_indices = vec![0; cell_count];
-            grid.fg_colors = vec![[0, 0, 0, 255]; cell_count];
-            grid.bg_colors = vec![[0, 0, 0, 255]; cell_count];
+    // R7-M01 FIX: Must unwrap the Option before calling .read() — Option has no .read() method.
+    if let Some(mut reader) = resize_events {
+        for event in reader.read() {
+            let font_width = 8;  // from font atlas
+            let font_height = 8;
+            let new_w = event.width as u32 / font_width;
+            let new_h = event.height as u32 / font_height;
+            if new_w != grid.width || new_h != grid.height {
+                // Resize the grid (allocate new arrays)
+                let cell_count = (new_w * new_h) as usize;
+                grid.width = new_w;
+                grid.height = new_h;
+                grid.char_indices = vec![0; cell_count];
+                grid.fg_colors = vec![[0, 0, 0, 255]; cell_count];
+                grid.bg_colors = vec![[0, 0, 0, 255]; cell_count];
+            }
         }
     }
 }
@@ -323,14 +326,12 @@ fn generate_test_pattern(mut grid: ResMut<AsciiCellGrid>) {
             } else {
                 [64, 0, 0, 255]     // dark red
             };
-            // M-04 FIX: set_cell() was planned but NOT implemented. AsciiCellGrid uses
-            // direct field mutation — see P3-H01 FIX in 03-01-PLAN.md. Actual pattern:
-            //   let idx = (y * grid.width + x) as usize;
-            //   grid.char_indices[idx] = glyph;
-            //   grid.fg_colors[idx] = fg;
-            //   grid.bg_colors[idx] = bg;
-            // The set_cell() call below is a documentation artifact; it will not compile.
-            grid.set_cell(x, y, glyph, fg, bg);
+            // R7-L02 FIX: Direct field mutation (set_cell() was never implemented).
+            // Access grid cells via grid.cells[y * grid.width + x] and set glyph/fg/bg fields directly.
+            let idx = y * grid.width + x;
+            grid.cells[idx].glyph = glyph;
+            grid.cells[idx].fg = fg;
+            grid.cells[idx].bg = bg;
         }
     }
 }

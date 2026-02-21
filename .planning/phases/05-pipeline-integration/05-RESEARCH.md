@@ -405,6 +405,10 @@ pub fn build_bsp(instances: &mut [BspItem]) -> BspNode {
         ca.partial_cmp(&cb).unwrap_or(Ordering::Equal)
     });
 
+    // **R7-011 FIX:** The `items[best_split - 1]` and `items[best_split]` references below use
+    // `items` which is the local name for the `instances` parameter BEFORE `split_at_mut`.
+    // Compute `split_plane` value BEFORE calling `split_at_mut`:
+    let sp = (instances[best_split - 1].centroid[best_axis] + instances[best_split].centroid[best_axis]) / 2.0;
     let (left, right) = instances.split_at_mut(best_split);
     let left_node = build_bsp(left);
     let right_node = build_bsp(right);
@@ -413,8 +417,8 @@ pub fn build_bsp(instances: &mut [BspItem]) -> BspNode {
         children: [Some(Box::new(left_node)), Some(Box::new(right_node))],
         bbox: combined_bbox(&instances),
         // ~~split_plane: 0.0~~  WRONG placeholder — see P5-074 FIX in 05-02-PLAN.md
-        // Correct: split_plane = (items[best_split-1].centroid[best_axis] + items[best_split].centroid[best_axis]) / 2.0
-        split_plane: (items[best_split - 1].centroid[best_axis] + items[best_split].centroid[best_axis]) / 2.0,
+        // Correct: split_plane computed BEFORE split_at_mut (R7-011 FIX)
+        split_plane: sp,
         split_axis: best_axis as u8,
     }
 }

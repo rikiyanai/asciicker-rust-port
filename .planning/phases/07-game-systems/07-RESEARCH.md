@@ -36,7 +36,7 @@ The audio subsystem is the most straightforward: bevy_kira_audio 0.25 provides B
 |---------|---------|---------|--------------|
 | bevy_kira_audio | 0.25 | Audio playback, channels, mixer | Official Bevy audio plugin; 0.25 = Bevy 0.18 compatible; Kira backend handles Ogg/MP3/WAV/FLAC |
 | bevy_replicon | 0.38 | Server-authoritative entity replication | Mature Bevy networking abstraction; transport-agnostic; supports singleplayer + dedicated server modes |
-| bevy_renet | latest (Bevy 0.18) | Network transport for bevy_replicon | TCP/UDP transport; bevy_replicon_renet integrates the two; simpler than lightyear for basic replication |
+| bevy_renet | (transitive via bevy_replicon_renet2 = "0.13") | Network transport for bevy_replicon | TCP/UDP transport; bevy_replicon_renet2 integrates the two; simpler than lightyear for basic replication |
 | kiddo | 5.2 | k-d tree nearest-neighbor search | Fastest Rust k-d tree; const-generic dimensions (supports 6D); f32 support; `nearest_one` avoids heap alloc |
 | noise | 0.9+ | Perlin noise for weather wind simulation | Standard Rust noise library; 2D/3D Perlin + Simplex; used for wind vector variation like C++ siv::PerlinNoise |
 

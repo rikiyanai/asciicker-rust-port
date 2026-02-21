@@ -29,7 +29,7 @@ Bevy uses Y-up internally (right-handed, +Y up, -Z forward). The C++ Asciicker e
 - Plugin communication: Resources + explicit system ordering (.before/.after)
 - Each plugin is a Bevy Plugin struct implementing the Plugin trait
 - Use glam types directly (Vec3, Mat4, Quat) -- no thin wrappers
-- Success criteria require `const UP: Vec3 = Vec3::Z` and a compile-time type alias at minimum
+- Success criteria require `const UP: Vec3 = Vec3::Z` and a `GameVec3` newtype struct (`pub struct GameVec3(pub Vec3)`) with `Deref<Target=Vec3>`.
 - SampleBuffer dimensions configurable via a RenderConfig resource
 - Default resolution: 240x135 ASCII (SampleBuffer = 484x274 (formula: 2*ascii_width+4 x 2*ascii_height+4))
 - SampleBuffer: flat Vec<Sample> with index methods -- match C++ layout
@@ -190,8 +190,8 @@ impl Deref for GameVec3 {
 }
 
 impl GameVec3 {
-    pub fn to_bevy(self) -> Vec3 { Vec3::new(self.0.x, self.0.y, self.0.z) }
-    pub fn from_bevy(v: Vec3) -> Self { Self(Vec3::new(v.x, v.y, v.z)) }
+    pub fn to_bevy(self) -> Vec3 { Vec3::new(self.0.x, self.0.z, -self.0.y) }
+    pub fn from_bevy(v: Vec3) -> Self { Self(Vec3::new(v.x, -v.z, v.y)) }
 }
 ```
 

@@ -268,6 +268,7 @@ pub struct AnsiCell {
 
 ### Pitfall 5: Resolve Pass Elevation Detection
 **What goes wrong:** The resolve pass computes elevation (elv 0-3) by looking at the row ABOVE and BELOW the current 2x2 block (`src[-dw]` and `src[dw]`). This requires the border samples.
+**R7-M02 FIX:** The above is INCORRECT. Only `src[-dw]` (row above) is used for elevation computation. `src[dw]` (row below) is NOT read. See R6-M03 FIX in 04-04-PLAN.md for the authoritative correction.
 **Why it happens:** Off-by-one in pointer arithmetic when porting from raw C++ pointer math.
 **How to avoid:** Precompute row offsets. The current row's 2x2 block uses samples at `[src+0, src+1, src+dw, src+dw+1]`. The row above is `src-dw`. Always verify against buffer dimensions.
 **Warning signs:** Wrong elevation glyphs (flat terrain showing slope characters).
