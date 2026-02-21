@@ -408,14 +408,16 @@ pub fn build_bsp(instances: &mut [BspItem]) -> BspNode {
     // **R7-011 FIX:** The `items[best_split - 1]` and `items[best_split]` references below use
     // `items` which is the local name for the `instances` parameter BEFORE `split_at_mut`.
     // Compute `split_plane` value BEFORE calling `split_at_mut`:
+    // **R8-001 FIX:** Compute `combined_bbox` BEFORE `split_at_mut` (instances is consumed by the split):
     let sp = (instances[best_split - 1].centroid[best_axis] + instances[best_split].centroid[best_axis]) / 2.0;
+    let total_bbox = combined_bbox(instances);  // MUST be before split_at_mut
     let (left, right) = instances.split_at_mut(best_split);
     let left_node = build_bsp(left);
     let right_node = build_bsp(right);
 
     BspNode::Node {
         children: [Some(Box::new(left_node)), Some(Box::new(right_node))],
-        bbox: combined_bbox(&instances),
+        bbox: total_bbox,
         // ~~split_plane: 0.0~~  WRONG placeholder — see P5-074 FIX in 05-02-PLAN.md
         // Correct: split_plane computed BEFORE split_at_mut (R7-011 FIX)
         split_plane: sp,
@@ -488,6 +490,10 @@ pub fn update_camera(camera: &mut GameCamera, dw: f64, dh: f64) {
 // R6-002 FIX: THIS ENTIRE CODE BLOCK IS STALE. The function body below uses the OLD 3-parameter
 // signature (with `world` parameter and raycast calls). See 05-06-PLAN.md Task 1 for the
 // CORRECT 2-parameter signature: update_terrain_dark(terrain: &mut RuntimeTerrain, light_dir: [f64; 3])
+//
+// **R8-002 WARNING: THIS ENTIRE CODE BLOCK IS STALE AND WILL NOT COMPILE.**
+// The function signature is wrong (3 params, should be 2). See 05-06-PLAN.md Task 1
+// for the CORRECT 2-parameter implementation. DO NOT USE.
 //
 // Source: C++ terrain.cpp:1714-1765 (DarkUpdater)
 pub fn update_terrain_dark(

@@ -285,7 +285,8 @@ fn create_data_texture(width: u32, height: u32, data: &[u8]) -> Image {
 fn handle_window_resize(
     mut resize_events: Option<MessageReader<WindowResized>>,
     mut grid: ResMut<AsciiCellGrid>,
-    config: Res<RenderConfig>,
+    config: Res<AsciiRenderConfig>,
+    windows: Query<&Window>,
 ) {
     // R7-M01 FIX: Must unwrap the Option before calling .read() — Option has no .read() method.
     if let Some(mut reader) = resize_events {
@@ -326,12 +327,11 @@ fn generate_test_pattern(mut grid: ResMut<AsciiCellGrid>) {
             } else {
                 [64, 0, 0, 255]     // dark red
             };
-            // R7-L02 FIX: Direct field mutation (set_cell() was never implemented).
-            // Access grid cells via grid.cells[y * grid.width + x] and set glyph/fg/bg fields directly.
+            // R8-M01 FIX: AsciiCellGrid uses separate flat arrays, not a cells[] struct array.
             let idx = y * grid.width + x;
-            grid.cells[idx].glyph = glyph;
-            grid.cells[idx].fg = fg;
-            grid.cells[idx].bg = bg;
+            grid.char_indices[idx] = glyph as u16;
+            grid.fg_colors[idx] = fg;
+            grid.bg_colors[idx] = bg;
         }
     }
 }

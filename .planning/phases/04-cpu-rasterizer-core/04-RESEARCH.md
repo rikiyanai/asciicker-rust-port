@@ -235,7 +235,7 @@ pub struct AnsiCell {
 | Benchmarking | Homemade timing | `criterion` crate | Statistical benchmarking with warmup, outlier detection |
 | xterm-256 palette | Runtime computation | Compile-time const array | The 6x6x6 cube mapping is static; use `const fn` |
 
-**Key insight:** The auto_mat LUT (32KB, 32*32*32*3 bytes) should be computed at compile time or lazily initialized once. In C++ it uses a static initializer. In Rust, use `std::sync::LazyLock` (stable since Rust 1.80) or a `const` block if the computation is const-compatible.
+**Key insight:** The auto_mat LUT (96KB, 32*32*32*3 bytes) should be computed at compile time or lazily initialized once. In C++ it uses a static initializer. In Rust, use `std::sync::LazyLock` (stable since Rust 1.80) or a `const` block if the computation is const-compatible.
 
 ## Common Pitfalls
 
