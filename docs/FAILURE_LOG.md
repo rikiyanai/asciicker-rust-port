@@ -219,8 +219,8 @@
 | F150 | PG-06: No full regression test (cargo test --all) between phases | High | RESOLVED | R14-PG06 FIX added to phase boundary plans (05-06, 06-03, 07-05) |
 | F151 | PG-10: No visual verification checkpoint after Phase 5 (SC requires visual recognition) | Critical | RESOLVED | R14-PG10 FIX visual checkpoint added to 05-06-PLAN.md |
 | F152 | PG-13: No .a3d world file in engine-port/assets/ — Phase 5 can't render anything | Critical | RESOLVED | R14-PG13 FIX asset prerequisite added to 05-05-PLAN.md |
-| F153 | PG-16: Golden-file C++ reference data doesn't exist — synthetic baselines only | Critical | RESOLVED | R14-PG16 FIX added to 05-06-PLAN.md — synthetic baselines accepted |
-| F154 | PG-17: No CI/CD pipeline exists (.github/workflows missing) | High | DEFERRED | CI setup deferred — not a plan content issue |
+| F153 | PG-16: Golden-file C++ reference data doesn't exist — synthetic baselines were accepted | Critical | BLOCKER | R14-SYNTH-BAN: Synthetic baselines BANNED. Real C++ reference data is a hard blocker. Must extract from C++ engine before golden-file tests can pass. Previous R14-PG16 FIX (accept synthetic) SUPERSEDED. |
+| F154 | PG-17: No CI/CD pipeline exists (.github/workflows missing) | High | RESOLVED | CI workflow created at .github/workflows/ci.yml |
 | F155 | PG-15: No .xp sprite files for Phase 6 character/equipment rendering | High | RESOLVED | R14-PG15 FIX asset prerequisite added to 06-02-PLAN.md |
 | F156 | PG-11/12: No visual verification or playtest checkpoint after Phase 6 or Phase 7 | High | RESOLVED | R14-PG11/PG12 FIX playtest checklists added to 06-03 and 07-05 |
 | F157 | PG-05: cargo fmt/clippy not mandated project-wide at wave boundaries | Medium | RESOLVED | R14-PG05 FIX added to wave-final plans |
