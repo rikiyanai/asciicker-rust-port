@@ -12,9 +12,10 @@ use std::time::Instant;
 use bevy::prelude::*;
 
 use crate::output::ascii_cell_grid::AsciiCellGrid;
-use crate::render::assembly::RuntimeMaterials;
+use crate::render::assembly::{MeshRegistry, RuntimeMaterials};
 use crate::render::camera::GameCamera;
 use crate::render::config::RenderConfig;
+use crate::render::mesh_shader::render_mesh;
 use crate::render::resolve_bridge::{AutoMatGlyphSelector, resolve_to_grid};
 use crate::render::sample_buffer::SampleBuffer;
 use crate::render::sprite_blit::{SpriteQueue, blit_sprite};
@@ -129,6 +130,7 @@ pub fn render_pipeline_system(
     world_data: Res<RuntimeWorld>,
     camera: Res<GameCamera>,
     materials: Option<Res<RuntimeMaterials>>,
+    mesh_registry: Res<MeshRegistry>,
     mut config: ResMut<RenderConfig>,
     mut sample_buffer: ResMut<SampleBuffer>,
     mut cell_grid: ResMut<AsciiCellGrid>,
@@ -190,15 +192,15 @@ pub fn render_pipeline_system(
             for vis_inst in &visible {
                 match vis_inst {
                     crate::world::bsp::VisibleInstance::Mesh(id) => {
-                        // Mesh rendering would require loaded AKM mesh data.
-                        // Skip with trace-level log if mesh not loaded.
-                        // Full mesh rendering with MeshRegistry is Phase 6 scope.
                         if let Some(crate::world::instance::RuntimeInstance::Mesh {
                             mesh_id, tm, ..
                         }) = world_data.instances.get(id.0)
                         {
-                            trace!("Pipeline: mesh instance '{}' visible (render deferred until mesh loaded)", mesh_id);
-                            let _ = (tm, buf_w, buf_h); // suppress unused warnings
+                            if let Some(mesh) = mesh_registry.loaded.get(mesh_id) {
+                                render_mesh(buf, buf_w, buf_h, mesh, tm, &camera.view_tm);
+                            } else {
+                                trace!("Pipeline: mesh '{}' visible but AKM not yet loaded", mesh_id);
+                            }
                         }
                     }
                     crate::world::bsp::VisibleInstance::Sprite(id) => {
@@ -391,5 +393,89 @@ mod tests {
             crate::render::sample_buffer::Sample::clear_state().visual
         );
         assert!(clear_us < 1_000_000, "Clear should complete quickly");
+    }
+
+    #[test]
+    fn test_pipeline_mesh_branch_calls_render_mesh() {
+        use crate::asset_loader::akm_mesh::{AkmFace, AkmMesh, AkmVertex};
+        use crate::render::sample_buffer::{Sample, spare_bits};
+        use std::collections::HashMap;
+
+        // Build a small AkmMesh with 1 triangle.
+        // Vertices are placed directly in sample-buffer coordinates via
+        // a custom view_tm, so we control exact pixel positions.
+        let mesh = AkmMesh {
+            vertices: vec![
+                AkmVertex { x: 0.0, y: 0.0, z: 0.0, r: 200, g: 100, b: 50, alpha: 255 },
+                AkmVertex { x: 1.0, y: 0.0, z: 0.0, r: 200, g: 100, b: 50, alpha: 255 },
+                AkmVertex { x: 0.0, y: 1.0, z: 0.0, r: 200, g: 100, b: 50, alpha: 255 },
+            ],
+            faces: vec![AkmFace {
+                indices: [0, 1, 2],
+                visual: 0,
+                freestyle: false,
+            }],
+            edges: vec![],
+        };
+
+        // Create a MeshRegistry with the mesh loaded under key "test_mesh"
+        let mut loaded = HashMap::new();
+        loaded.insert("test_mesh".to_string(), mesh);
+        let registry = MeshRegistry {
+            meshes: HashMap::new(),
+            loaded,
+        };
+
+        // Create a small SampleBuffer (20x20 ASCII -> 44x44 sample)
+        let ascii_w: u32 = 20;
+        let ascii_h: u32 = 20;
+        let mut buf = SampleBuffer::new(ascii_w, ascii_h);
+        let buf_w = buf.width as i32;
+        let buf_h = buf.height as i32;
+
+        // Identity instance transform (no model->world transformation)
+        let instance_tm: [f64; 16] = [
+            1.0, 0.0, 0.0, 0.0,
+            0.0, 1.0, 0.0, 0.0,
+            0.0, 0.0, 1.0, 0.0,
+            0.0, 0.0, 0.0, 1.0,
+        ];
+
+        // Custom view_tm that scales world coords into sample-buffer center.
+        // The triangle occupies world [0,1]x[0,1], we want it to cover
+        // roughly sample-space [10,30]x[10,30] in a 44x44 buffer.
+        // view_tm is row-major: screen_x = col0*wx + col1*wy + col2*wz + col3
+        // We want: screen_x = 20*wx + 10, screen_y = 20*wy + 10, screen_z = 100
+        let view_tm: [f64; 16] = [
+            20.0, 0.0,   0.0, 0.0,   // column 0: X scale
+            0.0,  20.0,  0.0, 0.0,   // column 1: Y scale
+            0.0,  0.0,   0.0, 0.0,   // column 2: Z (flat)
+            10.0, 10.0, 100.0, 1.0,  // column 3: translation
+        ];
+
+        // Call render_mesh directly (same as pipeline Stage 3 would)
+        let akm_mesh = registry.loaded.get("test_mesh").unwrap();
+        render_mesh(
+            &mut buf.samples,
+            buf_w,
+            buf_h,
+            akm_mesh,
+            &instance_tm,
+            &view_tm,
+        );
+
+        // Verify at least one sample was written by render_mesh.
+        // Clear state also has MESH_FLAG (sky-blue), so we distinguish
+        // rendered samples by checking height != CLEAR_HEIGHT.
+        let rendered_samples = buf
+            .samples
+            .iter()
+            .filter(|s| s.spare == spare_bits::MESH_FLAG && s.height != Sample::CLEAR_HEIGHT)
+            .count();
+        assert!(
+            rendered_samples > 0,
+            "render_mesh must write at least one sample (height != CLEAR_HEIGHT), got 0 out of {}",
+            buf.samples.len()
+        );
     }
 }
