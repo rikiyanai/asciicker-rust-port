@@ -294,6 +294,11 @@
 | F225 | R17: 07-05 test_weather_update_spawns lacks expected particle count | Low | RESOLVED | Added R17-F225 FIX: assert pool.active_count() == 30. |
 | F226 | R17: 05-06 test_shadow_is_load_time rename creates confusion | Low | RESOLVED | Added R17-F226 FIX redirect to renamed test name. |
 | F227 | R17: 07-02 LoadingProgress stage decrement lacks concrete assertion | Low | RESOLVED | Added R17-F227 FIX with stage: 3 → 0 assertion. |
+| F228 | R18: 05-05 files_modified missing main.rs (R14-F124 plugin reorder) | Medium | RESOLVED | Added main.rs to 05-05 files_modified list. |
+| F229 | R18: 06-02 files_modified missing render/camera.rs (Q/E gating) | Medium | RESOLVED | Added camera.rs to 06-02 files_modified list. |
+| F230 | R18: TDD plans 06-01/06-02/07-05 lack explicit REFACTOR heading | Low | RESOLVED | Cosmetic; clippy clean serves same purpose. Informational, no fix. |
+| F231 | R18: 06-01 velocity clamping test lacks explicit expected value (MAX_VEL_AIR=27.0) | Low | RESOLVED | Added R18-F231 FIX with concrete clamping assertion. |
+| F232 | R18: 07-04 annotation density (61 tags, no APPENDIX) — repeat of F217 | Low | RESOLVED | Repeat finding; F217 already resolved as informational. |
 
 ---
 
@@ -374,4 +379,4 @@
 
 ---
 
-*Failure log last updated: 2026-02-22 (R17 findings F210-F227 added and RESOLVED: 0C/0H/5M/12L/1I across 10 audit scopes)*
+*Failure log last updated: 2026-02-22 (R18 findings F228-F232 added and RESOLVED: 0C/0H/2M/3L across 10 audit scopes)*
