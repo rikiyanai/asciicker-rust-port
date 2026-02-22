@@ -41,6 +41,21 @@ impl FromWorld for AsciiCellGrid {
 }
 
 impl AsciiCellGrid {
+    /// Create a standalone AsciiCellGrid with given dimensions.
+    ///
+    /// Initializes all cells to space glyph (32), black foreground, black background.
+    /// Usable outside Bevy ECS for unit tests and golden pipeline tests.
+    pub fn new(width: u32, height: u32) -> Self {
+        let cell_count = (width * height) as usize;
+        Self {
+            width,
+            height,
+            char_indices: vec![32; cell_count],
+            fg_colors: vec![[0, 0, 0, 255]; cell_count],
+            bg_colors: vec![[0, 0, 0, 255]; cell_count],
+        }
+    }
+
     /// Total number of cells in the grid.
     pub fn cells_count(&self) -> usize {
         (self.width * self.height) as usize
