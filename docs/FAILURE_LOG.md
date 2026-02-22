@@ -153,6 +153,81 @@
 | F116 | Codebase: test_pattern_system overwrites pipeline output (no feature gate) | Medium | RESOLVED | Tracked — Phase 5 Plan 05 adds #[cfg(feature = "test_pattern")] gate. |
 | F117 | 05-05: Debug deps (bevy-inspector-egui, bevy_mod_debugdump) already in Cargo.toml | Medium | RESOLVED | Same as F043. Plan 05-05 Task 3 updated to verify not re-add. |
 
+### Round 14 Findings (2026-02-21)
+
+**Standard Scope — Phase 7 (3 actionable)**
+
+| ID | Issue | Severity | Status | Resolution |
+|----|-------|----------|--------|------------|
+| F118 | 07-05: R13-035 pipeline signature missing `sprite_queue: Res<SpriteQueue>` and `time: Res<Time>` params | High | OPEN | Need to update R13-035 accumulated signature in 07-05 |
+| F119 | 07-02: main.rs plugin ordering needs verification step (AsciiOutputPlugin before CpuRasterizerPlugin) | Medium | OPEN | Add verification step to 07-02 |
+| F120 | 07-04: Font1 recolor trailing `0,0` is C++ terminator sentinel, not a 4th color pair — needs clarification | Medium | OPEN | Add parser clarification to 07-04 |
+
+**Standard Scope — Phase 6 (1 actionable)**
+
+| ID | Issue | Severity | Status | Resolution |
+|----|-------|----------|--------|------------|
+| F121 | 06-03: Benchmark uses `engine_port::` crate path but Cargo.toml name is `asciicker-engine` (= `asciicker_engine`) | Low | OPEN | Update example code or verify NOTE suffices |
+
+**Standard Scope — Cross-Phase (2 findings)**
+
+| ID | Issue | Severity | Status | Resolution |
+|----|-------|----------|--------|------------|
+| F122 | 07-05: R13-035 accumulated pipeline signature omits `ResMut<SpriteQueue>` (required by sprite blit stage) | Low | OPEN | Same root cause as F118 — fix pipeline sig |
+| F123 | 07-05: R13-035 includes `Res<WaterLevel>` but pipeline reads `Res<WaterConfig>` — WaterLevel is game-domain | Low | OPEN | Fix: remove WaterLevel, it reaches pipeline via WaterConfig |
+
+**Implementation Sequence (17 findings)**
+
+| ID | Issue | Severity | Status | Resolution |
+|----|-------|----------|--------|------------|
+| F124 | 05-05: No plan explicitly owns main.rs plugin reorder (AsciiOutputPlugin before CpuRasterizerPlugin) | Critical | OPEN | Add Step 0 to 05-05 Task 1 |
+| F125 | 07-02: depends_on:[] is misleading — pipeline.rs 4-way ownership requires 06-03 to complete first | Critical | OPEN | Change to depends_on: ["06-03"] |
+| F126 | 06-03: Update→PostUpdate schedule migration lacks verification step for stale references | Critical | OPEN | Add grep verification step to 06-03 |
+| F127 | Phase 7 wave 1: depends_on:[] with comment-only dependencies confuses automated executors | High | OPEN | Add explicit depends_on entries for Phase 7 plans |
+| F128 | 05-01/05-02: Stubs must register resources via init_resource before assembly consumes them | Medium | OPEN | Clarify ownership: TerrainPlugin inits empty, assembly populates |
+| F129 | 06-02: Disabling Phase 5 camera Q/E handling may break Phase 5 tests | High | OPEN | Document test expectation changes in 06-02 |
+| F130 | 05-04/05-05: MaterialTable Resource ownership gap — both plans claim creation | High | OPEN | Clarify 05-04 defines struct, 05-05 registers Resource |
+| F131 | Phase 5 Wave 1: No integration check before Wave 2 consumes Wave 1 APIs | Medium | OPEN | Add cargo build verification at wave boundaries |
+| F132 | 07-02: GameState testing requires functional render pipeline (bootstrap concern) | Medium | OPEN | Already addressed by Option (a)/(b) dual path |
+| F133 | Phase 7 wave labels imply parallelism that doesn't exist (sequential required) | Medium | OPEN | Informational — wave labels are misleading |
+| F134 | 05-05: test_pattern_system conflicts with render_pipeline_system (both write AsciiCellGrid) | Medium | OPEN | Already tracked (F116). Feature gate resolves this. |
+| F135 | Critical path is 10 sequential steps (informational) | Low | OPEN | Informational — reasonable for scope |
+| F136 | Phase 6 depends on Phase 5 APIs that don't exist yet (bootstrap managed by depends_on) | High | OPEN | Informational — correctly handled by depends_on |
+| F137 | Multi-file plans have no explicit rollback strategy | Medium | OPEN | Informational — git checkout . is implicit |
+| F138 | Phase 7 plans reference external GSD workflow files | Low | OPEN | Informational — execution framework concern |
+| F139 | SpriteQueue lifecycle split across Phase 5 and 6 (ownership transition) | Medium | OPEN | Correctly documented, no fix needed |
+| F140 | 06-02: game/mod.rs 3-way ownership (06-03→07-02→07-05) | High | OPEN | Correctly sequenced by depends_on |
+
+**UX and Complexity (grouped, 8 findings)**
+
+| ID | Issue | Severity | Status | Resolution |
+|----|-------|----------|--------|------------|
+| F141 | Plans are ~55% FIX-note audit noise (6,319 lines total, ~3,490 are annotations) | Critical | DEFERRED | Restructuring into SPEC+APPENDIX format deferred to post-execution |
+| F142 | 9 contradictions: old wrong text coexists with corrections (struck-through but readable) | High | DEFERRED | Would require major plan restructuring — deferred |
+| F143 | 7 avoidable ambiguities dumped onto executor (AnimState model, geometry source design, etc.) | High | OPEN | Resolve key decisions in plans |
+| F144 | 8 critical code sections in prose not Rust (frustum planes, collision sweep, water reflection) | High | DEFERRED | Prose-to-code conversion deferred to execution time |
+| F145 | GlyphSelector trait in Phase 5 is premature (YAGNI — only needed in Phase 7) | Medium | DEFERRED | Simplification deferred — trait exists for Phase 7 extensibility |
+| F146 | PhysicsGeometrySource trait vs free functions — plan admits free functions would be simpler | Medium | DEFERRED | Noted — implementer may use free functions per P6-012 |
+| F147 | SpawnNetworkedPlayer Command struct is over-engineering for single call site | Medium | DEFERRED | Noted — simplify during Phase 7 execution if appropriate |
+| F148 | ResolveBuffer pre-allocation (R62) added without profiling evidence | Medium | DEFERRED | Low-risk optimization — keep but profile during execution |
+
+**Process Gaps (12 findings)**
+
+| ID | Issue | Severity | Status | Resolution |
+|----|-------|----------|--------|------------|
+| F149 | PG-01: No plan includes ROADMAP.md update step after completion | High | OPEN | Add ROADMAP update step to all plans |
+| F150 | PG-06: No full regression test (cargo test --all) between phases | High | OPEN | Add full test step at phase boundaries |
+| F151 | PG-10: No visual verification checkpoint after Phase 5 (SC requires visual recognition) | Critical | OPEN | Add visual verification note to Phase 5 plans |
+| F152 | PG-13: No .a3d world file in engine-port/assets/ — Phase 5 can't render anything | Critical | OPEN | Add asset copy prerequisite step |
+| F153 | PG-16: Golden-file C++ reference data doesn't exist — synthetic baselines only | Critical | OPEN | Note limitation; accept synthetic baselines with manual visual check |
+| F154 | PG-17: No CI/CD pipeline exists (.github/workflows missing) | High | DEFERRED | CI setup deferred — not a plan content issue |
+| F155 | PG-15: No .xp sprite files for Phase 6 character/equipment rendering | High | OPEN | Add asset copy prerequisite to Phase 6 plans |
+| F156 | PG-11/12: No visual verification or playtest checkpoint after Phase 6 or Phase 7 | High | OPEN | Add playtest checkpoints to Phase 6/7 |
+| F157 | PG-05: cargo fmt/clippy not mandated project-wide at wave boundaries | Medium | OPEN | Add project-wide fmt/clippy step |
+| F158 | PG-22: Plugin stub conversion not explicitly tracked in plans | Medium | OPEN | Add stub cleanup verification step |
+| F159 | PG-23: render_pipeline_system in Update during Phase 6 wave 1 (before 06-03 migrates to PostUpdate) | Medium | OPEN | Accept intermediate state — documented behavior |
+| F160 | PG-14/21: Sound files not available; bevy_replicon fallback not fully documented | Medium | OPEN | Add asset setup and dependency fallback notes |
+
 ---
 
 ## RESOLVED ISSUES
@@ -232,4 +307,4 @@
 
 ---
 
-*Failure log last updated: 2026-02-20*
+*Failure log last updated: 2026-02-21 (R14 findings F118-F160 added)*
