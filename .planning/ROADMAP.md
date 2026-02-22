@@ -128,7 +128,7 @@ Plans:
 - [ ] 05-03-PLAN.md -- Perspective camera with view matrix, frustum planes, Q/E rotation (wave 1)
 - [ ] 05-04-PLAN.md -- TerrainShader, MeshShader, resolve_to_grid bridge (wave 2)
 - [ ] 05-05-PLAN.md -- A3D assembly system, pipeline orchestrator with per-stage timing (wave 3)
-- [ ] 05-06-PLAN.md -- Terrain shadows, golden-file CI comparison, budget assertion (wave 3)
+- [ ] 05-06-PLAN.md -- Terrain shadows, golden-file CI comparison, budget assertion (wave 4)
 
 ### Phase 6: Physics and Character
 **Goal**: A player-controlled character moves through the rendered world with sphere-based collision physics, state-machine animations, and water/effects, producing a playable single-player experience
@@ -144,8 +144,8 @@ Plans:
 
 Plans:
 - [ ] 06-01-PLAN.md -- Physics core: collision, forces, PhysicsIO, FixedUpdate, collect_terrain_triangles + collect_world_triangles free functions (TDD, wave 1)
-- [ ] 06-02-PLAN.md -- Character: state machine (with Block), equipment, input (Q/E ownership), animation, sprite_query (TDD, wave 1)
-- [ ] 06-03-PLAN.md -- Water reflection (actual geometry re-query), Perlin ripple, GamePlugin (no sub-plugins), torque-to-camera, perf benchmark (wave 2)
+- [ ] 06-02-PLAN.md -- Character: state machine (with Block), equipment, input (Q/E ownership), animation, sprite_query (TDD, wave 2)
+- [ ] 06-03-PLAN.md -- Water reflection (actual geometry re-query), Perlin ripple, GamePlugin (no sub-plugins), torque-to-camera, perf benchmark (wave 3)
 
 ### Phase 7: Game Systems
 **Goal**: Audio, multiplayer networking, weather effects, menus, and visual quality upgrades complete the game for v1 release
@@ -162,9 +162,9 @@ Plans:
 Plans:
 - [ ] 07-01-PLAN.md -- Audio: bevy_kira_audio 0.25, 16-track DynamicAudioChannels mixer (wave 1)
 - [ ] 07-02-PLAN.md -- Game state machine (Loading/Playing/Paused) and main menu (wave 1)
-- [ ] 07-03-PLAN.md -- Networking: bevy_replicon 0.38, binary protocol, server/client (wave 1)
-- [ ] 07-04-PLAN.md -- Visual quality: Alex Harri 6D shape-vector + Font1 3 skins (TDD, wave 2)
-- [ ] 07-05-PLAN.md -- Weather: ring-buffer particle pool, Perlin wind, snow/rain (TDD, wave 2)
+- [ ] 07-03-PLAN.md -- Networking: bevy_replicon 0.38, binary protocol, server/client (wave 2)
+- [ ] 07-04-PLAN.md -- Visual quality: Alex Harri 6D shape-vector + Font1 3 skins (TDD, wave 3)
+- [ ] 07-05-PLAN.md -- Weather: ring-buffer particle pool, Perlin wind, snow/rain (TDD, wave 4)
 
 ## Progress
 

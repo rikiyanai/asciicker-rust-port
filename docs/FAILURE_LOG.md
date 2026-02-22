@@ -276,6 +276,24 @@
 | F207 | R16: 07-04 no manual QA gate for shape-vector visual quality (core feature purpose) | Critical | RESOLVED | Added Manual QA Gate with 5-item visual comparison checklist. |
 | F208 | R16: 07-04 font skin color tests are vague — need exact RGB assertions | High | RESOLVED | Added R16-F208 FIX with concrete RGB color assertions. |
 | F209 | R16: 07-05 test_weather_clear_no_spawn trivially true by construction (SPAWN_RATES[0]=0) | Low | RESOLVED | Annotated as smoke test with cross-refs to meaningful tests. |
+| F210 | R17: ROADMAP wave annotations stale for 05-06, 06-02, 06-03, 07-03, 07-04, 07-05 | Low | RESOLVED | Updated 6 ROADMAP wave annotations to match plan frontmatter. |
+| F211 | R17: Plan wave labels cosmetic: 06-03 wave:2→3, 07-04 wave:2→3, 07-05 wave:3→4 | Low | RESOLVED | Updated 3 plan frontmatter wave labels. |
+| F212 | R17: 07-01 depends_on:[] should include "06-03" (main.rs/lib.rs/Cargo.toml chain) | Medium | RESOLVED | Added "06-03" to 07-01 depends_on with R17-F212 FIX comment. |
+| F213 | R17: 06-03 depends_on missing "05-05" (pipeline.rs ownership chain) | Medium | RESOLVED | Added "05-05" to 06-03 depends_on with R17-F213 FIX comment. |
+| F214 | R17: 07-01/07-03 missing plugin insertion point note (before GamePlugin) | Low | RESOLVED | Added R17-F214 FIX comments to both plan frontmatters. |
+| F215 | R17: 07-05 struck-through text at lines 218-220 (superseded P7-033) | Low | RESOLVED | Deleted struck-through P7-033 text, kept authoritative decision. |
+| F216 | R17: GameSet::PhysicsSync used in 06-03 but enum never defined in any plan | Low | RESOLVED | Added R17-F216 FIX with GameSet enum definition in 06-03 spec. |
+| F217 | R17: 07-04 has 54 annotation tags with no APPENDIX separation | Low | RESOLVED | Informational. No structural fix needed; tags are actionable inline annotations. |
+| F218 | R17: 05-04 appendix at 32% of plan length (threshold 30%) | Info | RESOLVED | Informational. Appendix well-separated and marked non-implementation. |
+| F219 | R17: 05-02 test_query_sphere not in explicit test list | Medium | RESOLVED | Added test_query_sphere to 05-02 explicit Unit tests list. |
+| F220 | R17: 06-02 WASD rotation sign convention possible sign error | Medium | RESOLVED | Added R17-F220 FIX verification note for sign convention at execution time. |
+| F221 | R17: 07-04 test_sample_to_lightness_range lacks known-answer | Medium | RESOLVED | Added R17-F221 FIX with RGB555=(31,0,0) known-answer case. |
+| F222 | R17: 05-02 test_build_from_parsed lacks concrete assertions | Low | RESOLVED | Added R17-F222 FIX with instance count and BSP depth assertions. |
+| F223 | R17: 05-02 test_query_visible_all/none lack expected counts | Low | RESOLVED | Added R17-F223 FIX with specific expected count assertions. |
+| F224 | R17: 07-05 test_weather_intensity_lerp lacks expected values | Low | RESOLVED | Added R17-F224 FIX with LERP_RATE=0.05 expected values. |
+| F225 | R17: 07-05 test_weather_update_spawns lacks expected particle count | Low | RESOLVED | Added R17-F225 FIX: assert pool.active_count() == 30. |
+| F226 | R17: 05-06 test_shadow_is_load_time rename creates confusion | Low | RESOLVED | Added R17-F226 FIX redirect to renamed test name. |
+| F227 | R17: 07-02 LoadingProgress stage decrement lacks concrete assertion | Low | RESOLVED | Added R17-F227 FIX with stage: 3 → 0 assertion. |
 
 ---
 
@@ -356,4 +374,4 @@
 
 ---
 
-*Failure log last updated: 2026-02-22 (R16 findings F175-F209 added and RESOLVED: 5C/8H/9M/13L across 10 audit scopes)*
+*Failure log last updated: 2026-02-22 (R17 findings F210-F227 added and RESOLVED: 0C/0H/5M/12L/1I across 10 audit scopes)*
