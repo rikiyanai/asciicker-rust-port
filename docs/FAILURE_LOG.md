@@ -241,6 +241,41 @@
 | F172 | R15: 05-05 Task 2.2 uses placeholder `/* GlyphSelector impl */` instead of explicit AutoMatGlyphSelector | Low | RESOLVED | Replaced with `AutoMatGlyphSelector::new()`. |
 | F173 | R15: 05-06 says cells_count() is "not a confirmed method" but it exists at ascii_cell_grid.rs:45 | Low | RESOLVED | Updated comment to acknowledge cells_count() exists. |
 | F174 | R15: 07-03 test description references stale SpawnNetworkedPlayer in ECS integration test comment | Low | RESOLVED | Updated to reference direct spawn_character() call. |
+| F175 | R16: 05-05 line 439 uses `AutoMatGlyphSelector::new()` but AutoMatGlyphSelector is a unit struct (no ::new() method) | Low | RESOLVED | Changed to `AutoMatGlyphSelector` (unit struct literal). |
+| F176 | R16: 07-03 lines 221-225 still have 5 struck-through SUPERSEDED lines (R15 F170 fix failed) | Low | RESOLVED | Deleted all 5 struck-through lines. |
+| F177 | R16: 07-03 line 277 H2-AUDIT-FIX text says `spawn_character_world()` but R14-F147 resolved to `spawn_character()` | Low | RESOLVED | Changed to `spawn_character()` and removed struck-through text. |
+| F178 | R16: 06-03 line 185 references `sample_buffer.samples_mut()` — SampleBuffer has no samples_mut() method | Low | RESOLVED | Changed to `sample_buffer.samples.iter_mut()`. |
+| F179 | R16: 07-05 accumulated sig uses `Res<RenderConfig>` but 05-05 requires `ResMut<RenderConfig>` for window resize sync | Medium | RESOLVED | Changed to `mut config: ResMut<RenderConfig>`. |
+| F180 | R16: 06-02 defines `spawn_character_world(&mut World)` with zero callers — YAGNI | Medium | RESOLVED | Annotated for removal at execution time. |
+| F181 | R16: 05-06/06-02/07-03/07-05 wave labels inconsistent with depends_on (4 cosmetic mismatches) | Low | RESOLVED | Fixed wave labels: 05-06→4, 06-02→2, 07-03→2, 07-05→3. |
+| F182 | R16: 07-03 WorldInstanceKind guidance (~50 lines) is scope creep in networking plan | Low | RESOLVED | Added NOTE: section is speculative guidance, not a deliverable. |
+| F183 | R16: 05-01 test_runtime_patch_from_terrain_patch lacks specific field value assertions | Medium | RESOLVED | Added R16-F183 FIX with concrete assertions (lo, hi, dark, materials). |
+| F184 | R16: 05-01 test_frustum_partial_overlap lacks expected visible count | Low | RESOLVED | Added R16-F184 FIX with expected "1 of 4 patches visible" spec. |
+| F185 | R16: 05-02 test_query_sphere test lacks concrete position/radius values | Medium | RESOLVED | Not in Phase 5 plans — deferred to execution. |
+| F186 | R16: 05-02 test_build_from_parsed lacks structural assertions | Low | RESOLVED | Not in Phase 5 plans — deferred to execution. |
+| F187 | R16: 05-03 CAM-02 Q/E rotation has NO automated test — only "Bevy system registration" | High | RESOLVED | Added R16-F187 FIX with test_q/e_yaw tests using Bevy App::update(). |
+| F188 | R16: 05-04 test_render_patch_produces_samples too weak ("non-clear samples exist") | Medium | RESOLVED | Added R16-F188 FIX with sample count ≥ 64 assertion. |
+| F189 | R16: 05-04 test_resolve_to_grid_clear_cells lacks specific value assertions | Medium | RESOLVED | Added R16-F189 FIX with char_indices/fg/bg color assertions. |
+| F190 | R16: 05-05 test_pipeline_timing_populated asserts only total_us > 0 (trivial) | High | RESOLVED | Added R16-F190 FIX with per-stage breakdown assertions. |
+| F191 | R16: 05-05 test_assembly_state_default is structural, not behavioral | Medium | RESOLVED | Annotated as acceptable smoke test. |
+| F192 | R16: 05-06 test_shadow_determinism is trivial — no known-answer test case | High | RESOLVED | Added R16-F192 FIX with known-answer shadow test spec. |
+| F193 | R16: 05-06 test_flat_terrain_no_shadows is degenerate case (trivially passes) | Low | RESOLVED | Annotated as acceptable smoke test with cross-ref to F192. |
+| F194 | R16: 06-01 physics tests described in prose — no specific numeric assertions | High | RESOLVED | Added R16-F194 FIX with gravity/jump/damping numeric assertions. |
+| F195 | R16: 06-01 collect_terrain_triangles missing expected count = 32 (4×4×2 for single patch) | High | RESOLVED | Added R16-F195 FIX with triangle count = 32 assertion. |
+| F196 | R16: 06-01 test_height_conversion is trivial arithmetic identity | Medium | RESOLVED | Annotated as acceptable constant validation smoke test. |
+| F197 | R16: 06-02 test_block_input_requires_shield doesn't verify state remains unchanged without shield | Medium | RESOLVED | Added R16-F197 FIX with negative test case spec. |
+| F198 | R16: 06-02 no manual QA gate for character visual rendering | Low | RESOLVED | Added manual QA checkpoint deferred to 06-03 playtest. |
+| F199 | R16: 06-03 test_rotation_frame_rate_independent lacks setup specification for different frame rates | Critical | RESOLVED | Added R16-F199 FIX with 30fps vs 60fps test setup. |
+| F200 | R16: 06-03 water reflection "mock test" tests function call, not geometric correctness | High | RESOLVED | Added R16-F200 FIX with behavioral 2-patch terrain test. |
+| F201 | R16: 06-03 Perlin ripple color shift test too weak ("non-zero" not sufficient) | Critical | RESOLVED | Added R16-F201 FIX with different-cells-different-shifts assertion. |
+| F202 | R16: 07-01 no manual QA gate for audio output (inherently non-automatable) | Critical | RESOLVED | Added Manual QA Gate with 4-item audio checklist. |
+| F203 | R16: 07-01 audio channel starvation integration test lacks setup specification | Medium | RESOLVED | Added R16-F203 FIX with 16-event + wrap test setup. |
+| F204 | R16: 07-02 no manual QA gate for main menu visual appearance | Critical | RESOLVED | Added Manual QA Gate with 5-item menu checklist. |
+| F205 | R16: 07-02 no automated test that render_pipeline_system is gated on Playing state | High | RESOLVED | Added R16-F205 FIX with test_pipeline_does_not_run_during_menu spec. |
+| F206 | R16: 07-03 in-process connectivity test is #[ignore] with no non-ignored networking test | Medium | RESOLVED | Added R16-F206 FIX with non-ignored roundtrip test spec. |
+| F207 | R16: 07-04 no manual QA gate for shape-vector visual quality (core feature purpose) | Critical | RESOLVED | Added Manual QA Gate with 5-item visual comparison checklist. |
+| F208 | R16: 07-04 font skin color tests are vague — need exact RGB assertions | High | RESOLVED | Added R16-F208 FIX with concrete RGB color assertions. |
+| F209 | R16: 07-05 test_weather_clear_no_spawn trivially true by construction (SPAWN_RATES[0]=0) | Low | RESOLVED | Annotated as smoke test with cross-refs to meaningful tests. |
 
 ---
 
@@ -321,4 +356,4 @@
 
 ---
 
-*Failure log last updated: 2026-02-21 (R15 findings F161-F174 added)*
+*Failure log last updated: 2026-02-22 (R16 findings F175-F209 added and RESOLVED: 5C/8H/9M/13L across 10 audit scopes)*
