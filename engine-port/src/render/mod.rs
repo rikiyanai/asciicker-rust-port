@@ -1,3 +1,4 @@
+pub mod camera;
 pub mod config;
 pub mod material;
 pub mod quantize;
@@ -8,6 +9,7 @@ pub mod types;
 
 use bevy::prelude::*;
 
+use camera::{GameCamera, camera_input_system, camera_update_system};
 use config::RenderConfig;
 use sample_buffer::SampleBuffer;
 
@@ -36,7 +38,9 @@ pub struct CpuRasterizerPlugin;
 impl Plugin for CpuRasterizerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<RenderConfig>()
-            .init_resource::<SampleBuffer>();
+            .init_resource::<SampleBuffer>()
+            .init_resource::<GameCamera>()
+            .add_systems(Update, (camera_input_system, camera_update_system).chain());
         info!("CpuRasterizerPlugin registered");
     }
 }
