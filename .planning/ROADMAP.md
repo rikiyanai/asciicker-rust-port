@@ -120,7 +120,7 @@ Plans:
   3. Terrain quadtree with HEIGHT_CELLS=4 and VISUAL_CELLS=8 renders with frustum culling, and terrain shadows cast correctly via 64-bit bitmask per patch
   4. BSP tree traversal renders world geometry with frustum culling, all 4 node types functional (NODE, NODE_SHARE, LEAF, INST), and instance flags respected
   5. Golden-file CI comparison of full-scene AnsiCell output against C++ reference shows <1% cell difference
-**Plans**: 6 plans
+**Plans**: 8 plans
 
 Plans:
 - [x] 05-01-PLAN.md -- Terrain quadtree runtime (RuntimePatch, QuadNode, frustum query) (wave 1)
@@ -129,6 +129,8 @@ Plans:
 - [x] 05-04-PLAN.md -- TerrainShader, MeshShader, resolve_to_grid bridge (wave 2)
 - [x] 05-05-PLAN.md -- A3D assembly system, pipeline orchestrator with per-stage timing (wave 3)
 - [x] 05-06-PLAN.md -- Terrain shadows, golden-file CI comparison, budget assertion (wave 4)
+- [ ] 05-07-PLAN.md -- GAP CLOSURE: Deploy game_map_y8.a3d asset, wire render_mesh() in pipeline (wave 5)
+- [ ] 05-08-PLAN.md -- GAP CLOSURE: VIS-02 status correction and C++ reference unblock documentation (wave 5)
 
 ### Phase 6: Physics and Character
 **Goal**: A player-controlled character moves through the rendered world with sphere-based collision physics, state-machine animations, and water/effects, producing a playable single-player experience
@@ -179,7 +181,7 @@ Note: Phases 3 and 4 are independent (both depend only on Phase 1) and can execu
 | 3. GPU Output | 3/3 | Complete | 2026-02-20 |
 | 3.1 Audit Remediation | 1/1 | Complete    | 2026-02-20 |
 | 4. CPU Rasterizer Core | 4/4 | Complete | 2026-02-20 |
-| 5. Pipeline Integration | 4/6 | In Progress | - |
+| 5. Pipeline Integration | 6/8 | Gap Closure | - |
 | 6. Physics and Character | 0/3 | Planned | - |
 | 7. Game Systems | 0/5 | Planned | - |
 
