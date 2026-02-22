@@ -129,8 +129,8 @@ Plans:
 - [x] 05-04-PLAN.md -- TerrainShader, MeshShader, resolve_to_grid bridge (wave 2)
 - [x] 05-05-PLAN.md -- A3D assembly system, pipeline orchestrator with per-stage timing (wave 3)
 - [x] 05-06-PLAN.md -- Terrain shadows, golden-file CI comparison, budget assertion (wave 4)
-- [ ] 05-07-PLAN.md -- GAP CLOSURE: Deploy game_map_y8.a3d asset, wire render_mesh() in pipeline (wave 5)
-- [ ] 05-08-PLAN.md -- GAP CLOSURE: VIS-02 status correction and C++ reference unblock documentation (wave 5)
+- [x] 05-07-PLAN.md -- GAP CLOSURE: Deploy game_map_y8.a3d asset, wire render_mesh() in pipeline (wave 5)
+- [x] 05-08-PLAN.md -- GAP CLOSURE: VIS-02 status correction and C++ reference unblock documentation (wave 5)
 
 ### Phase 6: Physics and Character
 **Goal**: A player-controlled character moves through the rendered world with sphere-based collision physics, state-machine animations, and water/effects, producing a playable single-player experience
