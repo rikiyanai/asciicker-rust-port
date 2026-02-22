@@ -11,13 +11,13 @@ use std::collections::HashMap;
 
 use bevy::prelude::*;
 
+use crate::asset_loader::a3d_terrain::A3dTerrain;
+use crate::asset_loader::a3d_terrain::MatCell as AssetMatCell;
 use crate::asset_loader::a3d_terrain::MaterialTable;
+use crate::asset_loader::a3d_world::A3dWorld;
 use crate::asset_loader::akm_mesh::AkmMesh;
 use crate::asset_loader::bevy_loaders::A3dFile;
-use crate::asset_loader::a3d_terrain::MatCell as AssetMatCell;
-use crate::asset_loader::a3d_world::A3dWorld;
-use crate::asset_loader::a3d_terrain::A3dTerrain;
-use crate::render::material::{Material, MatCell as RenderMatCell};
+use crate::render::material::{MatCell as RenderMatCell, Material};
 use crate::terrain::RuntimeTerrain;
 use crate::terrain::shadow::{default_light_dir, update_terrain_dark};
 use crate::world::RuntimeWorld;
