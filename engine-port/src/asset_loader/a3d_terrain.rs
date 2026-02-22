@@ -8,7 +8,8 @@
 compile_error!("A3D parsing requires little-endian platform");
 
 use super::constants::{
-    A3D_HEADER_SIZE, A3D_MAGIC, FILE_PATCH_SIZE, HEIGHT_CELLS, MATERIAL_TABLE_SIZE, VISUAL_CELLS,
+    A3D_HEADER_SIZE, A3D_MAGIC, FILE_PATCH_SIZE, HEIGHT_CELLS_PLUS_ONE, MATERIAL_TABLE_SIZE,
+    VISUAL_CELLS,
 };
 use super::error::AssetError;
 
@@ -48,9 +49,6 @@ struct FilePatch {
     height: [[u16; HEIGHT_CELLS_PLUS_ONE]; HEIGHT_CELLS_PLUS_ONE],
     diag: u16,
 }
-
-/// HEIGHT_CELLS + 1 as a constant usable in array types.
-const HEIGHT_CELLS_PLUS_ONE: usize = HEIGHT_CELLS + 1;
 
 const _ASSERT_FILE_PATCH_SIZE: () = assert!(
     std::mem::size_of::<FilePatch>() == FILE_PATCH_SIZE,

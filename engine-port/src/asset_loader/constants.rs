@@ -57,6 +57,9 @@ pub const SPRITE_HEIGHT_UNDEFINED: u8 = 0xFF;
 /// Number of height cells per terrain patch edge (5x5 vertices, 4x4 quads).
 pub const HEIGHT_CELLS: usize = 4;
 
+/// Number of height vertices per terrain patch edge (HEIGHT_CELLS + 1).
+pub const HEIGHT_CELLS_PLUS_ONE: usize = HEIGHT_CELLS + 1;
+
 /// Number of visual (material) cells per terrain patch edge.
 pub const VISUAL_CELLS: usize = 8;
 
