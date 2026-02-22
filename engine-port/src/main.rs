@@ -10,17 +10,21 @@ use asciicker_engine::terrain::TerrainPlugin;
 use asciicker_engine::world::WorldPlugin;
 
 fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins)
+    let mut app = App::new();
+    app.add_plugins(DefaultPlugins)
         .add_plugins((
             AssetLoaderPlugin,
             WorldPlugin,
             TerrainPlugin,
-            CpuRasterizerPlugin,
             AsciiOutputPlugin,
+            CpuRasterizerPlugin,
             PhysicsPlugin,
             CharacterPlugin,
             GamePlugin,
-        ))
-        .run();
+        ));
+
+    #[cfg(feature = "schedule_dump")]
+    app.add_plugins(bevy_mod_debugdump::CommandLineArgs);
+
+    app.run();
 }
