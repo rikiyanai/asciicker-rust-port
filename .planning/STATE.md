@@ -10,20 +10,20 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 ## Current Position
 
 Phase: 5 of 7 (Pipeline Integration) -- IN PROGRESS
-Plan: 3 of 6 in current phase (05-01, 05-02, 05-03 complete)
-Status: 05-02 complete (commits `fba4f74`, `75e5b0a`). BSP tree runtime with SAH construction and frustum-culled traversal.
-Last activity: 2026-02-22 -- Completed 05-02: BSP tree with near-child-first traversal, sphere query for physics
+Plan: 4 of 6 in current phase (05-01, 05-02, 05-03, 05-04 complete)
+Status: 05-04 complete (commits `537eb82`, `6a53ab0`). TerrainShader, MeshShader, resolve_to_grid bridge.
+Last activity: 2026-02-22 -- Completed 05-04: Shader implementations and resolve bridge
 
-Progress: [########..] 84%
+Progress: [#########.] 87%
 
-**Note:** Phase 5 wave 1 complete (05-01, 05-02, 05-03). 28 world tests + 23 terrain tests passing. Plans 05-04, 05-05, 05-06 remaining (waves 2-4).
+**Note:** Phase 5 waves 1-2 complete (05-01 through 05-04). 219 tests passing. Plans 05-05, 05-06 remaining (waves 3-4).
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 16
+- Total plans completed: 17
 - Average duration: ~7 min
-- Total execution time: ~1.6 hours
+- Total execution time: ~1.8 hours
 
 **By Phase:**
 
@@ -34,14 +34,15 @@ Progress: [########..] 84%
 | 3 - GPU Output | 2 | 15 min | ~8 min |
 | 3.1 - Audit Remediation | 1 | 8 min | 8 min |
 | 4 - CPU Rasterizer Core | 4 | 30 min | ~8 min |
-| 5 - Pipeline Integration | 3 | 43 min | ~14 min |
+| 5 - Pipeline Integration | 4 | 54 min | ~14 min |
 
 **Recent Trend:**
-- Last 5 plans: 031-01, 05-01, 05-02, 05-03
-- Trend: Consistent ~13-17 min per plan
+- Last 5 plans: 05-01, 05-02, 05-03, 05-04
+- Trend: Consistent ~11-17 min per plan
 
 *Updated after each plan completion*
 | Phase 05 P01 | 17min | 2 tasks | 5 files |
+| Phase 05 P04 | 11min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -102,6 +103,11 @@ Recent decisions affecting current work:
 - 05-02: Items always skip BSP tree (P5-066 FIX), go to flat_list
 - 05-02: Split plane set to median centroid coordinate (P5-074 FIX)
 - 05-02: WorldPlugin::build() calls app.init_resource::<RuntimeWorld>() (XP-114 FIX)
+- 05-04: TerrainShader uses inline depth test (not depth_test_ro) due to semantic inversion
+- 05-04: render_patch subdivides height-cell quads into 2x2 visual sub-quads for material mapping
+- 05-04: resolve_to_grid uses generic GlyphSelector (not dyn) for monomorphization
+- 05-04: XTERM_256_PALETTE uses evenly-spaced levels matching rgb2pal round-tripping
+- 05-04: transform_vertex extracted to render/math.rs as shared utility
 
 ### Pending Todos
 
@@ -118,5 +124,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 05-01-PLAN.md (Terrain quadtree runtime). Wave 1 complete (05-01, 05-02, 05-03). Next: 05-04.
+Stopped at: Completed 05-04-PLAN.md (Shader implementations and resolve bridge). Waves 1-2 complete (05-01 through 05-04). Next: 05-05.
 Resume file: None

@@ -126,7 +126,7 @@ Plans:
 - [x] 05-01-PLAN.md -- Terrain quadtree runtime (RuntimePatch, QuadNode, frustum query) (wave 1)
 - [x] 05-02-PLAN.md -- BSP tree runtime with SAH construction, near-child-first frustum query (wave 1)
 - [x] 05-03-PLAN.md -- Perspective camera with view matrix, frustum planes, Q/E rotation (wave 1)
-- [ ] 05-04-PLAN.md -- TerrainShader, MeshShader, resolve_to_grid bridge (wave 2)
+- [x] 05-04-PLAN.md -- TerrainShader, MeshShader, resolve_to_grid bridge (wave 2)
 - [ ] 05-05-PLAN.md -- A3D assembly system, pipeline orchestrator with per-stage timing (wave 3)
 - [ ] 05-06-PLAN.md -- Terrain shadows, golden-file CI comparison, budget assertion (wave 4)
 
@@ -179,7 +179,7 @@ Note: Phases 3 and 4 are independent (both depend only on Phase 1) and can execu
 | 3. GPU Output | 3/3 | Complete | 2026-02-20 |
 | 3.1 Audit Remediation | 1/1 | Complete    | 2026-02-20 |
 | 4. CPU Rasterizer Core | 4/4 | Complete | 2026-02-20 |
-| 5. Pipeline Integration | 3/6 | In Progress | - |
+| 5. Pipeline Integration | 4/6 | In Progress | - |
 | 6. Physics and Character | 0/3 | Planned | - |
 | 7. Game Systems | 0/5 | Planned | - |
 
