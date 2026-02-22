@@ -75,9 +75,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Camera
 
-- [ ] **CAM-01**: Perspective camera with configurable FOV
-- [ ] **CAM-02**: Q/E rotation toggle (required by D004-D005)
-- [ ] **CAM-03**: Scene shift in sample-buffer space (multiplied by 2 per TRAP-R06)
+- [x] **CAM-01**: Perspective camera with configurable FOV
+- [x] **CAM-02**: Q/E rotation toggle (required by D004-D005)
+- [x] **CAM-03**: Scene shift in sample-buffer space (multiplied by 2 per TRAP-R06)
 
 ### Effects
 
@@ -193,9 +193,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WRLD-04 | Phase 5 | Pending |
 | REND-08 | Phase 5 | Pending |
 | REND-09 | Phase 5 | Pending |
-| CAM-01 | Phase 5 | Pending |
-| CAM-02 | Phase 5 | Pending |
-| CAM-03 | Phase 5 | Pending |
+| CAM-01 | Phase 5 | Complete |
+| CAM-02 | Phase 5 | Complete |
+| CAM-03 | Phase 5 | Complete |
 | VIS-02 | Phase 5 | Pending |
 | PHYS-01 | Phase 6 | Pending |
 | PHYS-02 | Phase 6 | Pending |

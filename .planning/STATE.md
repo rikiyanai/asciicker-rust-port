@@ -9,21 +9,21 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 
 ## Current Position
 
-Phase: 3.1 of 7 (Audit Remediation) -- COMPLETE
-Plan: 1 of 1 in current phase (031-01 complete)
-Status: Phase 3.1 complete (commits `281301e`, `d8039ea`, `78170a3`). Ready for Phase 5.
-Last activity: 2026-02-20 -- Completed audit remediation: TextureView fix, GameVec3 newtype, parser robustness, plugin ordering tests, Phase 4 gap closures
+Phase: 5 of 7 (Pipeline Integration) -- IN PROGRESS
+Plan: 3 of 6 in current phase (05-03 complete)
+Status: 05-03 complete (commit `1607303`). GameCamera resource with view matrix and frustum planes.
+Last activity: 2026-02-22 -- Completed 05-03: Camera system with C++ view matrix port, frustum extraction, Q/E input
 
-Progress: [########..] 80%
+Progress: [########..] 82%
 
-**Note:** Phase 3.1 inserted between Phase 4 and Phase 5. All audit items and Phase 4 execution gaps resolved. 188 tests passing (140 lib + 48 integration). Phase 3 human visual verification checkpoint (03-03 Task 2) still pending from prior session.
+**Note:** Phase 5 execution started. 05-03 camera system complete. 200 tests passing (152 lib + 48 integration). Plans 05-01 and 05-02 not yet executed (wave dependencies may allow parallel execution).
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 13
+- Total plans completed: 14
 - Average duration: ~6 min
-- Total execution time: ~1.1 hours
+- Total execution time: ~1.3 hours
 
 **By Phase:**
 
@@ -34,10 +34,11 @@ Progress: [########..] 80%
 | 3 - GPU Output | 2 | 15 min | ~8 min |
 | 3.1 - Audit Remediation | 1 | 8 min | 8 min |
 | 4 - CPU Rasterizer Core | 4 | 30 min | ~8 min |
+| 5 - Pipeline Integration | 1 | 13 min | 13 min |
 
 **Recent Trend:**
-- Last 5 plans: 04-03, 04-04, 03-03 (Task 1 only), 031-01
-- Trend: Consistent ~8 min per plan
+- Last 5 plans: 04-04, 03-03 (Task 1 only), 031-01, 05-03
+- Trend: Consistent ~8-13 min per plan
 
 *Updated after each plan completion*
 
@@ -88,6 +89,10 @@ Recent decisions affecting current work:
 - 031-01: TextureView fields stored in AsciiGpuTextures struct outliving BindGroup (both prepare and resize paths)
 - 031-01: Dead unsafe unchecked SampleBuffer accessors removed (zero callers in codebase)
 - 031-01: Plugin ordering test uses AssetPlugin + ImagePlugin for full 8-plugin init verification
+- 05-03: Ported C++ view matrix exactly: DBL_SCALE=3.0, ds=2*zoom*scale/VISUAL_CELLS, sin30=0.5
+- 05-03: Frustum uses PlaneFromPoints (perspective) and TransposeProduct (isometric) matching C++ branches
+- 05-03: ButtonInput<KeyCode> confirmed as Bevy 0.18 API; MinimalPlugins test needs manual resource init
+- 05-03: Camera stores mul[6]/add[3] arrays for terrain/world query compatibility
 
 ### Pending Todos
 
@@ -103,6 +108,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-02-20
-Stopped at: Completed 031-01-PLAN.md (Phase 3.1 Audit Remediation). All 10 requirements addressed. Ready for Phase 5 pipeline integration.
+Last session: 2026-02-22
+Stopped at: Completed 05-03-PLAN.md (GameCamera resource). Next: 05-01, 05-02, or 05-04.
 Resume file: None
