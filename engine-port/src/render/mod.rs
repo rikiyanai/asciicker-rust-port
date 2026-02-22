@@ -1,10 +1,14 @@
 pub mod camera;
 pub mod config;
 pub mod material;
+pub mod math;
+pub mod mesh_shader;
 pub mod quantize;
 pub mod rasterizer;
 pub mod resolve;
+pub mod resolve_bridge;
 pub mod sample_buffer;
+pub mod terrain_shader;
 pub mod types;
 
 use bevy::prelude::*;
