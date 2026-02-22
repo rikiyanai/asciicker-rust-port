@@ -82,12 +82,10 @@ impl Plugin for CpuRasterizerPlugin {
 }
 
 /// Startup system that verifies required plugins are registered before CpuRasterizerPlugin.
+///
+/// Note: AsciiOutputPlugin must come AFTER CpuRasterizerPlugin (needs RenderConfig for
+/// AsciiCellGrid::from_world), so we check for it at Startup time when both have built.
 fn verify_plugin_prerequisites(world: &World) {
-    assert!(
-        world.contains_resource::<crate::output::ascii_cell_grid::AsciiCellGrid>(),
-        "CpuRasterizerPlugin requires AsciiOutputPlugin to be registered FIRST. \
-         AsciiCellGrid resource is missing."
-    );
     assert!(
         world.contains_resource::<crate::terrain::RuntimeTerrain>(),
         "CpuRasterizerPlugin requires TerrainPlugin to be registered FIRST. \
@@ -97,6 +95,11 @@ fn verify_plugin_prerequisites(world: &World) {
         world.contains_resource::<crate::world::RuntimeWorld>(),
         "CpuRasterizerPlugin requires WorldPlugin to be registered FIRST. \
          RuntimeWorld resource is missing."
+    );
+    assert!(
+        world.contains_resource::<crate::output::ascii_cell_grid::AsciiCellGrid>(),
+        "CpuRasterizerPlugin requires AsciiOutputPlugin to be registered AFTER it. \
+         AsciiCellGrid resource is missing."
     );
 }
 

@@ -5,14 +5,26 @@ use asciicker_engine::output::ascii_cell_grid::AsciiCellGrid;
 use asciicker_engine::render::CpuRasterizerPlugin;
 use asciicker_engine::render::config::RenderConfig;
 use asciicker_engine::render::sample_buffer::SampleBuffer;
+use asciicker_engine::terrain::TerrainPlugin;
+use asciicker_engine::world::WorldPlugin;
+
+/// Helper: build an app with all required plugins in correct order.
+/// Does NOT call app.update() — the pipeline systems need a real asset server.
+fn build_app() -> App {
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_plugins((
+        WorldPlugin,
+        TerrainPlugin,
+        CpuRasterizerPlugin,
+        AsciiOutputPlugin,
+    ));
+    app
+}
 
 #[test]
 fn sample_buffer_and_grid_coexist() {
-    let mut app = App::new();
-    app.add_plugins(MinimalPlugins);
-    app.add_plugins((CpuRasterizerPlugin, AsciiOutputPlugin));
-
-    app.update();
+    let app = build_app();
 
     let buffer = app.world().resource::<SampleBuffer>();
     assert_eq!(
@@ -35,15 +47,17 @@ fn sample_buffer_and_grid_coexist() {
 fn render_config_controls_dimensions() {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);
-    // Insert custom config before plugins -- supersample_factor removed,
-    // dimensions are always 2*ascii+4
+    // Insert custom config before plugins -- dimensions are always 2*ascii+4
     app.insert_resource(RenderConfig {
         ascii_width: 80,
         ascii_height: 40,
     });
-    app.add_plugins((CpuRasterizerPlugin, AsciiOutputPlugin));
-
-    app.update();
+    app.add_plugins((
+        WorldPlugin,
+        TerrainPlugin,
+        CpuRasterizerPlugin,
+        AsciiOutputPlugin,
+    ));
 
     let buffer = app.world().resource::<SampleBuffer>();
     assert_eq!(
@@ -62,11 +76,7 @@ fn render_config_controls_dimensions() {
 
 #[test]
 fn write_sample_read_cell_same_frame() {
-    let mut app = App::new();
-    app.add_plugins(MinimalPlugins);
-    app.add_plugins((CpuRasterizerPlugin, AsciiOutputPlugin));
-
-    app.update();
+    let mut app = build_app();
 
     // Write to SampleBuffer using new field names
     let mut buffer = app.world_mut().resource_mut::<SampleBuffer>();
@@ -84,11 +94,7 @@ fn write_sample_read_cell_same_frame() {
 
 #[test]
 fn separate_gpu_arrays_verified() {
-    let mut app = App::new();
-    app.add_plugins(MinimalPlugins);
-    app.add_plugins((CpuRasterizerPlugin, AsciiOutputPlugin));
-
-    app.update();
+    let mut app = build_app();
 
     let grid = app.world().resource::<AsciiCellGrid>();
 
