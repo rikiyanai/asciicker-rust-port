@@ -8,6 +8,7 @@ use bevy::prelude::*;
 
 pub mod patch_runtime;
 pub mod quadtree;
+pub mod shadow;
 
 use crate::asset_loader::a3d_terrain::A3dTerrain;
 use crate::asset_loader::constants::{HEIGHT_CELLS, HEIGHT_SCALE, VISUAL_CELLS};

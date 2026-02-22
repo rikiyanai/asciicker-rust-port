@@ -19,6 +19,7 @@ use crate::asset_loader::a3d_world::A3dWorld;
 use crate::asset_loader::a3d_terrain::A3dTerrain;
 use crate::render::material::{Material, MatCell as RenderMatCell};
 use crate::terrain::RuntimeTerrain;
+use crate::terrain::shadow::{default_light_dir, update_terrain_dark};
 use crate::world::RuntimeWorld;
 
 // ---------------------------------------------------------------------------
@@ -118,6 +119,15 @@ pub fn a3d_assembly_system(
     let built_terrain = RuntimeTerrain::build_from_parsed(terrain);
     let patch_count = built_terrain.patch_count;
     *runtime_terrain = built_terrain;
+
+    // (a.2) Compute terrain shadows (load-time precomputation, NOT per-frame).
+    // P5-004 FIX: Shadow call site added by Plan 05-06.
+    // P5-128 FIX: Inserted AFTER build_from_parsed, BEFORE RuntimeMaterials insert.
+    update_terrain_dark(&mut runtime_terrain, default_light_dir());
+    info!(
+        "Terrain shadow computation complete ({} patches)",
+        patch_count
+    );
 
     // (b) Build RuntimeWorld
     let built_world = RuntimeWorld::build_from_parsed(world);
