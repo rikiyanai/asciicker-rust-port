@@ -1,0 +1,337 @@
+//! Runtime instance types for the world system.
+//!
+//! Converts parsed `WorldInstance` variants (from the asset loader) into
+//! runtime representations with bounding boxes and flag accessors.
+//! Instance flags control visibility and BSP membership.
+
+use crate::asset_loader::a3d_world::WorldInstance;
+
+// --- Instance Flags (matches C++ INST_FLAGS enum) ---
+
+/// Instance is rendered (hidden instances skip query callbacks).
+pub const INST_VISIBLE: i32 = 0x1;
+/// Instance participates in BSP tree (vs. flat list).
+pub const INST_USE_TREE: i32 = 0x2;
+/// Temporary instance (NPCs, projectiles) -- excluded from save.
+pub const INST_VOLATILE: i32 = 0x4;
+/// Editor selection highlight.
+pub const INST_SELECTED: i32 = 0x8;
+
+/// Newtype index into the `RuntimeWorld.instances` vector.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct InstanceId(pub usize);
+
+/// Axis-aligned bounding box: `[xmin, xmax, ymin, ymax, zmin, zmax]`.
+pub type Bbox = [f64; 6];
+
+/// A runtime instance converted from a parsed `WorldInstance`.
+#[derive(Debug, Clone)]
+pub enum RuntimeInstance {
+    Mesh {
+        mesh_id: String,
+        inst_name: String,
+        tm: [f64; 16],
+        bbox: Bbox,
+        flags: i32,
+    },
+    Sprite {
+        sprite_name: String,
+        pos: [f32; 3],
+        yaw: f32,
+        anim: i32,
+        frame: i32,
+        reps: [i32; 4],
+        bbox: Bbox,
+        flags: i32,
+    },
+    Item {
+        item_proto_index: i32,
+        count: i32,
+        pos: [f32; 3],
+        yaw: f32,
+        bbox: Bbox,
+        flags: i32,
+    },
+}
+
+/// Small half-extent for point-like instances (sprites, items).
+const POINT_HALF_EXTENT: f64 = 0.5;
+
+/// Compute the AABB of a unit cube `[-1,1]^3` transformed by a 4x4 column-major matrix.
+///
+/// The 8 corners of the unit cube are transformed, and the AABB is the min/max
+/// across all transformed corners. This matches the C++ `GetInstBBox` behavior
+/// for mesh instances.
+fn compute_transformed_unit_cube_bbox(tm: &[f64; 16]) -> Bbox {
+    let mut bbox = [f64::MAX, f64::MIN, f64::MAX, f64::MIN, f64::MAX, f64::MIN];
+
+    for &sx in &[-1.0_f64, 1.0] {
+        for &sy in &[-1.0_f64, 1.0] {
+            for &sz in &[-1.0_f64, 1.0] {
+                // Column-major 4x4: col0=[0..3], col1=[4..7], col2=[8..11], col3=[12..15]
+                let x = tm[0] * sx + tm[4] * sy + tm[8] * sz + tm[12];
+                let y = tm[1] * sx + tm[5] * sy + tm[9] * sz + tm[13];
+                let z = tm[2] * sx + tm[6] * sy + tm[10] * sz + tm[14];
+
+                bbox[0] = bbox[0].min(x);
+                bbox[1] = bbox[1].max(x);
+                bbox[2] = bbox[2].min(y);
+                bbox[3] = bbox[3].max(y);
+                bbox[4] = bbox[4].min(z);
+                bbox[5] = bbox[5].max(z);
+            }
+        }
+    }
+
+    bbox
+}
+
+/// Compute a small AABB around a point position.
+fn point_bbox(pos: &[f32; 3]) -> Bbox {
+    let x = pos[0] as f64;
+    let y = pos[1] as f64;
+    let z = pos[2] as f64;
+    [
+        x - POINT_HALF_EXTENT,
+        x + POINT_HALF_EXTENT,
+        y - POINT_HALF_EXTENT,
+        y + POINT_HALF_EXTENT,
+        z - POINT_HALF_EXTENT,
+        z + POINT_HALF_EXTENT,
+    ]
+}
+
+impl RuntimeInstance {
+    /// Convert a parsed `WorldInstance` into a `RuntimeInstance`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a `WorldInstance::Mesh` has a `tm` vector with length != 16
+    /// (F033 FIX: validate tm length before copying).
+    pub fn from_world_instance(wi: &WorldInstance) -> Self {
+        match wi {
+            WorldInstance::Mesh {
+                mesh_id,
+                inst_name,
+                tm,
+                flags,
+                story_id: _,
+            } => {
+                let tm_arr: [f64; 16] = tm.as_slice().try_into().unwrap_or_else(|_| {
+                    panic!(
+                        "WorldInstance tm must have exactly 16 elements, got {}",
+                        tm.len()
+                    );
+                });
+                let bbox = compute_transformed_unit_cube_bbox(&tm_arr);
+                RuntimeInstance::Mesh {
+                    mesh_id: mesh_id.clone(),
+                    inst_name: inst_name.clone(),
+                    tm: tm_arr,
+                    bbox,
+                    flags: *flags,
+                }
+            }
+            WorldInstance::Sprite {
+                sprite_name,
+                pos,
+                yaw,
+                anim,
+                frame,
+                reps,
+                flags,
+                story_id: _,
+            } => {
+                let bbox = point_bbox(pos);
+                RuntimeInstance::Sprite {
+                    sprite_name: sprite_name.clone(),
+                    pos: *pos,
+                    yaw: *yaw,
+                    anim: *anim,
+                    frame: *frame,
+                    reps: *reps,
+                    bbox,
+                    flags: *flags,
+                }
+            }
+            WorldInstance::Item {
+                item_proto_index,
+                count,
+                pos,
+                yaw,
+                flags,
+                story_id: _,
+            } => {
+                let bbox = point_bbox(pos);
+                RuntimeInstance::Item {
+                    item_proto_index: *item_proto_index,
+                    count: *count,
+                    pos: *pos,
+                    yaw: *yaw,
+                    bbox,
+                    flags: *flags,
+                }
+            }
+        }
+    }
+
+    /// Get the axis-aligned bounding box.
+    pub fn bbox(&self) -> &Bbox {
+        match self {
+            RuntimeInstance::Mesh { bbox, .. } => bbox,
+            RuntimeInstance::Sprite { bbox, .. } => bbox,
+            RuntimeInstance::Item { bbox, .. } => bbox,
+        }
+    }
+
+    /// Get instance flags.
+    pub fn flags(&self) -> i32 {
+        match self {
+            RuntimeInstance::Mesh { flags, .. } => *flags,
+            RuntimeInstance::Sprite { flags, .. } => *flags,
+            RuntimeInstance::Item { flags, .. } => *flags,
+        }
+    }
+
+    /// Check if the instance is visible (INST_VISIBLE flag set).
+    pub fn is_visible(&self) -> bool {
+        self.flags() & INST_VISIBLE != 0
+    }
+
+    /// Check if the instance participates in the BSP tree (INST_USE_TREE flag set).
+    pub fn uses_tree(&self) -> bool {
+        self.flags() & INST_USE_TREE != 0
+    }
+
+    /// Returns true if this is an Item variant.
+    pub fn is_item(&self) -> bool {
+        matches!(self, RuntimeInstance::Item { .. })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn identity_tm() -> Vec<f64> {
+        vec![
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        ]
+    }
+
+    #[test]
+    fn test_mesh_from_world_instance() {
+        let wi = WorldInstance::Mesh {
+            mesh_id: "castle.akm".to_string(),
+            inst_name: "castle_01".to_string(),
+            tm: identity_tm(),
+            flags: INST_VISIBLE | INST_USE_TREE,
+            story_id: -1,
+        };
+        let ri = RuntimeInstance::from_world_instance(&wi);
+        assert!(ri.is_visible());
+        assert!(ri.uses_tree());
+        assert!(!ri.is_item());
+
+        // Identity transform of unit cube -> bbox should be [-1,1] on all axes
+        let bb = ri.bbox();
+        assert!((bb[0] - (-1.0)).abs() < 1e-9);
+        assert!((bb[1] - 1.0).abs() < 1e-9);
+        assert!((bb[2] - (-1.0)).abs() < 1e-9);
+        assert!((bb[3] - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_sprite_from_world_instance() {
+        let wi = WorldInstance::Sprite {
+            sprite_name: "npc_guard".to_string(),
+            pos: [10.0, 20.0, 5.0],
+            yaw: 0.0,
+            anim: 0,
+            frame: 0,
+            reps: [0; 4],
+            flags: INST_VISIBLE,
+            story_id: -1,
+        };
+        let ri = RuntimeInstance::from_world_instance(&wi);
+        assert!(ri.is_visible());
+        assert!(!ri.uses_tree());
+
+        let bb = ri.bbox();
+        assert!(bb[0] < 10.0 && bb[1] > 10.0);
+        assert!(bb[2] < 20.0 && bb[3] > 20.0);
+    }
+
+    #[test]
+    fn test_item_from_world_instance() {
+        let wi = WorldInstance::Item {
+            item_proto_index: 5,
+            count: 1,
+            pos: [3.0, 4.0, 0.0],
+            yaw: 0.0,
+            flags: INST_VISIBLE,
+            story_id: -1,
+        };
+        let ri = RuntimeInstance::from_world_instance(&wi);
+        assert!(ri.is_item());
+        // Items never have USE_TREE (P5-066 FIX)
+        assert!(!ri.uses_tree());
+    }
+
+    #[test]
+    #[should_panic(expected = "WorldInstance tm must have exactly 16 elements")]
+    fn test_mesh_invalid_tm_length_panics() {
+        let wi = WorldInstance::Mesh {
+            mesh_id: "bad.akm".to_string(),
+            inst_name: "bad".to_string(),
+            tm: vec![1.0; 12], // wrong length
+            flags: 0,
+            story_id: -1,
+        };
+        RuntimeInstance::from_world_instance(&wi);
+    }
+
+    #[test]
+    fn test_flags_accessors() {
+        let wi = WorldInstance::Mesh {
+            mesh_id: "x.akm".to_string(),
+            inst_name: "x".to_string(),
+            tm: identity_tm(),
+            flags: 0,
+            story_id: -1,
+        };
+        let ri = RuntimeInstance::from_world_instance(&wi);
+        assert!(!ri.is_visible());
+        assert!(!ri.uses_tree());
+        assert_eq!(ri.flags(), 0);
+    }
+
+    #[test]
+    fn test_transformed_bbox() {
+        // Scale by 2 on X, translate by (10, 20, 30)
+        let tm = [
+            2.0, 0.0, 0.0, 0.0, // col0
+            0.0, 1.0, 0.0, 0.0, // col1
+            0.0, 0.0, 1.0, 0.0, // col2
+            10.0, 20.0, 30.0, 1.0, // col3 (translation)
+        ];
+        let wi = WorldInstance::Mesh {
+            mesh_id: "m.akm".to_string(),
+            inst_name: "m".to_string(),
+            tm: tm.to_vec(),
+            flags: INST_VISIBLE | INST_USE_TREE,
+            story_id: -1,
+        };
+        let ri = RuntimeInstance::from_world_instance(&wi);
+        let bb = ri.bbox();
+        // X: 10 + 2*[-1,1] = [8, 12]
+        assert!((bb[0] - 8.0).abs() < 1e-9);
+        assert!((bb[1] - 12.0).abs() < 1e-9);
+        // Y: 20 + [-1,1] = [19, 21]
+        assert!((bb[2] - 19.0).abs() < 1e-9);
+        assert!((bb[3] - 21.0).abs() < 1e-9);
+        // Z: 30 + [-1,1] = [29, 31]
+        assert!((bb[4] - 29.0).abs() < 1e-9);
+        assert!((bb[5] - 31.0).abs() < 1e-9);
+    }
+}

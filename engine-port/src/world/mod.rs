@@ -1,5 +1,8 @@
 use bevy::prelude::*;
 
+pub mod bsp;
+pub mod instance;
+
 pub struct WorldPlugin;
 
 impl Plugin for WorldPlugin {
