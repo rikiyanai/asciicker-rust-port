@@ -227,6 +227,20 @@
 | F158 | PG-22: Plugin stub conversion not explicitly tracked in plans | Medium | OPEN | Add stub cleanup verification step |
 | F159 | PG-23: render_pipeline_system in Update during Phase 6 wave 1 (before 06-03 migrates to PostUpdate) | Medium | OPEN | Accept intermediate state — documented behavior |
 | F160 | PG-14/21: Sound files not available; bevy_replicon fallback not fully documented | Medium | OPEN | Add asset setup and dependency fallback notes |
+| F161 | R15: 07-05 R13-035 accumulated pipeline signature includes removed ResolveBuffer Resource | High | RESOLVED | Replaced `ResMut<ResolveBuffer>` with comment re: local alloc per R14-F148. |
+| F162 | R15: 06-03 SPEC uses `resolve_buf.0` syntax assuming removed ResolveBuffer newtype | Medium | RESOLVED | Changed `&mut resolve_buf.0` to `&mut resolve_buf` in 06-03 apply_water_ripple_pass call. |
+| F163 | R15: 06-03 precondition text lists ResolveBuffer as Phase 5 abstraction (removed by R14-F148) | Low | RESOLVED | Removed ResolveBuffer from 06-03 precondition text. |
+| F164 | R15: 06-02 depends_on missing "06-01" — PhysicsIO type dependency causes compile failure if parallel | High | RESOLVED | Added `"06-01"` to 06-02 depends_on. |
+| F165 | R15: 07-03 calls spawn_character_world(&mut commands) but fn takes &mut World — should call spawn_character | Medium | RESOLVED | Changed to spawn_character(&mut commands) throughout 07-03. |
+| F166 | R15: ROADMAP.md Phase 6 plan 06-01 description says "TerrainGeometrySource + WorldGeometrySource" (stale trait names) | Low | RESOLVED | Updated to reference free functions per R14-F146. |
+| F167 | R15: 06-03 render_water_reflections body is comment-only pseudocode — no actual Rust code | High | RESOLVED | Replaced comment body with actual Z-flip matrix code and spare-bit OR pattern. |
+| F168 | R15: 05-01 has struck-through P5-H07 text inline (no APPENDIX to move it to) | Medium | RESOLVED | Deleted struck-through line. |
+| F169 | R15: 07-02 has struck-through legacy text inside R7-HIGH-003 FIX block | Low | RESOLVED | Removed struck-through text. |
+| F170 | R15: 07-03 has 5 struck-through SUPERSEDED fixes (ECS-FIX-03, C1, C2, R13-025, R13-027) | Low | RESOLVED | Removed all five lines. |
+| F171 | R15: 07-04 P7-025/P7-057/P7-104 supersession chain is 18 lines of tangled commentary | Medium | RESOLVED | Condensed to 3-line blockquote with P7-057 AUTHORITATIVE label. |
+| F172 | R15: 05-05 Task 2.2 uses placeholder `/* GlyphSelector impl */` instead of explicit AutoMatGlyphSelector | Low | RESOLVED | Replaced with `AutoMatGlyphSelector::new()`. |
+| F173 | R15: 05-06 says cells_count() is "not a confirmed method" but it exists at ascii_cell_grid.rs:45 | Low | RESOLVED | Updated comment to acknowledge cells_count() exists. |
+| F174 | R15: 07-03 test description references stale SpawnNetworkedPlayer in ECS integration test comment | Low | RESOLVED | Updated to reference direct spawn_character() call. |
 
 ---
 
@@ -307,4 +321,4 @@
 
 ---
 
-*Failure log last updated: 2026-02-21 (R14 findings F118-F160 added)*
+*Failure log last updated: 2026-02-21 (R15 findings F161-F174 added)*

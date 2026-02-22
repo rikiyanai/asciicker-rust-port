@@ -143,7 +143,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 06-01-PLAN.md -- Physics core: collision, forces, PhysicsIO, FixedUpdate, TerrainGeometrySource + WorldGeometrySource (TDD, wave 1)
+- [ ] 06-01-PLAN.md -- Physics core: collision, forces, PhysicsIO, FixedUpdate, collect_terrain_triangles + collect_world_triangles free functions (TDD, wave 1)
 - [ ] 06-02-PLAN.md -- Character: state machine (with Block), equipment, input (Q/E ownership), animation, sprite_query (TDD, wave 1)
 - [ ] 06-03-PLAN.md -- Water reflection (actual geometry re-query), Perlin ripple, GamePlugin (no sub-plugins), torque-to-camera, perf benchmark (wave 2)
 
