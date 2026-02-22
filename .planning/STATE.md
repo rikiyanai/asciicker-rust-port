@@ -10,20 +10,20 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 ## Current Position
 
 Phase: 5 of 7 (Pipeline Integration) -- IN PROGRESS
-Plan: 3 of 6 in current phase (05-03 complete)
-Status: 05-03 complete (commit `1607303`). GameCamera resource with view matrix and frustum planes.
-Last activity: 2026-02-22 -- Completed 05-03: Camera system with C++ view matrix port, frustum extraction, Q/E input
+Plan: 3 of 6 in current phase (05-01, 05-02, 05-03 complete)
+Status: 05-02 complete (commits `fba4f74`, `75e5b0a`). BSP tree runtime with SAH construction and frustum-culled traversal.
+Last activity: 2026-02-22 -- Completed 05-02: BSP tree with near-child-first traversal, sphere query for physics
 
-Progress: [########..] 82%
+Progress: [########..] 84%
 
-**Note:** Phase 5 execution started. 05-03 camera system complete. 200 tests passing (152 lib + 48 integration). Plans 05-01 and 05-02 not yet executed (wave dependencies may allow parallel execution).
+**Note:** Phase 5 wave 1 complete (05-01, 05-02, 05-03). 28 world tests + 23 terrain tests passing. Plans 05-04, 05-05, 05-06 remaining (waves 2-4).
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 14
-- Average duration: ~6 min
-- Total execution time: ~1.3 hours
+- Total plans completed: 16
+- Average duration: ~7 min
+- Total execution time: ~1.6 hours
 
 **By Phase:**
 
@@ -34,11 +34,11 @@ Progress: [########..] 82%
 | 3 - GPU Output | 2 | 15 min | ~8 min |
 | 3.1 - Audit Remediation | 1 | 8 min | 8 min |
 | 4 - CPU Rasterizer Core | 4 | 30 min | ~8 min |
-| 5 - Pipeline Integration | 1 | 13 min | 13 min |
+| 5 - Pipeline Integration | 3 | 43 min | ~14 min |
 
 **Recent Trend:**
-- Last 5 plans: 04-04, 03-03 (Task 1 only), 031-01, 05-03
-- Trend: Consistent ~8-13 min per plan
+- Last 5 plans: 031-01, 05-01, 05-02, 05-03
+- Trend: Consistent ~13-17 min per plan
 
 *Updated after each plan completion*
 
@@ -93,6 +93,14 @@ Recent decisions affecting current work:
 - 05-03: Frustum uses PlaneFromPoints (perspective) and TransposeProduct (isometric) matching C++ branches
 - 05-03: ButtonInput<KeyCode> confirmed as Bevy 0.18 API; MinimalPlugins test needs manual resource init
 - 05-03: Camera stores mul[6]/add[3] arrays for terrain/world query compatibility
+- 05-01: HEIGHT_CELLS_PLUS_ONE promoted to constants.rs for shared access (F032 FIX)
+- 05-01: interpolate_height returns Option<f64>; Phase 5 shadow uses f64, Phase 6 physics casts to f32 at call site
+- 05-01: TerrainPlugin explicitly calls init_resource::<RuntimeTerrain>() (XP-114 FIX)
+- 05-01: QuadNode uses Option<Box<QuadNode>> children for sparse quadtree representation
+- 05-02: BspNode::NodeShare uses fixed-order [0,1] traversal (no near-child-first) matching C++ behavior
+- 05-02: Items always skip BSP tree (P5-066 FIX), go to flat_list
+- 05-02: Split plane set to median centroid coordinate (P5-074 FIX)
+- 05-02: WorldPlugin::build() calls app.init_resource::<RuntimeWorld>() (XP-114 FIX)
 
 ### Pending Todos
 
@@ -109,5 +117,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 05-03-PLAN.md (GameCamera resource). Next: 05-01, 05-02, or 05-04.
+Stopped at: Completed 05-01-PLAN.md (Terrain quadtree runtime). Wave 1 complete (05-01, 05-02, 05-03). Next: 05-04.
 Resume file: None

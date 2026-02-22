@@ -47,17 +47,17 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Terrain System
 
-- [ ] **TERR-01**: Quadtree heightmap with HEIGHT_CELLS=4 (5x5 vertex grid per patch)
-- [ ] **TERR-02**: VISUAL_CELLS=8 material grid (8x8 cells per patch)
-- [ ] **TERR-03**: Quadtree propagates height bounds for frustum culling
-- [ ] **TERR-04**: Known C++ bugs fixed during port (TERRAIN-001 through TERRAIN-004)
+- [x] **TERR-01**: Quadtree heightmap with HEIGHT_CELLS=4 (5x5 vertex grid per patch)
+- [x] **TERR-02**: VISUAL_CELLS=8 material grid (8x8 cells per patch)
+- [x] **TERR-03**: Quadtree propagates height bounds for frustum culling
+- [x] **TERR-04**: Known C++ bugs fixed during port (TERRAIN-001 through TERRAIN-004)
 
 ### World System
 
-- [ ] **WRLD-01**: BSP tree with SAH-style construction
-- [ ] **WRLD-02**: 4 BSP node types supported (NODE, NODE_SHARE, LEAF, INST)
-- [ ] **WRLD-03**: Frustum-culled BSP traversal for rendering
-- [ ] **WRLD-04**: Instance flags functional (VISIBLE, USE_TREE, VOLATILE, SELECTED)
+- [x] **WRLD-01**: BSP tree with SAH-style construction
+- [x] **WRLD-02**: 4 BSP node types supported (NODE, NODE_SHARE, LEAF, INST)
+- [x] **WRLD-03**: Frustum-culled BSP traversal for rendering
+- [x] **WRLD-04**: Instance flags functional (VISIBLE, USE_TREE, VOLATILE, SELECTED)
 
 ### Physics
 
@@ -183,14 +183,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | REND-06 | Phase 4 | Complete |
 | REND-07 | Phase 4 | Complete |
 | REND-10 | Phase 4 | Complete |
-| TERR-01 | Phase 5 | Pending |
-| TERR-02 | Phase 5 | Pending |
-| TERR-03 | Phase 5 | Pending |
-| TERR-04 | Phase 5 | Pending |
-| WRLD-01 | Phase 5 | Pending |
-| WRLD-02 | Phase 5 | Pending |
-| WRLD-03 | Phase 5 | Pending |
-| WRLD-04 | Phase 5 | Pending |
+| TERR-01 | Phase 5 | Complete |
+| TERR-02 | Phase 5 | Complete |
+| TERR-03 | Phase 5 | Complete |
+| TERR-04 | Phase 5 | Complete |
+| WRLD-01 | Phase 5 | Complete |
+| WRLD-02 | Phase 5 | Complete |
+| WRLD-03 | Phase 5 | Complete |
+| WRLD-04 | Phase 5 | Complete |
 | REND-08 | Phase 5 | Pending |
 | REND-09 | Phase 5 | Pending |
 | CAM-01 | Phase 5 | Complete |
