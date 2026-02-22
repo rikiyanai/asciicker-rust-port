@@ -9,14 +9,14 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 
 ## Current Position
 
-Phase: 5 of 7 (Pipeline Integration) -- IN PROGRESS
-Plan: 5 of 6 in current phase (05-01 through 05-05 complete)
-Status: 05-05 complete (commits `37dad88`, `bf37678`). Assembly system, pipeline orchestrator, sprite blit, profiling.
-Last activity: 2026-02-22 -- Completed 05-05: Pipeline orchestrator and assembly system
+Phase: 5 of 7 (Pipeline Integration) -- COMPLETE
+Plan: 6 of 6 in current phase (05-01 through 05-06 complete)
+Status: Phase 5 COMPLETE (all 6 plans executed). Ready for Phase 6.
+Last activity: 2026-02-22 -- Completed 05-06: Terrain shadow and golden-file CI
 
-Progress: [#########.] 90%
+Progress: [##########] 100%
 
-**Note:** Phase 5 waves 1-3 complete (05-01 through 05-05). 233 tests passing. Plan 05-06 remaining (wave 4).
+**Note:** Phase 5 ALL plans complete (05-01 through 05-06). 248 tests passing (238 lib + 10 golden).
 
 ## Performance Metrics
 
@@ -34,16 +34,17 @@ Progress: [#########.] 90%
 | 3 - GPU Output | 2 | 15 min | ~8 min |
 | 3.1 - Audit Remediation | 1 | 8 min | 8 min |
 | 4 - CPU Rasterizer Core | 4 | 30 min | ~8 min |
-| 5 - Pipeline Integration | 5 | 67 min | ~13 min |
+| 5 - Pipeline Integration | 6 | 87 min | ~15 min |
 
 **Recent Trend:**
-- Last 5 plans: 05-01, 05-02, 05-03, 05-04, 05-05
-- Trend: Consistent ~11-17 min per plan
+- Last 5 plans: 05-02, 05-03, 05-04, 05-05, 05-06
+- Trend: Consistent ~11-20 min per plan
 
 *Updated after each plan completion*
 | Phase 05 P01 | 17min | 2 tasks | 5 files |
 | Phase 05 P04 | 11min | 2 tasks | 6 files |
 | Phase 05 P05 | 13min | 3 tasks | 7 files |
+| Phase 05 P06 | 20min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -114,6 +115,10 @@ Recent decisions affecting current work:
 - 05-05: test_pattern_system gated behind cfg(feature = test_pattern) to prevent overwriting pipeline output
 - 05-05: Plugin order fixed: AsciiOutputPlugin before CpuRasterizerPlugin (R14-F124)
 - 05-05: Mesh rendering deferred until AKM mesh data loaded via MeshRegistry
+- 05-06: Light direction Z positive (toward light above terrain); plan had Z=-2.0 which shadowed everything
+- 05-06: Two-pass shadow: immutable collect + mutable write avoids borrow conflict
+- 05-06: compare_rgba_grids for determinism (no round-trip); compare_ansi_grids for C++ reference only
+- 05-06: R14-SYNTH-BAN enforced: all C++ reference tests are #[ignore], no synthetic baselines
 
 ### Pending Todos
 
@@ -130,5 +135,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 05-05-PLAN.md (Pipeline orchestrator and assembly system). Waves 1-3 complete (05-01 through 05-05). Next: 05-06.
+Stopped at: Completed 05-06-PLAN.md (Terrain shadow and golden-file CI). Phase 5 COMPLETE. Next: Phase 6.
 Resume file: None

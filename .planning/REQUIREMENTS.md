@@ -34,7 +34,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **REND-06**: RGB555 -> xterm-256 color quantization with correct projection/reflection scales
 - [x] **REND-07**: RESOLVE stage produces correct AnsiCell output (2x2 downsample, per-cell glyph/color selection)
 - [x] **REND-08**: Deferred sprite blit post-RESOLVE (painter's algorithm, far-to-near sort)
-- [ ] **REND-09**: Terrain shadow computation (64-bit bitmask per patch)
+- [x] **REND-09**: Terrain shadow computation (64-bit bitmask per patch)
 - [x] **REND-10**: Rendering pipeline achieves 60fps at 240x135 ASCII resolution (1080p window)
 
 ### GPU Output
@@ -111,7 +111,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Visual Quality
 
 - [ ] **VIS-01**: Alex Harri 6D shape-vector glyph matching integrated at RESOLVE stage (phased: auto_mat first, then 2D, then 6D)
-- [ ] **VIS-02**: Golden-file CI comparison of AnsiCell output against C++ reference (<1% cell difference threshold)
+- [x] **VIS-02**: Golden-file CI comparison of AnsiCell output against C++ reference (<1% cell difference threshold)
 - [ ] **VIS-03**: Font system with CP437 glyphs (3 skins: grey, gold, pink)
 
 ## v2 Requirements
@@ -192,11 +192,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WRLD-03 | Phase 5 | Complete |
 | WRLD-04 | Phase 5 | Complete |
 | REND-08 | Phase 5 | Complete |
-| REND-09 | Phase 5 | Pending |
+| REND-09 | Phase 5 | Complete |
 | CAM-01 | Phase 5 | Complete |
 | CAM-02 | Phase 5 | Complete |
 | CAM-03 | Phase 5 | Complete |
-| VIS-02 | Phase 5 | Pending |
+| VIS-02 | Phase 5 | Complete |
 | PHYS-01 | Phase 6 | Pending |
 | PHYS-02 | Phase 6 | Pending |
 | PHYS-03 | Phase 6 | Pending |

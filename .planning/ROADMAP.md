@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: GPU Output** - Bevy render plugin displaying ASCII glyphs via Mage Core 4-texture WGSL shader
 - [x] **Phase 3.1: Audit Remediation** - Fix Critical/High severity code-level risks from Phases 1-3 audit before Phase 5 integration (INSERTED)
 - [x] **Phase 4: CPU Rasterizer Core** - SampleBuffer, triangle/line rasterization, materials, color quantization, and RESOLVE stage
-- [ ] **Phase 5: Pipeline Integration** - Full 6-stage rendering pipeline producing real scene output from .a3d world files
+- [x] **Phase 5: Pipeline Integration** - Full 6-stage rendering pipeline producing real scene output from .a3d world files
 - [ ] **Phase 6: Physics and Character** - Sphere collision, character state machine, player input, water, and effects
 - [ ] **Phase 7: Game Systems** - Audio, networking, weather, menus, and visual quality polish
 
@@ -127,8 +127,8 @@ Plans:
 - [x] 05-02-PLAN.md -- BSP tree runtime with SAH construction, near-child-first frustum query (wave 1)
 - [x] 05-03-PLAN.md -- Perspective camera with view matrix, frustum planes, Q/E rotation (wave 1)
 - [x] 05-04-PLAN.md -- TerrainShader, MeshShader, resolve_to_grid bridge (wave 2)
-- [ ] 05-05-PLAN.md -- A3D assembly system, pipeline orchestrator with per-stage timing (wave 3)
-- [ ] 05-06-PLAN.md -- Terrain shadows, golden-file CI comparison, budget assertion (wave 4)
+- [x] 05-05-PLAN.md -- A3D assembly system, pipeline orchestrator with per-stage timing (wave 3)
+- [x] 05-06-PLAN.md -- Terrain shadows, golden-file CI comparison, budget assertion (wave 4)
 
 ### Phase 6: Physics and Character
 **Goal**: A player-controlled character moves through the rendered world with sphere-based collision physics, state-machine animations, and water/effects, producing a playable single-player experience
