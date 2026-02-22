@@ -47,10 +47,13 @@ impl Plugin for AsciiOutputPlugin {
 
         app.add_plugins(gpu_plugin::AsciiGpuPlugin);
         app.add_systems(Startup, spawn_camera);
+        #[cfg(feature = "test_pattern")]
         app.add_systems(
             Update,
             (handle_window_resize, test_pattern::test_pattern_system).chain(),
         );
+        #[cfg(not(feature = "test_pattern"))]
+        app.add_systems(Update, handle_window_resize);
     }
 }
 

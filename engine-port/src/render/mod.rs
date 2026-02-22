@@ -1,37 +1,42 @@
+pub mod assembly;
 pub mod camera;
 pub mod config;
 pub mod material;
 pub mod math;
 pub mod mesh_shader;
+pub mod pipeline;
 pub mod quantize;
 pub mod rasterizer;
 pub mod resolve;
 pub mod resolve_bridge;
 pub mod sample_buffer;
+pub mod sprite_blit;
 pub mod terrain_shader;
 pub mod types;
 
 use bevy::prelude::*;
 
+use assembly::{AssemblyState, MeshRegistry, a3d_assembly_system, load_a3d_scene};
 use camera::{GameCamera, camera_input_system, camera_update_system};
 use config::RenderConfig;
+use pipeline::{PipelineTiming, render_pipeline_system};
 use sample_buffer::SampleBuffer;
+use sprite_blit::SpriteQueue;
 
 /// The 6-stage CPU rasterization pipeline, matching the C++ render loop.
 ///
 /// Stages execute in order: Clear -> Terrain -> World -> Shadow -> Reflection -> Resolve.
-/// Stages 2-5 (Terrain through Reflection) are stubs until Phase 5 integration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PipelineStage {
     /// Stage 1: memcpy clear of the SampleBuffer.
     Clear,
-    /// Stage 2: terrain patch rasterization (Phase 5).
+    /// Stage 2: terrain patch rasterization.
     Terrain,
-    /// Stage 3: mesh/sprite rasterization (Phase 5).
+    /// Stage 3: mesh/sprite rasterization.
     World,
-    /// Stage 4: player shadow projection (Phase 5).
+    /// Stage 4: player shadow projection.
     Shadow,
-    /// Stage 5: re-render below water plane for reflections (Phase 5).
+    /// Stage 5: re-render below water plane for reflections.
     Reflection,
     /// Stage 6: 2x2 downsample SampleBuffer -> AnsiCell grid.
     Resolve,
@@ -44,22 +49,55 @@ impl Plugin for CpuRasterizerPlugin {
         app.init_resource::<RenderConfig>()
             .init_resource::<SampleBuffer>()
             .init_resource::<GameCamera>()
-            .add_systems(Update, (camera_input_system, camera_update_system).chain());
-        info!("CpuRasterizerPlugin registered");
+            .init_resource::<AssemblyState>()
+            .init_resource::<PipelineTiming>()
+            .init_resource::<MeshRegistry>()
+            .init_resource::<SpriteQueue>();
+
+        app.add_systems(Startup, (load_a3d_scene, verify_plugin_prerequisites));
+
+        app.add_systems(
+            Update,
+            (
+                camera_input_system,
+                camera_update_system,
+                a3d_assembly_system
+                    .run_if(|assembly: Res<AssemblyState>| !assembly.assembled),
+                render_pipeline_system,
+            )
+                .chain(),
+        );
+        // 1-frame display latency: Update (pipeline writes cell_grid) -> Render schedule
+        // (GPU reads cell_grid). Standard Bevy behavior. Not a bug.
+
+        #[cfg(feature = "inspector")]
+        {
+            use bevy_inspector_egui::quick::ResourceInspectorPlugin;
+            app.add_plugins(ResourceInspectorPlugin::<PipelineTiming>::default());
+            app.add_plugins(ResourceInspectorPlugin::<RenderConfig>::default());
+        }
+
+        info!("CpuRasterizerPlugin registered (with pipeline, assembly, sprites)");
     }
 }
 
-/// Stub render pipeline system: runs Clear + Resolve (stages 2-5 are Phase 5).
-///
-/// Not added to a schedule yet -- Phase 5 wires the full pipeline.
-/// Exists to verify the system signature compiles.
-#[allow(dead_code)]
-fn render_pipeline(mut sample_buf: ResMut<SampleBuffer>) {
-    // Stage 1: Clear
-    sample_buf.clear();
-    // Stages 2-5: Stubs (Phase 5)
-    // Stage 6: Resolve
-    // resolve::resolve(&sample_buf.samples, ...);
+/// Startup system that verifies required plugins are registered before CpuRasterizerPlugin.
+fn verify_plugin_prerequisites(world: &World) {
+    assert!(
+        world.contains_resource::<crate::output::ascii_cell_grid::AsciiCellGrid>(),
+        "CpuRasterizerPlugin requires AsciiOutputPlugin to be registered FIRST. \
+         AsciiCellGrid resource is missing."
+    );
+    assert!(
+        world.contains_resource::<crate::terrain::RuntimeTerrain>(),
+        "CpuRasterizerPlugin requires TerrainPlugin to be registered FIRST. \
+         RuntimeTerrain resource is missing."
+    );
+    assert!(
+        world.contains_resource::<crate::world::RuntimeWorld>(),
+        "CpuRasterizerPlugin requires WorldPlugin to be registered FIRST. \
+         RuntimeWorld resource is missing."
+    );
 }
 
 #[cfg(test)]

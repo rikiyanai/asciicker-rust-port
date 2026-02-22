@@ -9,6 +9,8 @@ description = "Asciicker game engine port from C++ to Rust using Bevy"
 # Enables Bevy dynamic linking (~10x faster incremental link times on macOS/Linux).
 # NEVER use in release builds or CI. The resulting binary requires the Bevy .dylib at runtime.
 dev = ["bevy/dynamic_linking"]
+# Enable Phase 3 test pattern (overwritten by pipeline in Phase 5)
+test_pattern = []
 # Debug tooling (ADD.2 fix): enable runtime inspector UI
 inspector = ["dep:bevy-inspector-egui"]
 # Schedule dump: dump system schedule graph to DOT file on startup
