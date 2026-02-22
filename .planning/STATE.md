@@ -10,20 +10,20 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 ## Current Position
 
 Phase: 5 of 7 (Pipeline Integration) -- IN PROGRESS
-Plan: 4 of 6 in current phase (05-01, 05-02, 05-03, 05-04 complete)
-Status: 05-04 complete (commits `537eb82`, `6a53ab0`). TerrainShader, MeshShader, resolve_to_grid bridge.
-Last activity: 2026-02-22 -- Completed 05-04: Shader implementations and resolve bridge
+Plan: 5 of 6 in current phase (05-01 through 05-05 complete)
+Status: 05-05 complete (commits `37dad88`, `bf37678`). Assembly system, pipeline orchestrator, sprite blit, profiling.
+Last activity: 2026-02-22 -- Completed 05-05: Pipeline orchestrator and assembly system
 
-Progress: [#########.] 87%
+Progress: [#########.] 90%
 
-**Note:** Phase 5 waves 1-2 complete (05-01 through 05-04). 219 tests passing. Plans 05-05, 05-06 remaining (waves 3-4).
+**Note:** Phase 5 waves 1-3 complete (05-01 through 05-05). 233 tests passing. Plan 05-06 remaining (wave 4).
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 17
+- Total plans completed: 18
 - Average duration: ~7 min
-- Total execution time: ~1.8 hours
+- Total execution time: ~2.0 hours
 
 **By Phase:**
 
@@ -34,15 +34,16 @@ Progress: [#########.] 87%
 | 3 - GPU Output | 2 | 15 min | ~8 min |
 | 3.1 - Audit Remediation | 1 | 8 min | 8 min |
 | 4 - CPU Rasterizer Core | 4 | 30 min | ~8 min |
-| 5 - Pipeline Integration | 4 | 54 min | ~14 min |
+| 5 - Pipeline Integration | 5 | 67 min | ~13 min |
 
 **Recent Trend:**
-- Last 5 plans: 05-01, 05-02, 05-03, 05-04
+- Last 5 plans: 05-01, 05-02, 05-03, 05-04, 05-05
 - Trend: Consistent ~11-17 min per plan
 
 *Updated after each plan completion*
 | Phase 05 P01 | 17min | 2 tasks | 5 files |
 | Phase 05 P04 | 11min | 2 tasks | 6 files |
+| Phase 05 P05 | 13min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -108,6 +109,11 @@ Recent decisions affecting current work:
 - 05-04: resolve_to_grid uses generic GlyphSelector (not dyn) for monomorphization
 - 05-04: XTERM_256_PALETTE uses evenly-spaced levels matching rgb2pal round-tripping
 - 05-04: transform_vertex extracted to render/math.rs as shared utility
+- 05-05: ResolveBuffer allocated locally in pipeline (not as Resource) per R14-F148
+- 05-05: SpriteQueue cleared at Stage 3 WORLD start (Phase 5; Phase 6 migrates to PreUpdate)
+- 05-05: test_pattern_system gated behind cfg(feature = test_pattern) to prevent overwriting pipeline output
+- 05-05: Plugin order fixed: AsciiOutputPlugin before CpuRasterizerPlugin (R14-F124)
+- 05-05: Mesh rendering deferred until AKM mesh data loaded via MeshRegistry
 
 ### Pending Todos
 
@@ -124,5 +130,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-22
-Stopped at: Completed 05-04-PLAN.md (Shader implementations and resolve bridge). Waves 1-2 complete (05-01 through 05-04). Next: 05-05.
+Stopped at: Completed 05-05-PLAN.md (Pipeline orchestrator and assembly system). Waves 1-3 complete (05-01 through 05-05). Next: 05-06.
 Resume file: None

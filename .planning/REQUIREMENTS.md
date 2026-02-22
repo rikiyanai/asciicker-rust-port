@@ -33,7 +33,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **REND-05**: Material system with auto_mat LUT (32KB, shade[4][16] elevation/diffuse lookup)
 - [x] **REND-06**: RGB555 -> xterm-256 color quantization with correct projection/reflection scales
 - [x] **REND-07**: RESOLVE stage produces correct AnsiCell output (2x2 downsample, per-cell glyph/color selection)
-- [ ] **REND-08**: Deferred sprite blit post-RESOLVE (painter's algorithm, far-to-near sort)
+- [x] **REND-08**: Deferred sprite blit post-RESOLVE (painter's algorithm, far-to-near sort)
 - [ ] **REND-09**: Terrain shadow computation (64-bit bitmask per patch)
 - [x] **REND-10**: Rendering pipeline achieves 60fps at 240x135 ASCII resolution (1080p window)
 
@@ -191,7 +191,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WRLD-02 | Phase 5 | Complete |
 | WRLD-03 | Phase 5 | Complete |
 | WRLD-04 | Phase 5 | Complete |
-| REND-08 | Phase 5 | Pending |
+| REND-08 | Phase 5 | Complete |
 | REND-09 | Phase 5 | Pending |
 | CAM-01 | Phase 5 | Complete |
 | CAM-02 | Phase 5 | Complete |
