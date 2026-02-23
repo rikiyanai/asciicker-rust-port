@@ -4,6 +4,8 @@
 //! The quadtree is built from parsed `A3dTerrain` patches and supports
 //! frustum-culled traversal, coordinate lookup, and height interpolation.
 
+use std::collections::HashMap;
+
 use bevy::prelude::*;
 
 pub mod patch_runtime;
@@ -36,6 +38,8 @@ pub struct RuntimeTerrain {
     pub base_y: i32,
     /// Total number of terrain patches.
     pub patch_count: usize,
+    /// O(1) patch lookup by (x, y) coordinates. Cloned from quadtree leaves.
+    patch_map: HashMap<(i32, i32), RuntimePatch>,
 }
 
 impl RuntimeTerrain {
@@ -49,12 +53,19 @@ impl RuntimeTerrain {
         let patch_count = terrain.patches.len();
         let (root, level, base_x, base_y) = build_quadtree(&terrain.patches);
 
+        // Build O(1) lookup map from quadtree leaves
+        let mut patch_map = HashMap::with_capacity(patch_count);
+        if let Some(ref r) = root {
+            Self::collect_into_map(r, &mut patch_map);
+        }
+
         Self {
             root,
             level,
             base_x,
             base_y,
             patch_count,
+            patch_map,
         }
     }
 
@@ -96,13 +107,18 @@ impl RuntimeTerrain {
         if let Some(ref mut root) = self.root {
             Self::walk_mutable(root, &mut callback);
         }
+        // Sync patch_map after mutation (e.g., shadow dark values).
+        self.patch_map.clear();
+        if let Some(ref root) = self.root {
+            Self::collect_into_map(root, &mut self.patch_map);
+        }
     }
 
-    /// Look up a patch by its world coordinates.
+    /// Look up a patch by its world coordinates. O(1) via HashMap.
     ///
     /// Returns `Some(&RuntimePatch)` if a patch exists at `(x, y)`, else `None`.
     pub fn get_patch_at(&self, x: i32, y: i32) -> Option<&RuntimePatch> {
-        self.root.as_ref().and_then(|root| Self::find_patch(root, x, y))
+        self.patch_map.get(&(x, y))
     }
 
     /// Bilinear height interpolation at arbitrary world coordinates.
@@ -160,6 +176,20 @@ impl RuntimeTerrain {
 
     // --- Private helpers ---
 
+    /// Collect all patches from the quadtree into a HashMap for O(1) lookup.
+    fn collect_into_map(node: &QuadNode, map: &mut HashMap<(i32, i32), RuntimePatch>) {
+        match node {
+            QuadNode::Leaf(patch) => {
+                map.insert((patch.x, patch.y), patch.clone());
+            }
+            QuadNode::Interior { children, .. } => {
+                for child_node in children.iter().flatten() {
+                    Self::collect_into_map(child_node, map);
+                }
+            }
+        }
+    }
+
     fn walk_immutable<F>(node: &QuadNode, callback: &mut F)
     where
         F: FnMut(&RuntimePatch),
@@ -184,26 +214,6 @@ impl RuntimeTerrain {
                 for child in children.iter_mut().flatten() {
                     Self::walk_mutable(child, callback);
                 }
-            }
-        }
-    }
-
-    fn find_patch(node: &QuadNode, x: i32, y: i32) -> Option<&RuntimePatch> {
-        match node {
-            QuadNode::Leaf(patch) => {
-                if patch.x == x && patch.y == y {
-                    Some(patch)
-                } else {
-                    None
-                }
-            }
-            QuadNode::Interior { children, .. } => {
-                for child_node in children.iter().flatten() {
-                    if let Some(patch) = Self::find_patch(child_node, x, y) {
-                        return Some(patch);
-                    }
-                }
-                None
             }
         }
     }

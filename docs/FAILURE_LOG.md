@@ -36,6 +36,7 @@
 | F028 | Phase 6: Camera rotation frame-rate-dependent (45 deg/frame, not deg/sec) | High | PARTIAL | Plan 06-03 multiplies by time.delta_secs(). See R55. |
 | F029 | Phase 6: PhysicsIO.yaw never written — WASD forces in world-space not camera-space | High | PARTIAL | Plan 06-03 adds camera-relative WASD rotation. See R57. |
 | F030 | Phase 7: Shape-vector cache unbounded HashMap grows without limit | High | PARTIAL | Plan 07-04 uses LRU cache (8192 cap). See R61. |
+| F233 | Phase 5 runtime: Black screen — shadow computation hangs due to O(n) linear scan in find_patch(). 9207 patches × 64 cells × 32 raysteps = 18.8M calls to interpolate_height(), each doing O(9207) scan = ~173B ops. Root cause: quadtree find_patch() never used spatial narrowing. Fix: HashMap<(i32,i32), RuntimePatch> for O(1) lookup. Shadow now completes in 375ms (release). 4 integration tests added against real game_map_y8.a3d. | Critical | RESOLVED | HashMap patch_map in RuntimeTerrain, dead find_patch() removed. |
 
 ### Round 13 Audit Findings (2026-02-21)
 

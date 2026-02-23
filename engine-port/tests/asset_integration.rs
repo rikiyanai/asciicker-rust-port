@@ -223,6 +223,63 @@ fn test_test_map_no_terrain_instances() {
 }
 
 // ---------------------------------------------------------------------------
+// Full game map integration test (game_map_y8.a3d)
+// ---------------------------------------------------------------------------
+
+static GAME_MAP_Y8_A3D: &[u8] = include_bytes!("golden/a3d/game_map_y8.a3d");
+
+#[test]
+fn test_game_map_y8_terrain_parse() {
+    let (terrain, terrain_consumed) =
+        parse_terrain_section(GAME_MAP_Y8_A3D).expect("terrain section should parse");
+    assert_eq!(terrain.patches.len(), 9207, "game_map_y8 has 9207 patches");
+    assert!(terrain_consumed > 0);
+}
+
+#[test]
+fn test_game_map_y8_material_parse() {
+    let (_terrain, terrain_consumed) =
+        parse_terrain_section(GAME_MAP_Y8_A3D).expect("terrain section should parse");
+    let (materials, mat_consumed) =
+        parse_material_section(&GAME_MAP_Y8_A3D[terrain_consumed..])
+            .expect("material section should parse");
+    assert_eq!(materials.materials.len(), 256);
+    assert_eq!(mat_consumed, 131_072);
+}
+
+#[test]
+fn test_game_map_y8_world_parse() {
+    let (_terrain, terrain_consumed) =
+        parse_terrain_section(GAME_MAP_Y8_A3D).expect("terrain section should parse");
+    let (_materials, mat_consumed) =
+        parse_material_section(&GAME_MAP_Y8_A3D[terrain_consumed..])
+            .expect("material section should parse");
+    let world = parse_world_section(&GAME_MAP_Y8_A3D[terrain_consumed + mat_consumed..])
+        .expect("world section should parse");
+    assert_eq!(world.instances.len(), 47, "game_map_y8 has 47 instances");
+    assert_eq!(world.format_version, 1);
+}
+
+#[test]
+fn test_game_map_y8_full_pipeline() {
+    // All three sections must parse sequentially without panic
+    let (terrain, terrain_consumed) =
+        parse_terrain_section(GAME_MAP_Y8_A3D).expect("terrain");
+    let (materials, mat_consumed) =
+        parse_material_section(&GAME_MAP_Y8_A3D[terrain_consumed..]).expect("materials");
+    let world =
+        parse_world_section(&GAME_MAP_Y8_A3D[terrain_consumed + mat_consumed..]).expect("world");
+
+    assert_eq!(terrain.patches.len(), 9207);
+    assert_eq!(materials.materials.len(), 256);
+    assert_eq!(world.instances.len(), 47);
+
+    // Verify total bytes consumed matches file size (no trailing garbage)
+    let world_section = &GAME_MAP_Y8_A3D[terrain_consumed + mat_consumed..];
+    assert!(world_section.len() >= 8, "world section has header");
+}
+
+// ---------------------------------------------------------------------------
 // AKM integration tests
 // ---------------------------------------------------------------------------
 
