@@ -85,8 +85,8 @@ pub struct GameCamera {
 impl Default for GameCamera {
     fn default() -> Self {
         Self {
-            pos: [0.0, 0.0, 0.0],
-            yaw: 0.0,
+            pos: [0.0, 15.0, 0.0],
+            yaw: 45.0,
             zoom: 1.0,
             perspective: true,
             scene_shift: [0, 0],
@@ -731,8 +731,8 @@ mod tests {
 
         let camera = app.world().get_resource::<GameCamera>().unwrap();
         assert!(
-            (camera.yaw - (-45.0)).abs() < 1e-5,
-            "After Q press, yaw should be -45, got {}",
+            (camera.yaw - 0.0).abs() < 1e-5,
+            "After Q press from default yaw=45, yaw should be 0, got {}",
             camera.yaw
         );
     }
@@ -758,8 +758,8 @@ mod tests {
 
         let camera = app.world().get_resource::<GameCamera>().unwrap();
         assert!(
-            (camera.yaw - 45.0).abs() < 1e-5,
-            "After E press, yaw should be 45, got {}",
+            (camera.yaw - 90.0).abs() < 1e-5,
+            "After E press from default yaw=45, yaw should be 90, got {}",
             camera.yaw
         );
     }
