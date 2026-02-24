@@ -13,6 +13,7 @@ pub mod sample_buffer;
 pub mod sprite_blit;
 pub mod terrain_shader;
 pub mod types;
+pub mod water;
 
 use bevy::prelude::*;
 
@@ -22,6 +23,8 @@ use config::RenderConfig;
 use pipeline::{PipelineTiming, camera_terrain_init_system, render_pipeline_system};
 use sample_buffer::SampleBuffer;
 use sprite_blit::SpriteQueue;
+
+use crate::system_sets::RenderSet;
 
 /// The 6-stage CPU rasterization pipeline, matching the C++ render loop.
 ///
@@ -42,6 +45,31 @@ pub enum PipelineStage {
     Resolve,
 }
 
+/// Water configuration resource owned by CpuRasterizerPlugin.
+///
+/// Controls water reflection rendering and ripple animation.
+/// Read by render_pipeline_system (PostUpdate) for Stage 5 REFLECTION
+/// and resolve-stage ripple pass. Written by advance_water_time_system (Update)
+/// and sync_water_to_render (Update, GamePlugin).
+#[derive(Resource)]
+pub struct WaterConfig {
+    /// Water surface height (NEG_INFINITY = no water).
+    pub water_z: f32,
+    /// Animation time for Perlin noise ripple effect.
+    pub ripple_time: f32,
+}
+
+/// Advance water ripple animation time each frame.
+///
+/// Registered in Update by CpuRasterizerPlugin (owns WaterConfig resource).
+/// Update always precedes PostUpdate -- no explicit ordering needed.
+fn advance_water_time_system(
+    time: Res<Time>,
+    mut water_config: ResMut<WaterConfig>,
+) {
+    water_config.ripple_time += time.delta_secs();
+}
+
 pub struct CpuRasterizerPlugin;
 
 impl Plugin for CpuRasterizerPlugin {
@@ -52,10 +80,16 @@ impl Plugin for CpuRasterizerPlugin {
             .init_resource::<AssemblyState>()
             .init_resource::<PipelineTiming>()
             .init_resource::<MeshRegistry>()
-            .init_resource::<SpriteQueue>();
+            .init_resource::<SpriteQueue>()
+            .insert_resource(WaterConfig {
+                water_z: f32::NEG_INFINITY,
+                ripple_time: 0.0,
+            });
 
         app.add_systems(Startup, (load_a3d_scene, verify_plugin_prerequisites));
 
+        // R19-F01 FIX: Chain split -- camera+assembly+mesh loading+terrain init stay in Update.
+        // render_pipeline_system moves to PostUpdate for character sprite visibility.
         app.add_systems(
             Update,
             (
@@ -66,11 +100,21 @@ impl Plugin for CpuRasterizerPlugin {
                     .run_if(|assembly: Res<AssemblyState>| !assembly.assembled),
                 poll_akm_meshes,
                 camera_terrain_init_system,
-                render_pipeline_system,
             )
                 .chain(),
         );
-        // 1-frame display latency: Update (pipeline writes cell_grid) -> Render schedule
+
+        // Water time advances in Update (before PostUpdate render reads it)
+        app.add_systems(Update, advance_water_time_system);
+
+        // R19-F04 FIX: render_pipeline_system in PostUpdate with RenderSet::Pipeline label.
+        // This enables cross-plugin ordering: CharacterSet::SpritePush.before(RenderSet::Pipeline)
+        app.add_systems(
+            PostUpdate,
+            render_pipeline_system
+                .in_set(RenderSet::Pipeline),
+        );
+        // 1-frame display latency: PostUpdate (pipeline writes cell_grid) -> Render schedule
         // (GPU reads cell_grid). Standard Bevy behavior. Not a bug.
 
         #[cfg(feature = "inspector")]

@@ -16,10 +16,13 @@ use crate::render::assembly::{MeshRegistry, RuntimeMaterials};
 use crate::render::camera::GameCamera;
 use crate::render::config::RenderConfig;
 use crate::render::mesh_shader::render_mesh;
-use crate::render::resolve_bridge::{AutoMatGlyphSelector, resolve_to_grid};
+use crate::render::resolve::resolve;
+use crate::render::resolve_bridge::{AutoMatGlyphSelector, GlyphSelector, XTERM_256_PALETTE};
 use crate::render::sample_buffer::SampleBuffer;
 use crate::render::sprite_blit::{SpriteQueue, blit_sprite};
 use crate::render::types::AnsiCell;
+use crate::render::water;
+use crate::render::WaterConfig;
 use crate::terrain::RuntimeTerrain;
 use crate::world::RuntimeWorld;
 
@@ -176,13 +179,13 @@ pub fn camera_terrain_init_system(
 
 /// The 6-stage rendering pipeline system.
 ///
-/// Runs each frame. Stages:
+/// Runs each frame in PostUpdate (after character sprites are pushed). Stages:
 /// 1. CLEAR: memcpy-clear the SampleBuffer
 /// 2. TERRAIN: rasterize visible terrain patches (real TerrainShader)
 /// 3. WORLD: rasterize visible mesh instances (real MeshShader) + queue sprites
-/// 4. SHADOW: stub (deferred to Phase 6)
-/// 5. REFLECTION: stub (deferred to Phase 6)
-/// 6. RESOLVE: downsample SampleBuffer to AsciiCellGrid via resolve_to_grid
+/// 4. SHADOW: stub (future)
+/// 5. REFLECTION: re-render below water plane with flipped view matrix
+/// 6. RESOLVE: downsample SampleBuffer to AsciiCellGrid with water ripple
 ///
 /// Post-RESOLVE: sort and blit deferred sprites.
 ///
@@ -203,6 +206,7 @@ pub fn render_pipeline_system(
     mut cell_grid: ResMut<AsciiCellGrid>,
     mut sprite_queue: ResMut<SpriteQueue>,
     mut timing: ResMut<PipelineTiming>,
+    water_config: Res<WaterConfig>,
 ) {
     let frame_start = Instant::now();
 
@@ -281,10 +285,10 @@ pub fn render_pipeline_system(
 
         // Stage 2: TERRAIN (real rasterization with frustum culling)
         let t1 = Instant::now();
-        let mut terrain_patch_count = 0u32;
+        let mut _terrain_patch_count = 0u32;
         if terrain.root.is_some() {
             terrain.query_visible(&camera.frustum_planes, |patch| {
-                terrain_patch_count += 1;
+                _terrain_patch_count += 1;
                 crate::render::terrain_shader::render_patch(
                     buf,
                     buf_w,
@@ -299,12 +303,12 @@ pub fn render_pipeline_system(
         timing.terrain_us = t1.elapsed().as_micros() as u64;
 
         // Stage 3: WORLD (real rasterization for meshes, placeholder for sprites)
+        // Cleared by clear_sprite_queue_system in PreUpdate (Phase 6)
         let t2 = Instant::now();
-        sprite_queue.clear(); // Phase 5 standalone; Phase 6 moves this to PreUpdate
 
-        // TODO(frustum): BSP frustum culling disabled — coordinate system mismatch
+        // TODO(frustum): BSP frustum culling disabled -- coordinate system mismatch
         // between camera-pos-space frustum planes (game units) and visual-cell-space
-        // BSP bounding boxes (instance tm positions). Same issue as terrain (line 307).
+        // BSP bounding boxes (instance tm positions). Same issue as terrain.
         // Fix: convert frustum planes to visual-cell units or convert bbox to game units.
         // For now, iterate ALL instances directly (matching terrain approach).
         for inst in world_data.instances.iter() {
@@ -370,29 +374,75 @@ pub fn render_pipeline_system(
         }
         timing.world_us = t2.elapsed().as_micros() as u64;
 
-        // Stage 4: SHADOW (stub -- deferred to Phase 6)
+        // Stage 4: SHADOW (stub -- future)
         let t3 = Instant::now();
         timing.shadow_us = t3.elapsed().as_micros() as u64;
-
-        // Stage 5: REFLECTION (stub -- deferred to Phase 6)
-        let t4 = Instant::now();
-        timing.reflection_us = t4.elapsed().as_micros() as u64;
     } // mutable borrow of sample_buffer.samples ENDS here
 
-    // STEP 5: Stage 6 RESOLVE (immutable &SampleBuffer borrow)
+    // Stage 5: REFLECTION (water)
+    let t4 = Instant::now();
+    if water_config.water_z > f32::NEG_INFINITY {
+        water::render_water_reflections(
+            &mut sample_buffer,
+            &terrain,
+            &world_data,
+            &camera,
+            water_config.water_z,
+        );
+    }
+    timing.reflection_us = t4.elapsed().as_micros() as u64;
+
+    // STEP 5: Stage 6 RESOLVE
+    // R19-F02/F09 FIX: 3-step split -- resolve -> water ripple -> RGBA conversion.
+    // DO NOT call resolve_to_grid as single function (ripple must run between
+    // resolve and RGBA conversion, in the palette-index domain).
     let t5 = Instant::now();
     if let Some(mats) = materials.as_ref() {
         let ascii_w = config.ascii_width as usize;
         let ascii_h = config.ascii_height as usize;
+        let dw = sample_buffer.width as i32;
+        let dh = sample_buffer.height as i32;
         let mut resolve_buf = vec![AnsiCell::default(); ascii_w * ascii_h];
-        let mut glyph_sel = AutoMatGlyphSelector;
-        resolve_to_grid(
-            &sample_buffer,
+
+        // Step 1: resolve() fills resolve_buf with xterm-256 palette AnsiCells
+        resolve(
+            &sample_buffer.samples,
+            dw,
+            dh,
+            ascii_w as i32,
+            ascii_h as i32,
             &mats.0,
-            &mut cell_grid,
-            &mut glyph_sel,
             &mut resolve_buf,
         );
+
+        // Step 2: Water ripple modifies palette indices BEFORE RGBA conversion
+        if water_config.water_z > f32::NEG_INFINITY {
+            water::apply_water_ripple_pass(
+                &sample_buffer.samples,
+                &mut resolve_buf,
+                ascii_w as i32,
+                ascii_h as i32,
+                water_config.ripple_time,
+            );
+        }
+
+        // Step 3: Glyph selection + RGBA conversion to cell_grid
+        let mut glyph_sel = AutoMatGlyphSelector;
+        for cy in 0..ascii_h {
+            for cx in 0..ascii_w {
+                let i = cy * ascii_w + cx;
+                let cell = &resolve_buf[i];
+                let gl = match glyph_sel.select_glyph(&sample_buffer, cx, cy) {
+                    Some(glyph) => glyph,
+                    None => cell.gl,
+                };
+                let fg_rgb = XTERM_256_PALETTE[cell.fg as usize];
+                let bk_rgb = XTERM_256_PALETTE[cell.bk as usize];
+                cell_grid.char_indices[i] = gl as u16;
+                cell_grid.fg_colors[i] = [fg_rgb[0], fg_rgb[1], fg_rgb[2], 255];
+                cell_grid.bg_colors[i] = [bk_rgb[0], bk_rgb[1], bk_rgb[2], 255];
+            }
+        }
     }
     timing.resolve_us = t5.elapsed().as_micros() as u64;
 
