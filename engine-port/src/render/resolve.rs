@@ -71,11 +71,14 @@ pub fn resolve(
                 continue;
             }
 
-            // Average height (ignoring clear samples)
-            let (avg_height, _height_count) = average_height(s00, s10, s01, s11);
+            // Average height (ignoring clear samples) — used for future shadow/reflection
+            let (_avg_height, _height_count) = average_height(s00, s10, s01, s11);
 
-            // Average diffuse
-            let avg_diffuse = average_diffuse(s00, s10, s01, s11);
+            // Sum of all 4 diffuse values (C++ render.cpp:3449 keeps individual dif[4])
+            let diffuse_sum = s00.diffuse as u32
+                + s10.diffuse as u32
+                + s01.diffuse as u32
+                + s11.diffuse as u32;
 
             // Combined spare flags (OR of all 4)
             let combined_spare = s00.spare | s10.spare | s01.spare | s11.spare;
@@ -92,19 +95,19 @@ pub fn resolve(
             let diffuse_divisor: u32 = if is_reflection { 400 } else { 255 };
 
             let cell = if combined_spare & spare_bits::MESH_FLAG != 0 {
-                // Mesh path: auto_mat lookup
+                // Mesh path: auto_mat lookup (uses average diffuse)
+                let avg_diffuse = diffuse_sum / 4;
                 resolve_mesh(dominant.visual, avg_diffuse, diffuse_divisor)
             } else {
-                // Material path: shade table lookup
+                // Material path: shade table lookup (uses C++ sum-based rounding)
                 let ctx = MaterialResolveCtx {
                     samples,
                     dw,
                     sx,
                     sy,
-                    avg_height,
                     materials,
                 };
-                resolve_material(dominant.visual, avg_diffuse, &ctx)
+                resolve_material(dominant.visual, diffuse_sum, &ctx)
             };
 
             // Apply grid/wireframe overlay
@@ -118,6 +121,7 @@ pub fn resolve(
             };
         }
     }
+
 }
 
 /// Check if a sample is at clear height (sky).
@@ -145,11 +149,6 @@ fn average_height(s00: &Sample, s10: &Sample, s01: &Sample, s11: &Sample) -> (f3
     }
 }
 
-/// Average diffuse of all 4 samples in a 2x2 block.
-#[inline]
-fn average_diffuse(s00: &Sample, s10: &Sample, s01: &Sample, s11: &Sample) -> u32 {
-    (s00.diffuse as u32 + s10.diffuse as u32 + s01.diffuse as u32 + s11.diffuse as u32) / 4
-}
 
 /// Get the dominant sample (first non-clear, or fallback to s00).
 #[inline]
@@ -208,25 +207,30 @@ struct MaterialResolveCtx<'a> {
     dw: i32,
     sx: i32,
     sy: i32,
-    avg_height: f32,
     materials: &'a [Material],
 }
 
 /// Resolve a terrain material sample via shade table lookup.
 ///
-/// Computes elevation (0-3) from the row above, looks up the material shade
+/// Computes elevation (0-3) from bit 15 of visual values in surrounding rows,
+/// masks off bit 15 to get the material index, looks up the material shade
 /// table, and converts MatCell colors to xterm-256 palette indices.
-fn resolve_material(visual: u16, avg_diffuse: u32, ctx: &MaterialResolveCtx<'_>) -> ResolvedCell {
-    let mat_idx = visual as usize;
+///
+/// `diffuse_sum` is the raw sum of all 4 samples' diffuse values (0-1020).
+fn resolve_material(visual: u16, diffuse_sum: u32, ctx: &MaterialResolveCtx<'_>) -> ResolvedCell {
+    // C++ render.cpp:3448: mat[i] = src[i].visual & 0x00FF (8-bit material index).
+    // Upper bits may be used for visual shade / animation in future.
+    let mat_idx = (visual & 0x00FF) as usize;
 
-    // Compute elevation from row above
-    let elevation = compute_elevation(ctx.samples, ctx.dw, ctx.sx, ctx.sy, ctx.avg_height);
+    // Compute elevation from bit 15 of surrounding samples (C++ render.cpp:3456-3474)
+    let elevation = compute_elevation(ctx.samples, ctx.dw, ctx.sx, ctx.sy);
 
-    // Look up material shade table
-    // Pass raw avg_diffuse to lookup() — it handles the /17 division internally.
-    // Do NOT pre-divide; that causes a double-divide bug (P4-H03 FIX contract).
+    // C++ render.cpp:3493: shd = (dif[0]+dif[1]+dif[2]+dif[3] + 17*2) / (17*4)
+    // Rounding bias (+34) rounds to nearest instead of truncating.
+    let shade_idx = ((diffuse_sum + 34) / 68).min(15) as usize;
+
     if mat_idx < ctx.materials.len() {
-        let mat_cell = ctx.materials[mat_idx].lookup(elevation, avg_diffuse as u8);
+        let mat_cell = &ctx.materials[mat_idx].shade[elevation as usize][shade_idx];
         let fg_pal = rgb2pal(mat_cell.fg);
         let bg_pal = rgb2pal(mat_cell.bg);
         ResolvedCell {
@@ -244,37 +248,48 @@ fn resolve_material(visual: u16, avg_diffuse: u32, ctx: &MaterialResolveCtx<'_>)
     }
 }
 
-/// Compute elevation (0-3) by comparing current block height to the row above.
+/// Compute elevation (0-3) from bit 15 of visual values in surrounding rows.
 ///
-/// Reads `samples[(sy-1)*dw + sx]` height and compares to the current block
-/// average height. Larger height differences map to higher elevation values.
-fn compute_elevation(samples: &[Sample], dw: i32, sx: i32, sy: i32, avg_height: f32) -> u8 {
-    // Read the sample from the row above
-    let above_idx = ((sy - 1) * dw + sx) as usize;
-    let above_height = if sy > 0 && above_idx < samples.len() {
-        let above = &samples[above_idx];
-        if is_clear(above) {
-            avg_height // No slope if row above is clear
-        } else {
-            above.height
+/// Ports C++ render.cpp:3456-3474. Reads bit 15 (elevation flag) from the
+/// row above the 2x2 block and the bottom row of the block. The pattern
+/// of elevated vs non-elevated rows determines the elevation index:
+/// - 0 = lowering edge (above elevated, below not)
+/// - 1 = high flat (both elevated)
+/// - 2 = raising edge (above not elevated, below elevated)
+/// - 3 = low flat (neither elevated)
+///
+/// When no samples have bit 15 set (common in terrain data without elevation
+/// flags), all pairs are 0 → elevation=3. This matches C++ exactly.
+fn compute_elevation(samples: &[Sample], dw: i32, sx: i32, sy: i32) -> u8 {
+    let bit15 = |row: i32, col: i32| -> i32 {
+        if row < 0 || col < 0 {
+            return 0;
         }
-    } else {
-        avg_height // No slope at top edge
+        let idx = (row * dw + col) as usize;
+        samples
+            .get(idx)
+            .map_or(0, |s| ((s.visual >> 15) & 1) as i32)
     };
 
-    // Height difference determines elevation (0-3)
-    let diff = avg_height - above_height;
+    // Row above the 2x2 block (C++ src[-dw] and src[-dw+1])
+    let e_lo = bit15(sy - 1, sx) + bit15(sy - 1, sx + 1);
 
-    // Map height difference to elevation 0-3
-    // Roughly: 0 = flat, 1 = gentle slope, 2 = moderate, 3 = steep
-    if diff <= 0.5 {
+    // Bottom row of the 2x2 block (C++ src[dw] and src[dw+1])
+    let e_hi = bit15(sy + 1, sx) + bit15(sy + 1, sx + 1);
+
+    // C++ render.cpp:3461-3474: elevation from bit-15 pattern.
+    // When no bit-15 flags exist (e_lo=0, e_hi=0), both are <=1 → elevation=3.
+    // This IS correct C++ behavior — material shade[3] is the "low flat" entry.
+    if e_lo <= 1 {
+        if e_hi <= 1 {
+            3
+        } else {
+            2
+        }
+    } else if e_hi <= 1 {
         0
-    } else if diff <= 2.0 {
-        1
-    } else if diff <= 5.0 {
-        2
     } else {
-        3
+        1
     }
 }
 

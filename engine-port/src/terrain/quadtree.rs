@@ -5,7 +5,7 @@
 //! elimination.
 
 use crate::asset_loader::a3d_terrain::TerrainPatch;
-use crate::asset_loader::constants::{HEIGHT_SCALE, VISUAL_CELLS};
+use crate::asset_loader::constants::HEIGHT_SCALE;
 
 use super::patch_runtime::RuntimePatch;
 
@@ -288,16 +288,22 @@ pub fn query_terrain_frustum<F>(
 ) where
     F: FnMut(&RuntimePatch),
 {
-    // Compute AABB for this node
-    let size = (1i32 << level) as f64 * VISUAL_CELLS as f64;
-    let x0 = bx as f64 * VISUAL_CELLS as f64;
-    let y0 = by as f64 * VISUAL_CELLS as f64;
+    // Compute AABB in camera-pos-space (same as frustum planes).
+    // Frustum planes are in pos-space: inv(view_tm) divided by HEIGHT_CELLS.
+    // Patch coordinate bx maps directly to pos-space x (since world vertex
+    // x = bx * HEIGHT_CELLS, divided by HEIGHT_CELLS = bx).
+    let size = (1i32 << level) as f64;
+    let x0 = bx as f64;
+    let y0 = by as f64;
     let x1 = x0 + size;
     let y1 = y0 + size;
 
     let (lo, hi) = node.height_bounds();
-    let z0 = lo as f64 * HEIGHT_SCALE as f64;
-    let z1 = hi as f64 * HEIGHT_SCALE as f64;
+    // Z in raw height units (same space as frustum planes, which are derived
+    // from inv(view_tm) — the view matrix operates on raw heightmap z values).
+    // +HEIGHT_SCALE accounts for terrain shader's bit-15 elevation boost.
+    let z0 = lo as f64;
+    let z1 = hi as f64 + HEIGHT_SCALE as f64;
 
     let corners = aabb_corners(x0, x1, y0, y1, z0, z1);
 
@@ -376,7 +382,7 @@ where
 mod tests {
     use super::*;
     use crate::asset_loader::a3d_terrain::TerrainPatch;
-    use crate::asset_loader::constants::HEIGHT_CELLS_PLUS_ONE;
+    use crate::asset_loader::constants::{HEIGHT_CELLS_PLUS_ONE, VISUAL_CELLS};
 
     fn make_patch(x: i32, y: i32, base_height: u16) -> TerrainPatch {
         TerrainPatch {
@@ -553,11 +559,10 @@ mod tests {
         // Plane elimination: planes that fully contain a node should be
         // removed from the child test set. We verify by checking that
         // partial overlap produces correct count.
-        // Use a vertical plane that cuts the grid in half along X.
-        // Patch world X positions: patch(0,*) covers x=[0..8), patch(1,*) covers x=[8..16)
-        // Plane: x <= 4 (i.e. -x + 4 >= 0) should include only left column
+        // AABB is now in pos-space: patch(0,*) covers [0..1), patch(1,*) covers [1..2)
+        // Plane: x <= 0.5 should include only left column (partial overlap on patch 0)
         let planes = [
-            [-1.0, 0.0, 0.0, 4.0],     // -x + 4 >= 0 -> x <= 4
+            [-1.0, 0.0, 0.0, 0.5],     // -x + 0.5 >= 0 -> x <= 0.5
             [0.0, 1.0, 0.0, 10000.0],  // always true
             [0.0, -1.0, 0.0, 10000.0], // always true
             [0.0, 0.0, 1.0, 10000.0],  // always true
@@ -571,8 +576,8 @@ mod tests {
             });
         }
 
-        // Only patches at x=0 should be visible (their world coverage is [0..8) which overlaps x<=4)
-        // Patches at x=1 cover [8..16) which is entirely outside x<=4
+        // Only patches at x=0 should be visible (AABB [0,1) overlaps x<=0.5)
+        // Patches at x=1 have AABB [1,2) entirely outside x<=0.5
         for &(px, _py) in &visible {
             assert_eq!(px, 0, "Only patches at x=0 should be visible, got x={}", px);
         }
@@ -595,14 +600,14 @@ mod tests {
         ];
         let (root, level, bx, by) = build_quadtree(&patches);
 
-        // Frustum covering only top-left: x <= 4, y <= 4
-        // Patch(0,0) covers world [0..8)x[0..8) -> overlaps
-        // Patch(1,0) covers world [8..16)x[0..8) -> outside (x>4)
-        // Patch(0,1) covers world [0..8)x[8..16) -> outside (y>4)
-        // Patch(1,1) covers world [8..16)x[8..16) -> outside
+        // Frustum covering only top-left: x <= 0.5, y <= 0.5
+        // AABB is in pos-space: Patch(0,0) covers [0..1)x[0..1)
+        // Patch(1,0) covers [1..2)x[0..1) -> outside (x>0.5)
+        // Patch(0,1) covers [0..1)x[1..2) -> outside (y>0.5)
+        // Patch(1,1) covers [1..2)x[1..2) -> outside
         let planes = [
-            [-1.0, 0.0, 0.0, 4.0],     // x <= 4
-            [0.0, -1.0, 0.0, 4.0],     // y <= 4
+            [-1.0, 0.0, 0.0, 0.5],     // x <= 0.5
+            [0.0, -1.0, 0.0, 0.5],     // y <= 0.5
             [0.0, 0.0, 1.0, 10000.0],  // z always inside
             [0.0, 0.0, -1.0, 10000.0], // z always inside
         ];

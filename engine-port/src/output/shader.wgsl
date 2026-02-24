@@ -33,7 +33,11 @@ fn fragment(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
     let fh = i32(uniforms.font_height);
 
     // Cell coordinates (which ASCII cell this pixel belongs to)
-    let cp = vec2<i32>(i32(p.x) / fw, i32(p.y) / fh);
+    // Y-flip: the CPU rasterizer's sample buffer uses y-up convention
+    // (matching C++ render.cpp), but WebGPU screen has y=0 at top.
+    // Flip the grid lookup so higher world-z appears higher on screen.
+    let grid_h = i32(textureDimensions(t_fore).y);
+    let cp = vec2<i32>(i32(p.x) / fw, grid_h - 1 - i32(p.y) / fh);
 
     // Local pixel coordinates within the cell
     let lp = vec2<i32>(i32(p.x) % fw, i32(p.y) % fh);

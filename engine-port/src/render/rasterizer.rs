@@ -310,7 +310,7 @@ mod tests {
 
     impl RasterShader for FlatShader {
         fn blend(&self, sample: &mut Sample, z: f32, _bc: [f32; 3]) {
-            if sample.height > z || sample.height == Sample::CLEAR_HEIGHT {
+            if sample.height < z || sample.height == Sample::CLEAR_HEIGHT {
                 sample.visual = self.visual;
                 sample.diffuse = self.diffuse;
                 sample.spare = self.spare;
@@ -651,36 +651,37 @@ mod tests {
         let w = 16;
         let h = 16;
 
-        // First: draw a far triangle at z=200
-        let far_shader = FlatShader {
+        // First: draw a low triangle at z=50
+        let low_shader = FlatShader {
             visual: 0x1111,
             diffuse: 100,
             spare: 0,
         };
-        let v0: [i32; 4] = [2, 2, 200, 0];
-        let v1: [i32; 4] = [10, 2, 200, 0];
-        let v2: [i32; 4] = [6, 8, 200, 0];
+        let v0: [i32; 4] = [2, 2, 50, 0];
+        let v1: [i32; 4] = [10, 2, 50, 0];
+        let v2: [i32; 4] = [6, 8, 50, 0];
 
         let mut buf = make_buf(w, h);
-        rasterize(&mut buf, w, h, &far_shader, [&v0, &v1, &v2], false);
+        rasterize(&mut buf, w, h, &low_shader, [&v0, &v1, &v2], false);
 
-        // Then: draw a closer triangle at z=50 (same shape)
-        let near_shader = FlatShader {
+        // Then: draw a higher triangle at z=200 (same shape)
+        // In Z-up world, higher z = on top = should overwrite
+        let high_shader = FlatShader {
             visual: 0x2222,
             diffuse: 200,
             spare: 0,
         };
-        let n0: [i32; 4] = [2, 2, 50, 0];
-        let n1: [i32; 4] = [10, 2, 50, 0];
-        let n2: [i32; 4] = [6, 8, 50, 0];
+        let n0: [i32; 4] = [2, 2, 200, 0];
+        let n1: [i32; 4] = [10, 2, 200, 0];
+        let n2: [i32; 4] = [6, 8, 200, 0];
 
-        rasterize(&mut buf, w, h, &near_shader, [&n0, &n1, &n2], false);
+        rasterize(&mut buf, w, h, &high_shader, [&n0, &n1, &n2], false);
 
-        // Center pixel should show the closer (near) triangle
+        // Center pixel should show the higher (on-top) triangle
         let center = (w * 4 + 6) as usize;
         assert_eq!(
             buf[center].visual, 0x2222,
-            "Closer triangle should overwrite farther one"
+            "Higher z triangle should overwrite lower (on top in Z-up)"
         );
     }
 

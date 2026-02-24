@@ -67,40 +67,107 @@ fn ensure_buffer_size(buf: &mut SampleBuffer, config: &RenderConfig) {
 
 /// Project a world-space position to screen-space ASCII cell coordinates.
 ///
+/// Applies architectural perspective division matching C++ render.cpp:1804-1846.
+///
 /// Returns `Some((screen_x, screen_y))` if the position is in front of the camera,
 /// or `None` if behind.
 pub fn project_world_to_screen(pos: &[f32; 3], camera: &GameCamera) -> Option<(i32, i32)> {
-    // Compute distance along view direction
-    let dx = pos[0] - camera.view_pos[0];
-    let dy = pos[1] - camera.view_pos[1];
-    let dist = dx * camera.view_dir[0] + dy * camera.view_dir[1];
+    let hc = crate::asset_loader::constants::HEIGHT_CELLS as f64;
 
-    // Behind camera check (view_dir is normalized by focal, so dist > 0 means in front)
-    if dist <= 0.0 {
-        return None;
+    // Convert game position to visual-cell units (matching terrain/mesh shaders)
+    let wx = pos[0] as f64 * hc;
+    let wy = pos[1] as f64 * hc;
+    let wz = pos[2] as f64;
+
+    // Eye-to-vertex vector
+    let eye_x = wx as f32 - camera.view_pos[0];
+    let eye_y = wy as f32 - camera.view_pos[1];
+    let eye_z = wz as f32 - camera.view_pos[2];
+
+    // Distance along view direction (view_dir normalized by focal)
+    let viewer_dist = eye_x * camera.view_dir[0]
+        + eye_y * camera.view_dir[1]
+        + eye_z * camera.view_dir[2];
+
+    if viewer_dist <= 0.0 {
+        return None; // behind camera
     }
 
-    // Project using the isometric view matrix
-    let hc = crate::asset_loader::constants::HEIGHT_CELLS as f64;
-    let px = pos[0] as f64;
-    let py = pos[1] as f64;
-    let pz = pos[2] as f64;
+    let recp_dist = 1.0 / viewer_dist;
 
-    let screen_x = camera.view_tm[0] * px * hc
-        + camera.view_tm[4] * py * hc
-        + camera.view_tm[8] * pz
-        + camera.view_tm[12];
-    let screen_y = camera.view_tm[1] * px * hc
-        + camera.view_tm[5] * py * hc
-        + camera.view_tm[9] * pz
-        + camera.view_tm[13];
+    // Base screen position WITHOUT translation, scaled by 1/distance
+    let fx = (camera.mul[0] * wx + camera.mul[2] * wy) as f32 * recp_dist;
+    let fy = (camera.mul[1] * wx + camera.mul[3] * wy + camera.mul[5] * wz) as f32
+        * recp_dist;
+
+    // Translated offset with perspective
+    let qx = (camera.add[0] as f32 - camera.view_ofs[0]) * recp_dist + camera.view_ofs[0];
+    let qy = (camera.add[1] as f32 - camera.view_ofs[1]) * recp_dist + camera.view_ofs[1];
+
+    let sx = fx + qx;
+    let sy = fy + qy;
 
     // Convert from sample-space to ASCII cell coordinates
-    // Sample coords -> ASCII: (sample - 2) / 2
-    let ascii_x = ((screen_x - 2.0) / 2.0) as i32;
-    let ascii_y = ((screen_y - 2.0) / 2.0) as i32;
+    let ascii_x = ((sx - 2.0) / 2.0) as i32;
+    let ascii_y = ((sy - 2.0) / 2.0) as i32;
 
     Some((ascii_x, ascii_y))
+}
+
+// ---------------------------------------------------------------------------
+// Camera terrain initialization
+// ---------------------------------------------------------------------------
+
+/// One-shot system: after terrain first loads, set camera z to terrain surface height.
+///
+/// Without this, the camera starts at z=0 while terrain may be at elevation 40960,
+/// causing all terrain to project off-screen. This mimics the C++ behavior where the
+/// player spawns ON the terrain surface.
+pub fn camera_terrain_init_system(
+    mut camera: ResMut<GameCamera>,
+    terrain: Res<RuntimeTerrain>,
+    config: Res<RenderConfig>,
+    mut initialized: Local<bool>,
+) {
+    if *initialized || terrain.root.is_none() {
+        return;
+    }
+    *initialized = true;
+
+    // Find the patch at camera's (x,y) or nearest patch
+    let cam_x = camera.pos[0] as i32;
+    let cam_y = camera.pos[1] as i32;
+
+    let height = if let Some(patch) = terrain.get_patch_at(cam_x, cam_y) {
+        // Use center height vertex of the patch
+        patch.height[2][2]
+    } else {
+        // Find nearest patch
+        let mut best_height = 0u16;
+        let mut best_dist = f64::MAX;
+        terrain.for_each_patch(|patch| {
+            let dx = patch.x as f64 - camera.pos[0] as f64;
+            let dy = patch.y as f64 - camera.pos[1] as f64;
+            let d = dx * dx + dy * dy;
+            if d < best_dist {
+                best_dist = d;
+                best_height = patch.height[2][2];
+            }
+        });
+        best_height
+    };
+
+    camera.pos[2] = height as f32;
+    info!(
+        "Camera z initialized to terrain height: {} (raw u16) at pos=[{}, {}, {}]",
+        height, camera.pos[0], camera.pos[1], camera.pos[2]
+    );
+
+    // Recompute view matrix with corrected z position
+    let dw = config.sample_width() as f64;
+    let dh = config.sample_height() as f64;
+    camera.update(dw, dh);
+    camera.extract_frustum_planes(dw, dh);
 }
 
 // ---------------------------------------------------------------------------
@@ -155,6 +222,56 @@ pub fn render_pipeline_system(
     sample_buffer.clear();
     timing.clear_us = t0.elapsed().as_micros() as u64;
 
+    // One-time diagnostic: log camera, terrain, and material info
+    {
+        static DIAG_LOGGED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+        if terrain.root.is_some() && !DIAG_LOGGED.load(std::sync::atomic::Ordering::Relaxed) {
+            DIAG_LOGGED.store(true, std::sync::atomic::Ordering::Relaxed);
+            info!(
+                "Pipeline: camera pos={:?} yaw={} | terrain patches={} | grid={}x{} sample={}x{}",
+                camera.pos, camera.yaw, terrain.patch_count,
+                cell_grid.width, cell_grid.height,
+                sample_buffer.width, sample_buffer.height,
+            );
+            // Material and height distribution across all patches
+            let mut height_min = u16::MAX;
+            let mut height_max = 0u16;
+            let mut visual_zero = 0u64;
+            let mut visual_nonzero = 0u64;
+            let mut unique_vis = std::collections::HashSet::new();
+            terrain.for_each_patch(|patch| {
+                for row in &patch.height {
+                    for &h in row {
+                        if h < height_min { height_min = h; }
+                        if h > height_max { height_max = h; }
+                    }
+                }
+                for row in &patch.visual {
+                    for &v in row {
+                        if v == 0 { visual_zero += 1; } else { visual_nonzero += 1; }
+                        unique_vis.insert(v);
+                    }
+                }
+            });
+            info!(
+                "Terrain: heights [{},{}] | visual: {} zero, {} nonzero, {} unique indices",
+                height_min, height_max, visual_zero, visual_nonzero, unique_vis.len()
+            );
+            // Log first few non-zero material colors
+            if let Some(mats) = materials.as_ref() {
+                let mut shown = 0;
+                for idx in unique_vis.iter().take(8) {
+                    if (*idx as usize) < mats.0.len() {
+                        let mc = &mats.0[*idx as usize].shade[0][8]; // elevation 0, mid diffuse
+                        info!("Material[{}]: fg={:?} gl={} bg={:?}", idx, mc.fg, mc.gl, mc.bg);
+                        shown += 1;
+                    }
+                }
+                if shown == 0 { info!("No material samples to show"); }
+            }
+        }
+    }
+
     // STEP 4: Destructure for render stages (field borrows)
     // Read width/height BEFORE taking &mut samples to avoid borrow conflict.
     let buf_w = sample_buffer.width as i32;
@@ -162,11 +279,12 @@ pub fn render_pipeline_system(
     {
         let buf = &mut sample_buffer.samples;
 
-        // Stage 2: TERRAIN (real rasterization)
+        // Stage 2: TERRAIN (real rasterization with frustum culling)
         let t1 = Instant::now();
+        let mut terrain_patch_count = 0u32;
         if terrain.root.is_some() {
-            let planes = &camera.frustum_planes;
-            terrain.query_visible(planes, |patch| {
+            terrain.query_visible(&camera.frustum_planes, |patch| {
+                terrain_patch_count += 1;
                 crate::render::terrain_shader::render_patch(
                     buf,
                     buf_w,
@@ -174,7 +292,7 @@ pub fn render_pipeline_system(
                     patch,
                     patch.x,
                     patch.y,
-                    &camera.view_tm,
+                    &camera,
                 );
             });
         }
@@ -184,70 +302,67 @@ pub fn render_pipeline_system(
         let t2 = Instant::now();
         sprite_queue.clear(); // Phase 5 standalone; Phase 6 moves this to PreUpdate
 
-        if world_data.bsp_root.is_some() || !world_data.flat_list.is_empty() {
-            let planes = &camera.frustum_planes;
-            let camera_pos_f64: [f64; 3] = camera.pos.map(|x| x as f64);
-            let visible = world_data.query_visible(planes, camera_pos_f64);
-
-            for vis_inst in &visible {
-                match vis_inst {
-                    crate::world::bsp::VisibleInstance::Mesh(id) => {
-                        if let Some(crate::world::instance::RuntimeInstance::Mesh {
-                            mesh_id, tm, ..
-                        }) = world_data.instances.get(id.0)
-                        {
-                            if let Some(mesh) = mesh_registry.loaded.get(mesh_id) {
-                                render_mesh(buf, buf_w, buf_h, mesh, tm, &camera.view_tm);
-                            } else {
-                                trace!("Pipeline: mesh '{}' visible but AKM not yet loaded", mesh_id);
-                            }
+        // TODO(frustum): BSP frustum culling disabled — coordinate system mismatch
+        // between camera-pos-space frustum planes (game units) and visual-cell-space
+        // BSP bounding boxes (instance tm positions). Same issue as terrain (line 307).
+        // Fix: convert frustum planes to visual-cell units or convert bbox to game units.
+        // For now, iterate ALL instances directly (matching terrain approach).
+        for inst in world_data.instances.iter() {
+            match inst {
+                crate::world::instance::RuntimeInstance::Mesh {
+                    mesh_id, tm, ..
+                } => {
+                    if inst.is_visible() {
+                        if let Some(mesh) = mesh_registry.loaded.get(mesh_id) {
+                            render_mesh(buf, buf_w, buf_h, mesh, tm, &camera);
                         }
                     }
-                    crate::world::bsp::VisibleInstance::Sprite(id) => {
-                        if let Some(inst) = world_data.instances.get(id.0) {
-                            let (sprite_name, pos, yaw, anim, frame) = match inst {
-                                crate::world::instance::RuntimeInstance::Sprite {
-                                    sprite_name,
-                                    pos,
-                                    yaw,
-                                    anim,
-                                    frame,
-                                    ..
-                                } => (
-                                    sprite_name.clone(),
-                                    *pos,
-                                    *yaw,
-                                    *anim as u32,
-                                    *frame as u32,
-                                ),
-                                crate::world::instance::RuntimeInstance::Item {
-                                    pos, yaw, ..
-                                } => ("item".to_string(), *pos, *yaw, 0, 0),
-                                _ => continue,
-                            };
+                }
+                crate::world::instance::RuntimeInstance::Sprite {
+                    sprite_name, pos, yaw, anim, frame, ..
+                } => {
+                    if inst.is_visible() {
+                        let dx = pos[0] - camera.view_pos[0];
+                        let dy = pos[1] - camera.view_pos[1];
+                        let dist = dx * camera.view_dir[0] + dy * camera.view_dir[1];
 
-                            // Compute distance along view direction
-                            let dx = pos[0] - camera.view_pos[0];
-                            let dy = pos[1] - camera.view_pos[1];
-                            let dist =
-                                dx * camera.view_dir[0] + dy * camera.view_dir[1];
+                        if let Some((sx, sy)) = project_world_to_screen(pos, &camera) {
+                            sprite_queue.push(
+                                crate::render::sprite_blit::SpriteRenderEntry {
+                                    dist,
+                                    screen_x: sx,
+                                    screen_y: sy,
+                                    sprite_name: sprite_name.clone(),
+                                    pos: *pos,
+                                    yaw: *yaw,
+                                    anim: *anim as u32,
+                                    frame: *frame as u32,
+                                },
+                            );
+                        }
+                    }
+                }
+                crate::world::instance::RuntimeInstance::Item {
+                    pos, yaw, ..
+                } => {
+                    if inst.is_visible() {
+                        let dx = pos[0] - camera.view_pos[0];
+                        let dy = pos[1] - camera.view_pos[1];
+                        let dist = dx * camera.view_dir[0] + dy * camera.view_dir[1];
 
-                            if let Some((sx, sy)) =
-                                project_world_to_screen(&pos, &camera)
-                            {
-                                sprite_queue.push(
-                                    crate::render::sprite_blit::SpriteRenderEntry {
-                                        dist,
-                                        screen_x: sx,
-                                        screen_y: sy,
-                                        sprite_name,
-                                        pos,
-                                        yaw,
-                                        anim,
-                                        frame,
-                                    },
-                                );
-                            }
+                        if let Some((sx, sy)) = project_world_to_screen(pos, &camera) {
+                            sprite_queue.push(
+                                crate::render::sprite_blit::SpriteRenderEntry {
+                                    dist,
+                                    screen_x: sx,
+                                    screen_y: sy,
+                                    sprite_name: "item".to_string(),
+                                    pos: *pos,
+                                    yaw: *yaw,
+                                    anim: 0,
+                                    frame: 0,
+                                },
+                            );
                         }
                     }
                 }
@@ -280,6 +395,31 @@ pub fn render_pipeline_system(
         );
     }
     timing.resolve_us = t5.elapsed().as_micros() as u64;
+
+    // Diagnostic: log resolve stats for first 3 frames
+    {
+        static RESOLVE_FRAME: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let frame = RESOLVE_FRAME.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if materials.is_some() && frame < 3 {
+            let non_clear = sample_buffer.samples.iter()
+                .filter(|s| s.height != crate::render::sample_buffer::Sample::CLEAR_HEIGHT)
+                .count();
+            let mesh_samples = sample_buffer.samples.iter()
+                .filter(|s| s.height != crate::render::sample_buffer::Sample::CLEAR_HEIGHT
+                    && s.spare & crate::render::sample_buffer::spare_bits::MESH_FLAG != 0)
+                .count();
+            let non_space = cell_grid.char_indices.iter()
+                .filter(|&&c| c != 0 && c != 32)
+                .count();
+            info!(
+                "Resolve[frame {}]: {}/{} samples filled ({} mesh), {}/{} glyphs visible, {} meshes loaded",
+                frame, non_clear, sample_buffer.samples.len(),
+                mesh_samples,
+                non_space, cell_grid.char_indices.len(),
+                mesh_registry.loaded.len(),
+            );
+        }
+    }
 
     // STEP 6: Post-RESOLVE Deferred Sprite Blit
     let t6 = Instant::now();
@@ -398,6 +538,7 @@ mod tests {
     #[test]
     fn test_pipeline_mesh_branch_calls_render_mesh() {
         use crate::asset_loader::akm_mesh::{AkmFace, AkmMesh, AkmVertex};
+        use crate::render::camera::GameCamera;
         use crate::render::sample_buffer::{Sample, spare_bits};
         use std::collections::HashMap;
 
@@ -426,32 +567,26 @@ mod tests {
             loaded,
         };
 
-        // Create a small SampleBuffer (20x20 ASCII -> 44x44 sample)
-        let ascii_w: u32 = 20;
-        let ascii_h: u32 = 20;
+        // Larger buffer so the perspective-projected mesh fits comfortably.
+        let ascii_w: u32 = 200;
+        let ascii_h: u32 = 200;
         let mut buf = SampleBuffer::new(ascii_w, ascii_h);
         let buf_w = buf.width as i32;
         let buf_h = buf.height as i32;
 
-        // Identity instance transform (no model->world transformation)
+        // Scale mesh up: vertices (0,0,0),(1,0,0),(0,1,0) -> (10,10,0),(110,10,0),(10,110,0)
         let instance_tm: [f64; 16] = [
-            1.0, 0.0, 0.0, 0.0,
-            0.0, 1.0, 0.0, 0.0,
-            0.0, 0.0, 1.0, 0.0,
-            0.0, 0.0, 0.0, 1.0,
+            100.0, 0.0,   0.0, 0.0,
+            0.0,   100.0, 0.0, 0.0,
+            0.0,   0.0,   100.0, 0.0,
+            10.0,  10.0,  0.0, 1.0,
         ];
 
-        // Custom view_tm that scales world coords into sample-buffer center.
-        // The triangle occupies world [0,1]x[0,1], we want it to cover
-        // roughly sample-space [10,30]x[10,30] in a 44x44 buffer.
-        // view_tm is row-major: screen_x = col0*wx + col1*wy + col2*wz + col3
-        // We want: screen_x = 20*wx + 10, screen_y = 20*wy + 10, screen_z = 100
-        let view_tm: [f64; 16] = [
-            20.0, 0.0,   0.0, 0.0,   // column 0: X scale
-            0.0,  20.0,  0.0, 0.0,   // column 1: Y scale
-            0.0,  0.0,   0.0, 0.0,   // column 2: Z (flat)
-            10.0, 10.0, 100.0, 1.0,  // column 3: translation
-        ];
+        // Camera behind the mesh looking toward +Y (yaw=0)
+        let mut camera = GameCamera::default();
+        camera.pos = [0.0, -20.0, 0.0];
+        camera.yaw = 0.0;
+        camera.update(buf_w as f64, buf_h as f64);
 
         // Call render_mesh directly (same as pipeline Stage 3 would)
         let akm_mesh = registry.loaded.get("test_mesh").unwrap();
@@ -461,7 +596,7 @@ mod tests {
             buf_h,
             akm_mesh,
             &instance_tm,
-            &view_tm,
+            &camera,
         );
 
         // Verify at least one sample was written by render_mesh.

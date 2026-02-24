@@ -16,10 +16,10 @@ pub mod types;
 
 use bevy::prelude::*;
 
-use assembly::{AssemblyState, MeshRegistry, a3d_assembly_system, load_a3d_scene};
+use assembly::{AssemblyState, MeshRegistry, a3d_assembly_system, load_a3d_scene, poll_akm_meshes};
 use camera::{GameCamera, camera_input_system, camera_update_system};
 use config::RenderConfig;
-use pipeline::{PipelineTiming, render_pipeline_system};
+use pipeline::{PipelineTiming, camera_terrain_init_system, render_pipeline_system};
 use sample_buffer::SampleBuffer;
 use sprite_blit::SpriteQueue;
 
@@ -63,6 +63,8 @@ impl Plugin for CpuRasterizerPlugin {
                 camera_update_system,
                 a3d_assembly_system
                     .run_if(|assembly: Res<AssemblyState>| !assembly.assembled),
+                poll_akm_meshes,
+                camera_terrain_init_system,
                 render_pipeline_system,
             )
                 .chain(),
@@ -120,7 +122,7 @@ mod tests {
 
     impl RasterShader for FlatMeshShader {
         fn blend(&self, sample: &mut Sample, z: f32, _bc: [f32; 3]) {
-            if sample.height > z || sample.height == Sample::CLEAR_HEIGHT {
+            if sample.height < z || sample.height == Sample::CLEAR_HEIGHT {
                 sample.visual = self.visual;
                 sample.diffuse = self.diffuse;
                 sample.spare = spare_bits::MESH_FLAG;

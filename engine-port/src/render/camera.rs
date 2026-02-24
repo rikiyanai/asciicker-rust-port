@@ -21,10 +21,10 @@ use super::config::RenderConfig;
 /// In C++: `#ifdef DBL float scale = 3.0; #else float scale = 1.5; #endif`
 const DBL_SCALE: f32 = 3.0;
 
-/// sin(30 degrees) = 0.5, used for isometric projection tilt.
+/// sin(30 degrees) = 0.5, used for the 30-degree oblique tilt in the base view matrix.
 const SIN30: f64 = 0.5;
 
-/// cos(30 degrees), used for isometric height scaling.
+/// cos(30 degrees), used for height scaling in the base view matrix.
 const COS30: f64 = 0.866_025_403_784_438_6;
 
 /// Camera resource encapsulating position, orientation, and derived view state.
@@ -43,8 +43,9 @@ pub struct GameCamera {
     /// Zoom level. 1.0 = default. Higher = closer.
     pub zoom: f32,
 
-    /// Whether perspective (architectural) mode is active.
-    /// If false, uses isometric projection.
+    /// Perspective is always active (architectural perspective projection).
+    /// The C++ engine uses this projection exclusively.
+    /// This field exists only for test harness compatibility; runtime always true.
     pub perspective: bool,
 
     /// Scene shift in ASCII cells (screen shake). Multiplied by 2 in sample space (TRAP-R06).
@@ -72,7 +73,7 @@ pub struct GameCamera {
     pub view_ofs: [f32; 2],
 
     /// Extracted frustum planes `[a, b, c, d]` where `ax + by + cz + d >= 0` is inside.
-    /// At least 4 planes (left, right, top, bottom). No near/far for isometric.
+    /// At least 4 planes (left, right, top, bottom).
     pub frustum_planes: Vec<[f64; 4]>,
 
     /// The `mul[6]` array from C++ (3x2 rotation part), stored for use by terrain/world queries.
@@ -80,6 +81,13 @@ pub struct GameCamera {
 
     /// The `add[3]` translation offset from C++.
     pub add: [f64; 3],
+
+    /// Light direction (unit vector). C++ `r->light[0..2]`.
+    /// Default: normalized (1,1,1) ≈ sun from northeast-above.
+    pub light_dir: [f32; 3],
+
+    /// Ambient light factor (0.0 = no ambient, 1.0 = full ambient). C++ `r->light[3]`.
+    pub light_ambient: f32,
 }
 
 impl Default for GameCamera {
@@ -99,6 +107,11 @@ impl Default for GameCamera {
             frustum_planes: Vec::new(),
             mul: [0.0; 6],
             add: [0.0; 3],
+            light_dir: {
+                let inv = 1.0_f32 / 3.0_f32.sqrt();
+                [inv, inv, inv]
+            },
+            light_ambient: 1.0,
         }
     }
 }
@@ -116,7 +129,9 @@ impl GameCamera {
         let sinyaw = a.sin();
         let cosyaw = a.cos();
 
-        // Build isometric view matrix (C++ render.cpp:2971-2988)
+        // Build base view matrix (C++ render.cpp:2971-2988)
+        // This is the affine part; perspective division is applied per-vertex
+        // in transform_vertex_perspective() via 1/viewer_dist scaling.
         let mut tm = [0.0f64; 16];
         tm[0] = cosyaw * ds;
         tm[1] = -sinyaw * SIN30 * ds;
@@ -188,11 +203,8 @@ impl GameCamera {
 
     /// Extract frustum planes from the current camera state.
     ///
-    /// For perspective mode: derives planes from focus_node and screen corners
-    /// transformed through inv(view_tm), matching C++ render.cpp:3065-3136.
-    ///
-    /// For isometric mode: derives planes from a normalized clip-space transform,
-    /// matching C++ render.cpp:3137-3163.
+    /// Derives planes from focus_node and screen corners transformed through
+    /// inv(view_tm), matching C++ render.cpp:3065-3136.
     ///
     /// Each plane `[a, b, c, d]` satisfies: `ax + by + cz + d >= 0` means inside.
     pub fn extract_frustum_planes(&mut self, dw: f64, dh: f64) {
@@ -202,11 +214,7 @@ impl GameCamera {
         let sinyaw = a.sin();
         let cosyaw = a.cos();
 
-        if self.perspective {
-            self.extract_perspective_frustum(dw, dh, sinyaw, cosyaw);
-        } else {
-            self.extract_isometric_frustum(dw, dh, sinyaw, cosyaw);
-        }
+        self.extract_perspective_frustum(dw, dh, sinyaw, cosyaw);
     }
 
     /// Perspective frustum: transform screen corners through inv(view_tm),
@@ -299,62 +307,6 @@ impl GameCamera {
             .push(plane_from_points(&focus_node, &corner_lr, &corner_ll));
     }
 
-    /// Isometric frustum: build a normalized clip transform, then extract planes
-    /// via TransposeProduct. Ports C++ render.cpp:3137-3163.
-    fn extract_isometric_frustum(&mut self, dw: f64, dh: f64, sinyaw: f64, cosyaw: f64) {
-        let zoom_scaled = self.zoom * DBL_SCALE;
-        let ds = 2.0 * zoom_scaled as f64 / VISUAL_CELLS as f64;
-        let hc = HEIGHT_CELLS as f64;
-        let half_dw = 0.5 * dw;
-        let half_dh = 0.5 * dh;
-
-        // Build the normalized clip-space transform (C++ render.cpp:3142-3157)
-        let mut clip_tm = [0.0f64; 16];
-        clip_tm[0] = cosyaw / half_dw * ds * hc;
-        clip_tm[1] = -sinyaw * SIN30 / half_dh * ds * hc;
-        clip_tm[2] = 0.0;
-        clip_tm[3] = 0.0;
-        clip_tm[4] = sinyaw / half_dw * ds * hc;
-        clip_tm[5] = cosyaw * SIN30 / half_dh * ds * hc;
-        clip_tm[6] = 0.0;
-        clip_tm[7] = 0.0;
-        clip_tm[8] = 0.0;
-        clip_tm[9] = COS30 / HEIGHT_SCALE as f64 / half_dh * ds * hc;
-        clip_tm[10] = 2.0 / 65535.0;
-        clip_tm[11] = 0.0;
-        clip_tm[12] = -(self.pos[0] as f64 * clip_tm[0]
-            + self.pos[1] as f64 * clip_tm[4]
-            + self.pos[2] as f64 * clip_tm[8]
-            - self.scene_shift[0] as f64 * 2.0 / (dw / 2.0)); // width in C++ is ASCII width = dw/2 approx
-        clip_tm[13] = -(self.pos[0] as f64 * clip_tm[1]
-            + self.pos[1] as f64 * clip_tm[5]
-            + self.pos[2] as f64 * clip_tm[9]
-            - self.scene_shift[1] as f64 * 2.0 / (dh / 2.0));
-        clip_tm[14] = -1.0;
-        clip_tm[15] = 1.0;
-
-        // Clip planes in normalized device coords
-        let clip_left = [1.0, 0.0, 0.0, 1.0];
-        let clip_right = [-1.0, 0.0, 0.0, 1.0];
-        let clip_bottom = [0.0, 1.0, 0.0, 1.0];
-        let clip_top = [0.0, -1.0, 0.0, 1.0];
-
-        // TransposeProduct: clip_world = clip_tm^T * clip_plane
-        self.frustum_planes
-            .push(normalize_plane(transpose_product_4x4(&clip_tm, &clip_left)));
-        self.frustum_planes
-            .push(normalize_plane(transpose_product_4x4(
-                &clip_tm,
-                &clip_right,
-            )));
-        self.frustum_planes
-            .push(normalize_plane(transpose_product_4x4(
-                &clip_tm,
-                &clip_bottom,
-            )));
-        self.frustum_planes
-            .push(normalize_plane(transpose_product_4x4(&clip_tm, &clip_top)));
-    }
 }
 
 // --- Bevy Systems ---
@@ -372,19 +324,36 @@ pub fn camera_input_system(mut camera: ResMut<GameCamera>, keyboard: Res<ButtonI
         camera.yaw += 45.0;
     }
 
-    // Basic WASD movement (speed = 0.5 per frame)
-    let speed = 0.5f32;
-    if keyboard.pressed(KeyCode::KeyW) {
-        camera.pos[1] += speed;
-    }
-    if keyboard.pressed(KeyCode::KeyS) {
-        camera.pos[1] -= speed;
+    // Gather screen-relative input forces (matching C++ game.cpp:6175-6176)
+    let mut x_force = 0.0f32;
+    let mut y_force = 0.0f32;
+    if keyboard.pressed(KeyCode::KeyD) {
+        x_force += 1.0;
     }
     if keyboard.pressed(KeyCode::KeyA) {
-        camera.pos[0] -= speed;
+        x_force -= 1.0;
     }
-    if keyboard.pressed(KeyCode::KeyD) {
-        camera.pos[0] += speed;
+    if keyboard.pressed(KeyCode::KeyW) {
+        y_force += 1.0;
+    }
+    if keyboard.pressed(KeyCode::KeyS) {
+        y_force -= 1.0;
+    }
+
+    // Normalize diagonal movement
+    let len = (x_force * x_force + y_force * y_force).sqrt();
+    if len > 0.01 {
+        x_force /= len;
+        y_force /= len;
+
+        // Rotate by yaw (matching C++ physics.cpp:1429-1430)
+        let yaw_rad = camera.yaw * std::f32::consts::PI / 180.0;
+        let cos_yaw = yaw_rad.cos();
+        let sin_yaw = yaw_rad.sin();
+
+        let speed = 0.5f32;
+        camera.pos[0] += (x_force * cos_yaw - y_force * sin_yaw) * speed;
+        camera.pos[1] += (x_force * sin_yaw + y_force * cos_yaw) * speed;
     }
 }
 
@@ -456,17 +425,6 @@ fn mat4_mul_vec4(m: &[f64; 16], v: &[f64; 4]) -> [f64; 4] {
     ]
 }
 
-/// Compute `M^T * v` for a 4x4 column-major matrix and a 4-vector.
-/// This is the TransposeProduct from C++: each output component is a row of M dotted with v.
-fn transpose_product_4x4(m: &[f64; 16], v: &[f64; 4]) -> [f64; 4] {
-    [
-        m[0] * v[0] + m[1] * v[1] + m[2] * v[2] + m[3] * v[3],
-        m[4] * v[0] + m[5] * v[1] + m[6] * v[2] + m[7] * v[3],
-        m[8] * v[0] + m[9] * v[1] + m[10] * v[2] + m[11] * v[3],
-        m[12] * v[0] + m[13] * v[1] + m[14] * v[2] + m[15] * v[3],
-    ]
-}
-
 /// Compute a plane `[a, b, c, d]` from three points using cross product.
 /// The plane normal is `(p1 - p0) x (p2 - p0)`, normalized.
 /// `d = -dot(normal, p0)`.
@@ -489,15 +447,6 @@ fn plane_from_points(p0: &[f64; 3], p1: &[f64; 3], p2: &[f64; 3]) -> [f64; 4] {
     let d = -(a * p0[0] + b * p0[1] + c * p0[2]);
 
     [a, b, c, d]
-}
-
-/// Normalize a plane `[a, b, c, d]` so that `sqrt(a^2+b^2+c^2) == 1`.
-fn normalize_plane(p: [f64; 4]) -> [f64; 4] {
-    let len = (p[0] * p[0] + p[1] * p[1] + p[2] * p[2]).sqrt();
-    if len < 1e-30 {
-        return [0.0, 0.0, 0.0, 0.0];
-    }
-    [p[0] / len, p[1] / len, p[2] / len, p[3] / len]
 }
 
 /// Test whether a point is inside all frustum planes.
@@ -528,7 +477,7 @@ mod tests {
 
     #[test]
     fn test_yaw_zero_view_matrix() {
-        let cam = make_camera(0.0, [0.0, 0.0, 0.0], false);
+        let cam = make_camera(0.0, [0.0, 0.0, 0.0], true);
         // At yaw=0: cosyaw=1, sinyaw=0
         // zoom=1.0, scale=3.0, ds = 2*3.0/8 = 0.75
         let ds = 2.0 * 3.0 / 8.0;
@@ -616,18 +565,11 @@ mod tests {
 
     #[test]
     fn test_frustum_planes_count() {
-        let cam_iso = make_camera(0.0, [0.0, 0.0, 0.0], false);
+        let cam = make_camera(0.0, [0.0, 0.0, 0.0], true);
         assert!(
-            cam_iso.frustum_planes.len() >= 4,
-            "Isometric should have at least 4 planes, got {}",
-            cam_iso.frustum_planes.len()
-        );
-
-        let cam_persp = make_camera(0.0, [0.0, 0.0, 0.0], true);
-        assert!(
-            cam_persp.frustum_planes.len() >= 4,
-            "Perspective should have at least 4 planes, got {}",
-            cam_persp.frustum_planes.len()
+            cam.frustum_planes.len() >= 4,
+            "Should have at least 4 frustum planes, got {}",
+            cam.frustum_planes.len()
         );
     }
 
@@ -660,31 +602,19 @@ mod tests {
 
     #[test]
     fn test_frustum_planes_axis_aligned_camera() {
-        // R6-007: At yaw=0, pos=[0,0,0], zoom=1.0, isometric mode:
-        // left/right planes should have normal.x != 0,
-        // top/bottom planes should have normal.y != 0.
-        let cam = make_camera(0.0, [0.0, 0.0, 0.0], false);
+        // R6-007: At yaw=0, pos=[0,0,0], zoom=1.0:
+        // frustum planes should have nonzero normals.
+        let cam = make_camera(0.0, [0.0, 0.0, 0.0], true);
         assert!(cam.frustum_planes.len() >= 4);
 
-        // Planes 0,1 are left/right
-        assert!(
-            cam.frustum_planes[0][0].abs() > 0.01,
-            "Left plane normal.x should be nonzero"
-        );
-        assert!(
-            cam.frustum_planes[1][0].abs() > 0.01,
-            "Right plane normal.x should be nonzero"
-        );
-
-        // Planes 2,3 are bottom/top
-        assert!(
-            cam.frustum_planes[2][1].abs() > 0.01,
-            "Bottom plane normal.y should be nonzero"
-        );
-        assert!(
-            cam.frustum_planes[3][1].abs() > 0.01,
-            "Top plane normal.y should be nonzero"
-        );
+        // All planes should have nonzero normals
+        for (i, plane) in cam.frustum_planes.iter().enumerate() {
+            let normal_len = (plane[0] * plane[0] + plane[1] * plane[1] + plane[2] * plane[2]).sqrt();
+            assert!(
+                normal_len > 0.01,
+                "Frustum plane {i} should have nonzero normal, got len={normal_len}"
+            );
+        }
     }
 
     #[test]

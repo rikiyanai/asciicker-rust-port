@@ -95,7 +95,7 @@ fn run_pipeline(
             patch,
             patch.x,
             patch.y,
-            &camera.view_tm,
+            &camera,
         );
     });
 

@@ -1,7 +1,11 @@
 //! Shared math utilities for the render pipeline.
 //!
-//! Contains `transform_vertex` used by both terrain and mesh shaders
-//! to project world-space points through a 4x4 row-major matrix.
+//! Contains `transform_vertex` (base affine matrix multiply) and
+//! `transform_vertex_perspective` (architectural perspective with 1/dist scaling)
+//! used by terrain and mesh shaders to project world-space points into
+//! sample-buffer coordinates.
+
+use super::camera::GameCamera;
 
 /// Transform a world-space point through a 4x4 row-major matrix and return
 /// integer sample-buffer coordinates `[x, y, z, cull_flags]`.
@@ -54,6 +58,72 @@ pub fn transform_vertex(world: [f64; 3], view_tm: &[f64; 16]) -> [i32; 4] {
     }
 
     [ix, iy, iz, cull]
+}
+
+/// Transform a world-space point with architectural perspective projection.
+///
+/// Ports C++ render.cpp:1804-1846. Uses the camera's view direction and focal
+/// length for depth-dependent scaling (closer = larger, farther = smaller).
+///
+/// Returns `None` if the vertex is behind the camera.
+/// Returns `Some([x, y, z, cull_flags])` in sample-buffer integer coordinates.
+pub fn transform_vertex_perspective(
+    world: [f64; 3],
+    camera: &GameCamera,
+    buf_w: i32,
+    buf_h: i32,
+) -> Option<[i32; 4]> {
+    let wx = world[0];
+    let wy = world[1];
+    let wz = world[2];
+
+    // Eye-to-vertex vector in world units
+    let eye_x = wx as f32 - camera.view_pos[0];
+    let eye_y = wy as f32 - camera.view_pos[1];
+    let eye_z = wz as f32 - camera.view_pos[2];
+
+    // Distance along view direction (view_dir is normalized by focal)
+    let viewer_dist = eye_x * camera.view_dir[0]
+        + eye_y * camera.view_dir[1]
+        + eye_z * camera.view_dir[2];
+
+    if viewer_dist <= 0.0 {
+        return None; // behind camera
+    }
+
+    let recp_dist = 1.0 / viewer_dist;
+
+    // Base screen position WITHOUT translation (from affine view matrix components)
+    let fx = (camera.mul[0] * wx + camera.mul[2] * wy) as f32 * recp_dist;
+    let fy =
+        (camera.mul[1] * wx + camera.mul[3] * wy + camera.mul[5] * wz) as f32 * recp_dist;
+
+    // Apply translated offset with perspective
+    let qx = (camera.add[0] as f32 - camera.view_ofs[0]) * recp_dist + camera.view_ofs[0];
+    let qy = (camera.add[1] as f32 - camera.view_ofs[1]) * recp_dist + camera.view_ofs[1];
+
+    let sx = fx + qx;
+    let sy = fy + qy;
+
+    let ix = (sx + 0.5).floor() as i32;
+    let iy = (sy + 0.5).floor() as i32;
+    let iz = wz.floor() as i32;
+
+    let mut cull = 0i32;
+    if ix < 0 {
+        cull |= 1;
+    }
+    if ix > buf_w {
+        cull |= 2;
+    }
+    if iy < 0 {
+        cull |= 4;
+    }
+    if iy > buf_h {
+        cull |= 8;
+    }
+
+    Some([ix, iy, iz, cull])
 }
 
 #[cfg(test)]

@@ -60,9 +60,10 @@ pub struct RuntimeMaterials(pub Vec<Material>);
 /// Sets `AssemblyState.a3d_handle` to trigger the assembly system.
 /// TODO(Phase 7): Replace DEFAULT_SCENE_PATH with GameConfig resource.
 pub fn load_a3d_scene(mut assembly: ResMut<AssemblyState>, asset_server: Res<AssetServer>) {
-    const DEFAULT_SCENE_PATH: &str = "game_map_y8.a3d";
-    assembly.a3d_handle = Some(asset_server.load(DEFAULT_SCENE_PATH));
-    info!("load_a3d_scene: loading '{}'", DEFAULT_SCENE_PATH);
+    let scene_path = std::env::var("A3D_MAP")
+        .unwrap_or_else(|_| "game_map_y8.a3d".to_string());
+    assembly.a3d_handle = Some(asset_server.load(&scene_path));
+    info!("load_a3d_scene: loading '{}'", scene_path);
 }
 
 /// Assembly system that builds runtime structures from loaded A3D assets.
@@ -159,6 +160,38 @@ pub fn a3d_assembly_system(
         material_count,
         mesh_registry.meshes.len()
     );
+}
+
+/// System that polls pending AKM mesh handles and transfers loaded data
+/// into `MeshRegistry.loaded` for the render pipeline to consume.
+///
+/// Runs each frame until all meshes are loaded. Once `meshes` (pending) is
+/// empty, all queued meshes have been transferred to `loaded`.
+pub fn poll_akm_meshes(
+    mut mesh_registry: ResMut<MeshRegistry>,
+    akm_assets: Res<Assets<AkmMesh>>,
+) {
+    if mesh_registry.meshes.is_empty() {
+        return;
+    }
+
+    let mut newly_loaded = Vec::new();
+    for (name, handle) in mesh_registry.meshes.iter() {
+        if let Some(mesh) = akm_assets.get(handle) {
+            newly_loaded.push((name.clone(), mesh.clone()));
+        }
+    }
+
+    for (name, mesh) in newly_loaded {
+        mesh_registry.meshes.remove(&name);
+        let verts = mesh.vertices.len();
+        let faces = mesh.faces.len();
+        mesh_registry.loaded.insert(name.clone(), mesh);
+        info!(
+            "AKM mesh loaded: '{}' ({} vertices, {} faces)",
+            name, verts, faces,
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -279,5 +312,66 @@ mod tests {
         let reg = MeshRegistry::default();
         assert!(reg.meshes.is_empty());
         assert!(reg.loaded.is_empty());
+    }
+
+    /// F235 investigation: verify that the real game_map_y8.a3d material table
+    /// has non-zero glyphs at elevation 3, mid-diffuse (index 8).
+    ///
+    /// The terrain visual indices observed in the map are 0, 1, 5, 15 (no bit-15
+    /// flags). When no bit-15 flag is set the C++ resolve code uses elevation=3
+    /// for all cells. If shade[3][8].gl == 0 those cells would render as blank.
+    #[test]
+    #[ignore] // requires real asset: cargo test test_real_material_elevation_3 -- --ignored --nocapture
+    fn test_real_material_elevation_3() {
+        use crate::asset_loader::a3d_terrain::{parse_material_section, parse_terrain_section};
+
+        let a3d_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("assets")
+            .join("game_map_y8.a3d");
+        let data = std::fs::read(&a3d_path)
+            .unwrap_or_else(|e| panic!("Failed to read {}: {e}", a3d_path.display()));
+
+        // Parse terrain section to find where material table starts.
+        let (_terrain, terrain_bytes) =
+            parse_terrain_section(&data).expect("Failed to parse terrain section");
+
+        // Parse material table from the bytes after the terrain section.
+        let (mat_table, _mat_bytes) = parse_material_section(&data[terrain_bytes..])
+            .expect("Failed to parse material section");
+
+        let materials = convert_material_table(&mat_table);
+
+        let target_indices: &[usize] = &[0, 1, 5, 15];
+        let mid_diffuse: usize = 8; // mid-range diffuse level
+
+        for &mat_idx in target_indices {
+            println!("--- Material {mat_idx} ---");
+            for elv in 0..4usize {
+                let cell = &materials[mat_idx].shade[elv][mid_diffuse];
+                println!(
+                    "  shade[{elv}][{mid_diffuse}]: gl={:3} (0x{:02x}, '{}')  fg=[{},{},{}]  bg=[{},{},{}]  flags=0x{:02x}",
+                    cell.gl,
+                    cell.gl,
+                    if cell.gl >= 0x20 && cell.gl < 0x7f {
+                        cell.gl as char
+                    } else {
+                        '.'
+                    },
+                    cell.fg[0], cell.fg[1], cell.fg[2],
+                    cell.bg[0], cell.bg[1], cell.bg[2],
+                    cell.flags,
+                );
+            }
+        }
+
+        // Assert elevation 3, mid-diffuse has a non-zero glyph for each target material.
+        for &mat_idx in target_indices {
+            let cell = &materials[mat_idx].shade[3][mid_diffuse];
+            assert!(
+                cell.gl != 0,
+                "Material {mat_idx}: shade[3][{mid_diffuse}].gl is 0 (empty glyph) — \
+                 terrain cells using this material at elevation 3 would render blank!"
+            );
+        }
     }
 }

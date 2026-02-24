@@ -5,11 +5,34 @@
 //! (not RGB555) with `spare = 0` (no MESH_FLAG) so that the resolve stage
 //! takes the material path.
 
-use crate::asset_loader::constants::{HEIGHT_CELLS, VISUAL_CELLS};
+use crate::asset_loader::constants::{HEIGHT_CELLS, HEIGHT_SCALE, VISUAL_CELLS};
+use crate::render::camera::GameCamera;
 use crate::render::math::transform_vertex;
 use crate::render::rasterizer::{RasterShader, rasterize};
 use crate::render::sample_buffer::Sample;
 use crate::terrain::patch_runtime::RuntimePatch;
+
+/// Default light direction `[lx, ly, lz, ambient]`.
+/// Sun from upper-left, 30% ambient. Matches typical C++ scene setup.
+const LIGHT_DIR: [f32; 4] = [0.3, -0.3, 1.0, 0.3];
+
+/// Compute per-quad Lambertian diffuse from height gradients.
+///
+/// Ports C++ render.cpp:1680-1686 `Diffuse(dzdx, dzdy)`.
+/// `dzdx` and `dzdy` are integer height differences between quad corners.
+///
+/// Returns a diffuse intensity 0-255.
+fn compute_diffuse(dzdx: i32, dzdy: i32) -> u8 {
+    let hs = HEIGHT_SCALE as f32;
+    let nl = ((dzdx * dzdx + dzdy * dzdy) as f32 + hs * hs).sqrt();
+    let df = (dzdx as f32 * LIGHT_DIR[0] + dzdy as f32 * LIGHT_DIR[1] + hs * LIGHT_DIR[2]) / nl;
+    let df = df * (1.0 - 0.5 * LIGHT_DIR[3]) + 0.5 * LIGHT_DIR[3];
+    if df <= 0.0 {
+        0
+    } else {
+        (df * 255.0).min(255.0) as u8
+    }
+}
 
 /// Terrain shader implementing `RasterShader` for terrain patch triangles.
 ///
@@ -24,13 +47,19 @@ pub struct TerrainShader {
 
 impl RasterShader for TerrainShader {
     fn blend(&self, sample: &mut Sample, z: f32, _bc: [f32; 3]) {
-        // Depth test: SMALLER z = closer to camera (wins depth test).
-        // Inline pattern -- do NOT use depth_test_ro() which has semantic inversion.
-        if sample.height > z || sample.height == Sample::CLEAR_HEIGHT {
+        // Depth test: LARGER z = closer/on top (Z-up world; higher objects occlude lower).
+        // C++ render.cpp uses `if(sam.z < z)` — write if new fragment is higher.
+        if sample.height < z || sample.height == Sample::CLEAR_HEIGHT {
+            // Preserve full material index including bit 15 (elevation flag)
             sample.visual = self.material_index;
             sample.diffuse = self.diffuse_base;
             sample.spare = 0; // NO MESH_FLAG for terrain
-            sample.height = z;
+            // C++ render.cpp:1602-1603: if bit 15 set, add HEIGHT_SCALE to height
+            if self.material_index & 0x8000 != 0 {
+                sample.height = z + HEIGHT_SCALE as f32;
+            } else {
+                sample.height = z;
+            }
         }
     }
 }
@@ -40,6 +69,11 @@ impl RasterShader for TerrainShader {
 /// Triangulates the HEIGHT_CELLS x HEIGHT_CELLS grid (5x5 vertices, 4x4 quads)
 /// and calls `rasterize()` for each triangle (2 per quad).
 ///
+/// # Perspective projection
+/// When `camera.perspective` is true, applies per-vertex perspective scaling
+/// matching C++ render.cpp:1804-1846. Each vertex screen position is scaled
+/// by `1/viewer_distance` relative to the screen center, creating depth foreshortening.
+///
 /// # Arguments
 /// * `buf` - Flat sample buffer slice (row-major, `buf_w * buf_h` elements)
 /// * `buf_w` - SAMPLE buffer width (`2*ascii_w + 4`), NOT ASCII width
@@ -47,7 +81,7 @@ impl RasterShader for TerrainShader {
 /// * `patch` - Runtime terrain patch with height/visual/shadow data
 /// * `patch_x` - Patch X coordinate in patch-grid space
 /// * `patch_y` - Patch Y coordinate in patch-grid space
-/// * `view_tm` - 4x4 row-major view matrix
+/// * `camera` - Camera with view matrix and perspective parameters
 pub fn render_patch(
     buf: &mut [Sample],
     buf_w: i32,
@@ -55,9 +89,9 @@ pub fn render_patch(
     patch: &RuntimePatch,
     patch_x: i32,
     patch_y: i32,
-    view_tm: &[f64; 16],
+    camera: &GameCamera,
 ) {
-    let diffuse_base: u8 = 0xFF; // Full diffuse as default
+    let view_tm = &camera.view_tm;
 
     // Scale factor: each height cell spans this many visual cells
     let vis_per_height = VISUAL_CELLS / HEIGHT_CELLS; // = 2
@@ -70,10 +104,17 @@ pub fn render_patch(
             let h01 = patch.height[hy + 1][hx] as f64;
             let h11 = patch.height[hy + 1][hx + 1] as f64;
 
-            // Compute world-space vertex positions
-            let base_x = (patch_x * VISUAL_CELLS as i32 + (hx * vis_per_height) as i32) as f64;
-            let base_y = (patch_y * VISUAL_CELLS as i32 + (hy * vis_per_height) as i32) as f64;
-            let step = vis_per_height as f64;
+            // Compute per-quad Lambertian diffuse (C++ render.cpp:1680-1686)
+            let dzdx = (h10 - h00) as i32;
+            let dzdy = (h01 - h00) as i32;
+            let diffuse_base = compute_diffuse(dzdx, dzdy);
+
+            // Compute world-space vertex positions.
+            // C++ formula: vx = x * HEIGHT_CELLS + dx * VISUAL_CELLS (render.cpp:1723)
+            // Each height vertex is VISUAL_CELLS apart; patch offset is HEIGHT_CELLS.
+            let base_x = (patch_x * HEIGHT_CELLS as i32 + hx as i32 * VISUAL_CELLS as i32) as f64;
+            let base_y = (patch_y * HEIGHT_CELLS as i32 + hy as i32 * VISUAL_CELLS as i32) as f64;
+            let step = VISUAL_CELLS as f64;
 
             // Look up material from visual grid
             // Each height cell maps to vis_per_height visual cells
@@ -111,20 +152,78 @@ pub fn render_patch(
                     let fv0 = dv as f64 / vis_per_height as f64;
                     let fv1 = (dv + 1) as f64 / vis_per_height as f64;
 
-                    let interp = |fu: f64, fv: f64| -> [i32; 4] {
+                    // Early return closure for behind-camera vertices in perspective mode
+                    let mut behind_camera = false;
+
+                    let interp = |fu: f64, fv: f64, behind: &mut bool| -> [i32; 4] {
                         let wx = base_x + fu * step;
                         let wy = base_y + fv * step;
                         let wz = h00 * (1.0 - fu) * (1.0 - fv)
                             + h10 * fu * (1.0 - fv)
                             + h01 * (1.0 - fu) * fv
                             + h11 * fu * fv;
-                        transform_vertex([wx, wy, wz], view_tm)
+
+                        if camera.perspective {
+                            // C++ perspective path (render.cpp:1804-1846):
+                            // 1. Compute eye-to-vertex in world units
+                            let eye_x = wx as f32 - camera.view_pos[0];
+                            let eye_y = wy as f32 - camera.view_pos[1];
+                            let eye_z = wz as f32 - camera.view_pos[2];
+
+                            // 2. Distance along view direction
+                            let viewer_dist = eye_x * camera.view_dir[0]
+                                + eye_y * camera.view_dir[1]
+                                + eye_z * camera.view_dir[2];
+
+                            if viewer_dist <= 0.0 {
+                                *behind = true;
+                                return [0, 0, 0, 0xF]; // fully culled
+                            }
+
+                            let recp_dist = 1.0 / viewer_dist;
+
+                            // 3. Base screen position WITHOUT translation
+                            let fx = (camera.mul[0] * wx + camera.mul[2] * wy) as f32;
+                            let fy = (camera.mul[1] * wx + camera.mul[3] * wy
+                                + camera.mul[5] * wz) as f32;
+
+                            // 4. Scale by 1/dist
+                            let fx = fx * recp_dist;
+                            let fy = fy * recp_dist;
+
+                            // 5. Apply translated offset with perspective
+                            let qx = (camera.add[0] as f32 - camera.view_ofs[0]) * recp_dist
+                                + camera.view_ofs[0];
+                            let qy = (camera.add[1] as f32 - camera.view_ofs[1]) * recp_dist
+                                + camera.view_ofs[1];
+
+                            let sx = fx + qx;
+                            let sy = fy + qy;
+
+                            let ix = (sx + 0.5).floor() as i32;
+                            let iy = (sy + 0.5).floor() as i32;
+                            let iz = wz.floor() as i32;
+
+                            let mut cull = 0i32;
+                            if ix < 0 { cull |= 1; }
+                            if ix > buf_w { cull |= 2; }
+                            if iy < 0 { cull |= 4; }
+                            if iy > buf_h { cull |= 8; }
+
+                            [ix, iy, iz, cull]
+                        } else {
+                            transform_vertex([wx, wy, wz], view_tm)
+                        }
                     };
 
-                    let sv00 = interp(fu0, fv0);
-                    let sv10 = interp(fu1, fv0);
-                    let sv01 = interp(fu0, fv1);
-                    let sv11 = interp(fu1, fv1);
+                    let sv00 = interp(fu0, fv0, &mut behind_camera);
+                    if behind_camera { continue; }
+                    let sv10 = interp(fu1, fv0, &mut behind_camera);
+                    if behind_camera { continue; }
+                    let sv01 = interp(fu0, fv1, &mut behind_camera);
+                    if behind_camera { continue; }
+                    let sv11 = interp(fu1, fv1, &mut behind_camera);
+                    if behind_camera { continue; }
 
                     // Check diag bit to determine triangle split direction
                     let quad_idx = hx + hy * HEIGHT_CELLS;
@@ -195,6 +294,8 @@ mod tests {
 
     /// Create a simple identity-like view matrix that maps world coords
     /// to sample buffer coords with offset for the 2-pixel border.
+    /// Buffer must be >= 48x48 to hold a patch at (0,0) with C++ vertex scaling
+    /// (vertices span 0..32 + offset 4 = 4..36).
     fn make_test_view_tm() -> [f64; 16] {
         let mut tm = [0.0f64; 16];
         tm[0] = 1.0; // x -> screen x
@@ -204,6 +305,17 @@ mod tests {
         tm[12] = 4.0; // offset to stay within buffer
         tm[13] = 4.0;
         tm
+    }
+
+    /// Create a non-perspective camera with a test view matrix.
+    /// Used by existing tests that don't need perspective projection.
+    fn make_test_camera() -> GameCamera {
+        let tm = make_test_view_tm();
+        GameCamera {
+            perspective: false,
+            view_tm: tm,
+            ..Default::default()
+        }
     }
 
     #[test]
@@ -226,35 +338,35 @@ mod tests {
 
     #[test]
     fn test_terrain_shader_depth_test() {
-        // Write a near fragment
+        // Write an initial fragment (via CLEAR_HEIGHT path)
         let mut sample = Sample::clear_state();
-        let shader_near = TerrainShader {
+        let shader_low = TerrainShader {
             material_index: 10,
             diffuse_base: 200,
         };
-        shader_near.blend(&mut sample, 50.0, [0.33, 0.33, 0.34]);
+        shader_low.blend(&mut sample, 50.0, [0.33, 0.33, 0.34]);
         assert_eq!(sample.visual, 10);
 
-        // Try to write a farther fragment -- should NOT overwrite
-        let shader_far = TerrainShader {
+        // Write a HIGHER z fragment -- SHOULD overwrite (higher = on top in Z-up world)
+        let shader_high = TerrainShader {
             material_index: 20,
             diffuse_base: 100,
         };
-        shader_far.blend(&mut sample, 200.0, [0.33, 0.33, 0.34]);
+        shader_high.blend(&mut sample, 200.0, [0.33, 0.33, 0.34]);
         assert_eq!(
-            sample.visual, 10,
-            "Farther fragment should not overwrite closer"
+            sample.visual, 20,
+            "Higher z fragment should overwrite lower (on top in Z-up)"
         );
 
-        // Write a closer fragment -- SHOULD overwrite
-        let shader_closer = TerrainShader {
+        // Write a LOWER z fragment -- should NOT overwrite
+        let shader_below = TerrainShader {
             material_index: 30,
             diffuse_base: 255,
         };
-        shader_closer.blend(&mut sample, 25.0, [0.33, 0.33, 0.34]);
+        shader_below.blend(&mut sample, 25.0, [0.33, 0.33, 0.34]);
         assert_eq!(
-            sample.visual, 30,
-            "Closer fragment should overwrite farther"
+            sample.visual, 20,
+            "Lower z fragment should not overwrite higher (underneath in Z-up)"
         );
     }
 
@@ -262,14 +374,14 @@ mod tests {
     fn test_render_patch_produces_samples() {
         // Create a flat patch at height=0
         let patch = make_flat_patch(0);
-        let view_tm = make_test_view_tm();
+        let camera = make_test_camera();
 
         // Buffer large enough to hold the projected patch
-        let buf_w = 32;
-        let buf_h = 32;
+        let buf_w = 48;
+        let buf_h = 48;
         let mut buf = vec![Sample::clear_state(); (buf_w * buf_h) as usize];
 
-        render_patch(&mut buf, buf_w, buf_h, &patch, 0, 0, &view_tm);
+        render_patch(&mut buf, buf_w, buf_h, &patch, 0, 0, &camera);
 
         // Count non-clear samples
         let non_clear = buf
@@ -304,13 +416,13 @@ mod tests {
             diag: 0,
         };
         let patch = RuntimePatch::from_terrain_patch(&tp);
-        let view_tm = make_test_view_tm();
+        let camera = make_test_camera();
 
-        let buf_w = 32;
-        let buf_h = 32;
+        let buf_w = 48;
+        let buf_h = 48;
         let mut buf = vec![Sample::clear_state(); (buf_w * buf_h) as usize];
 
-        render_patch(&mut buf, buf_w, buf_h, &patch, 0, 0, &view_tm);
+        render_patch(&mut buf, buf_w, buf_h, &patch, 0, 0, &camera);
 
         // Collect all unique visual values from non-clear samples
         let visuals: std::collections::HashSet<u16> = buf
@@ -351,12 +463,12 @@ mod tests {
         // Set shadow on cell (0,0): bit 0
         patch.dark = 1;
 
-        let view_tm = make_test_view_tm();
-        let buf_w = 32;
-        let buf_h = 32;
+        let camera = make_test_camera();
+        let buf_w = 48;
+        let buf_h = 48;
         let mut buf = vec![Sample::clear_state(); (buf_w * buf_h) as usize];
 
-        render_patch(&mut buf, buf_w, buf_h, &patch, 0, 0, &view_tm);
+        render_patch(&mut buf, buf_w, buf_h, &patch, 0, 0, &camera);
 
         // Collect diffuse values from non-clear samples
         let diffuse_values: std::collections::HashSet<u8> = buf
@@ -381,12 +493,12 @@ mod tests {
     fn test_terrain_shader_no_mesh_flag() {
         // Verify that terrain samples never have MESH_FLAG
         let patch = make_flat_patch(100);
-        let view_tm = make_test_view_tm();
-        let buf_w = 32;
-        let buf_h = 32;
+        let camera = make_test_camera();
+        let buf_w = 48;
+        let buf_h = 48;
         let mut buf = vec![Sample::clear_state(); (buf_w * buf_h) as usize];
 
-        render_patch(&mut buf, buf_w, buf_h, &patch, 0, 0, &view_tm);
+        render_patch(&mut buf, buf_w, buf_h, &patch, 0, 0, &camera);
 
         for s in &buf {
             if s.height != Sample::CLEAR_HEIGHT {
@@ -397,5 +509,60 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_render_patch_with_real_camera_tm() {
+        // Reproduce the exact runtime scenario: camera at pos=[0,15,0], yaw=45°,
+        // buffer 516x184, rendering patch at grid (0,15).
+        use crate::render::camera::GameCamera;
+
+        let mut camera = GameCamera {
+            pos: [0.0, 15.0, 0.0],
+            yaw: 45.0,
+            zoom: 1.0,
+            perspective: true,
+            ..Default::default()
+        };
+        camera.update(516.0, 184.0);
+
+        let patch = make_flat_patch(100); // flat at height 100
+        let buf_w: i32 = 516;
+        let buf_h: i32 = 184;
+        let mut buf = vec![Sample::clear_state(); (buf_w * buf_h) as usize];
+
+        // Render patch at grid (0, 15) — near the camera
+        render_patch(&mut buf, buf_w, buf_h, &patch, 0, 15, &camera);
+
+        let non_clear = buf
+            .iter()
+            .filter(|s| s.height != Sample::CLEAR_HEIGHT)
+            .count();
+
+        // Debug: print first 4 sub-quad vertices
+        let hc = HEIGHT_CELLS;
+        let vc = VISUAL_CELLS;
+        let base_x = (0 * hc as i32 + 0 * vc as i32) as f64;
+        let base_y = (15 * hc as i32 + 0 * vc as i32) as f64;
+        let sv00 = transform_vertex([base_x, base_y, 100.0], &camera.view_tm);
+        let sv10 = transform_vertex([base_x + 4.0, base_y, 100.0], &camera.view_tm);
+        let sv01 = transform_vertex([base_x, base_y + 4.0, 100.0], &camera.view_tm);
+        eprintln!(
+            "TEST: base=({},{}) sv00=({},{},{}) sv10=({},{},{}) sv01=({},{},{})",
+            base_x, base_y,
+            sv00[0], sv00[1], sv00[2],
+            sv10[0], sv10[1], sv10[2],
+            sv01[0], sv01[1], sv01[2],
+        );
+        let area = 2 * ((sv10[0] - sv00[0]) * (sv01[1] - sv00[1])
+            - (sv10[1] - sv00[1]) * (sv01[0] - sv00[0]));
+        eprintln!("TEST: triangle area={}, non_clear={}", area, non_clear);
+
+        assert!(
+            non_clear > 0,
+            "Patch at (0,15) with real camera should produce samples, got {} non-clear out of {}",
+            non_clear,
+            buf.len()
+        );
     }
 }
