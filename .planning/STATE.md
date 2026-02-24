@@ -5,18 +5,18 @@
 See: .planning/PROJECT.md (updated 2026-02-20)
 
 **Core value:** The CPU rasterizer must produce visually identical output to the C++ engine -- same glyphs, same colors, same depth ordering -- so that existing Asciicker worlds render correctly in the Rust port.
-**Current focus:** Phase 6: Physics and Character (sphere collision, forces, input, character state)
+**Current focus:** Phase 6 COMPLETE. Ready for Phase 7: Game Systems.
 
 ## Current Position
 
-Phase: 6 of 7 (Physics and Character)
-Plan: 2 of 3 in current phase (06-02 complete)
-Status: Phase 6 IN PROGRESS. Plan 06-02 complete (character). Ready for 06-03.
-Last activity: 2026-02-24 -- Completed 06-02: Character state machine, equipment, input, animation, sprite query
+Phase: 6 of 7 (Physics and Character) -- COMPLETE
+Plan: 3 of 3 in current phase (06-03 complete -- phase done)
+Status: Phase 6 COMPLETE. All 3 plans executed. Ready for Phase 7.
+Last activity: 2026-02-24 -- Completed 06-03: Water reflection, Perlin ripple, GamePlugin, schedule migration, benchmarks
 
-Progress: [######----] 67%
+Progress: [########--] 80%
 
-**Note:** Phase 6 Plan 02 complete. 324 lib tests passing (49 new character tests). CharacterPlugin with input/sprite query ready for 06-03.
+**Note:** Phase 6 complete. 337 lib tests passing (13 new water+game tests). GamePlugin wires cross-plugin sync. Ready for Phase 7.
 
 ## Performance Metrics
 
@@ -49,6 +49,7 @@ Progress: [######----] 67%
 | Phase 05 P07 | 10min | 2 tasks | 3 files |
 | Phase 06 P01 | 12min | 2 tasks | 8 files |
 | Phase 06 P02 | 13min | 2 tasks | 11 files |
+| Phase 06 P03 | 25min | 2 tasks | 32 files |
 
 ## Accumulated Context
 
@@ -135,6 +136,12 @@ Recent decisions affecting current work:
 - 06-02: SpriteReq includes clr:u8 (default 0) for Phase 7 multiplayer forward-compatibility
 - 06-02: spawn_character() is single source of truth for character entity creation
 - 06-02: Dead state permanent (respawn deferred to Phase 7)
+- 06-03: WaterConfig owned by CpuRasterizerPlugin; WaterLevel owned by GamePlugin (separate concerns)
+- 06-03: render_pipeline_system migrated from Update to PostUpdate with RenderSet::Pipeline label
+- 06-03: 3-step resolve split: resolve() -> apply_water_ripple_pass() -> RGBA conversion (preserves resolve_bridge.rs)
+- 06-03: C++ RGB cube decomposition bug replicated intentionally for visual fidelity (R19-F07)
+- 06-03: Linear torque model: yaw += torque * 45.0 * dt (deliberate simplification)
+- 06-03: GamePlugin does NOT add sub-plugins -- main.rs registers all independently
 
 ### Pending Todos
 
@@ -151,5 +158,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Completed 06-02-PLAN.md (character: state machine, equipment, input, animation, sprite query). 324 lib tests passing.
+Stopped at: Completed 06-03-PLAN.md (water reflection, Perlin ripple, GamePlugin, schedule migration, benchmarks). Phase 6 COMPLETE. 337 lib tests passing.
 Resume file: None

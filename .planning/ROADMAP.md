@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3.1: Audit Remediation** - Fix Critical/High severity code-level risks from Phases 1-3 audit before Phase 5 integration (INSERTED)
 - [x] **Phase 4: CPU Rasterizer Core** - SampleBuffer, triangle/line rasterization, materials, color quantization, and RESOLVE stage
 - [x] **Phase 5: Pipeline Integration** - Full 6-stage rendering pipeline producing real scene output from .a3d world files
-- [ ] **Phase 6: Physics and Character** - Sphere collision, character state machine, player input, water, and effects
+- [x] **Phase 6: Physics and Character** - Sphere collision, character state machine, player input, water, and effects
 - [ ] **Phase 7: Game Systems** - Audio, networking, weather, menus, and visual quality polish
 
 ## Phase Details
@@ -147,7 +147,7 @@ Plans:
 Plans:
 - [x] 06-01-PLAN.md -- Physics core: collision, forces, PhysicsIO, FixedUpdate, collect_terrain_triangles + collect_world_triangles free functions (TDD, wave 1)
 - [x] 06-02-PLAN.md -- Character: state machine (with Block), equipment, input (Q/E ownership), animation, sprite_query (TDD, wave 2)
-- [ ] 06-03-PLAN.md -- Water reflection (actual geometry re-query), Perlin ripple, GamePlugin (no sub-plugins), torque-to-camera, perf benchmark (wave 3)
+- [x] 06-03-PLAN.md -- Water reflection (actual geometry re-query), Perlin ripple, GamePlugin (no sub-plugins), torque-to-camera, perf benchmark (wave 3)
 
 ### Phase 7: Game Systems
 **Goal**: Audio, multiplayer networking, weather effects, menus, and visual quality upgrades complete the game for v1 release
@@ -182,7 +182,7 @@ Note: Phases 3 and 4 are independent (both depend only on Phase 1) and can execu
 | 3.1 Audit Remediation | 1/1 | Complete    | 2026-02-20 |
 | 4. CPU Rasterizer Core | 4/4 | Complete | 2026-02-20 |
 | 5. Pipeline Integration | 8/8 | Complete | 2026-02-22 |
-| 6. Physics and Character | 2/3 | In Progress | - |
+| 6. Physics and Character | 3/3 | Complete | 2026-02-24 |
 | 7. Game Systems | 0/5 | Planned | - |
 
 ## Developer Experience

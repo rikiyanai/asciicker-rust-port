@@ -81,8 +81,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Effects
 
-- [ ] **FX-01**: Water rendering with reflective surface (reflection stage re-runs terrain+world below water plane)
-- [ ] **FX-02**: Perlin Z-perturbation for water ripple effect
+- [x] **FX-01**: Water rendering with reflective surface (reflection stage re-runs terrain+world below water plane)
+- [x] **FX-02**: Perlin Z-perturbation for water ripple effect
 
 ### Audio
 
@@ -205,8 +205,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CHAR-02 | Phase 6 | Complete |
 | CHAR-03 | Phase 6 | Complete |
 | CHAR-04 | Phase 6 | Complete |
-| FX-01 | Phase 6 | Pending |
-| FX-02 | Phase 6 | Pending |
+| FX-01 | Phase 6 | Complete |
+| FX-02 | Phase 6 | Complete |
 | AUD-01 | Phase 7 | Pending |
 | AUD-02 | Phase 7 | Pending |
 | NET-01 | Phase 7 | Pending |
