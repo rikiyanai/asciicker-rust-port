@@ -10,10 +10,11 @@ use bevy::prelude::*;
 
 use crate::character::equipment::SpriteReq;
 use crate::character::state_machine::Character;
-use crate::physics::PhysicsIO;
+use crate::physics::{PhysicsIO, PhysicsState};
 use crate::render::WaterConfig;
 use crate::render::camera::GameCamera;
 use crate::system_sets::CharacterSet;
+use crate::terrain::RuntimeTerrain;
 
 // ---------------------------------------------------------------------------
 // Resources
@@ -57,9 +58,18 @@ fn apply_torque_to_camera(
 /// Sync camera position to player position from physics output.
 ///
 /// Runs in PostUpdate before SpritePush so sprites use updated camera pos.
-fn sync_camera_to_player(physics_io: Res<PhysicsIO>, mut camera: ResMut<GameCamera>) {
-    // PhysicsIO.pos is [f32; 3] (array) -- use array indexing
+/// F235 FIX: Also recomputes view matrix so the pipeline sees updated position.
+fn sync_camera_to_player(
+    physics_io: Res<PhysicsIO>,
+    mut camera: ResMut<GameCamera>,
+    config: Res<crate::render::config::RenderConfig>,
+) {
     camera.pos = [physics_io.pos[0], physics_io.pos[1], physics_io.pos[2]];
+    // Recompute view matrix after position change so render pipeline uses correct view
+    let dw = config.sample_width() as f64;
+    let dh = config.sample_height() as f64;
+    camera.update(dw, dh);
+    camera.extract_frustum_planes(dw, dh);
 }
 
 /// Sync WaterLevel to PhysicsIO.water for buoyancy calculations.
@@ -105,6 +115,62 @@ fn sync_mount_to_physics(mut physics_io: ResMut<PhysicsIO>, q: Query<&SpriteReq,
     }
 }
 
+/// F234+F235 FIX: Teleport player to terrain surface when terrain first loads.
+///
+/// Character spawns at Startup before terrain loads async. By the time terrain
+/// assembles, the character has been falling for 100+ frames. This one-shot
+/// system detects terrain load and teleports player + camera to surface.
+fn teleport_to_terrain_system(
+    terrain: Res<RuntimeTerrain>,
+    mut physics_io: ResMut<PhysicsIO>,
+    mut physics_state: ResMut<PhysicsState>,
+    mut camera: ResMut<GameCamera>,
+    mut initialized: Local<bool>,
+) {
+    if *initialized || terrain.root.is_none() {
+        return;
+    }
+    *initialized = true;
+
+    let x = physics_io.pos[0];
+    let y = physics_io.pos[1];
+
+    // Find terrain height at player position
+    let terrain_z = terrain
+        .interpolate_height(x as f64, y as f64)
+        .map(|h| h as f32)
+        .unwrap_or_else(|| {
+            // Fallback: find nearest patch center height
+            let mut best_z = 0.0f32;
+            let mut best_dist = f64::MAX;
+            terrain.for_each_patch(|patch| {
+                let dx = patch.x as f64 - x as f64;
+                let dy = patch.y as f64 - y as f64;
+                let d = dx * dx + dy * dy;
+                if d < best_dist {
+                    best_dist = d;
+                    best_z = patch.height[2][2] as f32
+                        / crate::asset_loader::constants::HEIGHT_SCALE as f32;
+                }
+            });
+            best_z
+        });
+
+    let spawn_z = terrain_z + 2.0; // Slightly above terrain surface
+
+    physics_io.pos = [x, y, spawn_z];
+    // Reset velocity (stop falling)
+    physics_state.vel = [0.0, 0.0, 0.0];
+    physics_state.accum_contact = 5.0; // Start grounded
+
+    camera.pos = [x, y, spawn_z];
+
+    info!(
+        "F234 FIX: Teleported player to terrain surface z={:.1} (terrain_z={:.1}) at ({:.1}, {:.1})",
+        spawn_z, terrain_z, x, y
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Plugin
 // ---------------------------------------------------------------------------
@@ -129,10 +195,15 @@ impl Plugin for GamePlugin {
                 .in_set(GameSet::PhysicsSync),
         );
 
-        // Update: torque -> camera yaw, water -> render config
+        // Update: torque -> camera yaw, water -> render config, terrain teleport
         app.add_systems(
             Update,
-            (apply_torque_to_camera, sync_water_to_render).chain(),
+            (
+                teleport_to_terrain_system,
+                apply_torque_to_camera,
+                sync_water_to_render,
+            )
+                .chain(),
         );
 
         // PostUpdate: cross-plugin ordering for render pipeline

@@ -29,13 +29,10 @@ pub fn accumulate_forces(state: &mut PhysicsState, io: &PhysicsIO, dt: f32) {
     let acc = acc.clamp(-cnt, 1.0 - cnt);
     state.vel[2] += dt * acc;
 
-    // 2. Input forces rotated by yaw
-    let cos_yaw = io.yaw.cos();
-    let sin_yaw = io.yaw.sin();
-    let fx = io.x_force * cos_yaw - io.y_force * sin_yaw;
-    let fy = io.x_force * sin_yaw + io.y_force * cos_yaw;
-    state.vel[0] += fx;
-    state.vel[1] += fy;
+    // 2. Input forces (already camera-relative from accumulate_player_input)
+    // F233 FIX: input.rs already rotates by camera.yaw -- do NOT rotate again here.
+    state.vel[0] += io.x_force;
+    state.vel[1] += io.y_force;
 
     // 3. Impulse: add then drain
     state.vel[0] += io.x_impulse;
@@ -300,21 +297,27 @@ mod tests {
     }
 
     #[test]
-    fn test_input_forces_with_yaw() {
+    fn test_input_forces_pass_through() {
+        // F233 FIX: accumulate_forces no longer rotates by yaw.
+        // Input forces are already camera-relative from accumulate_player_input.
         let mut state = PhysicsState::default();
         let io = PhysicsIO {
             x_force: 1.0,
             y_force: 0.0,
-            yaw: std::f32::consts::FRAC_PI_2, // 90 degrees
+            yaw: std::f32::consts::FRAC_PI_2, // yaw should have no effect
             ..default_io()
         };
         let dt = 1.0 / 66.667;
         accumulate_forces(&mut state, &io, dt);
-        // With yaw=90deg, x_force should map to y direction
+        // x_force=1.0 should go directly into vel[0] (plus damping)
         assert!(
-            state.vel[1].abs() > state.vel[0].abs(),
-            "90deg yaw should rotate x_force to y, vel=[{}, {}]",
-            state.vel[0],
+            state.vel[0].abs() > 0.5,
+            "x_force should pass through to vel[0], got {}",
+            state.vel[0]
+        );
+        assert!(
+            state.vel[1].abs() < 0.01,
+            "y_force=0 should leave vel[1] near zero, got {}",
             state.vel[1]
         );
     }

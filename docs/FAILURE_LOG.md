@@ -2,7 +2,7 @@
 
 ## Issues, Blockers, and Problems
 
-**Last Updated:** 2026-02-21
+**Last Updated:** 2026-02-24
 
 ---
 
@@ -37,6 +37,22 @@
 | F029 | Phase 6: PhysicsIO.yaw never written — WASD forces in world-space not camera-space | High | PARTIAL | Plan 06-03 adds camera-relative WASD rotation. See R57. |
 | F030 | Phase 7: Shape-vector cache unbounded HashMap grows without limit | High | PARTIAL | Plan 07-04 uses LRU cache (8192 cap). See R61. |
 | F233 | Phase 5 runtime: Black screen — shadow computation hangs due to O(n) linear scan in find_patch(). 9207 patches × 64 cells × 32 raysteps = 18.8M calls to interpolate_height(), each doing O(9207) scan = ~173B ops. Root cause: quadtree find_patch() never used spatial narrowing. Fix: HashMap<(i32,i32), RuntimePatch> for O(1) lookup. Shadow now completes in 375ms (release). 4 integration tests added against real game_map_y8.a3d. | Critical | RESOLVED | HashMap patch_map in RuntimeTerrain, dead find_patch() removed. |
+
+### Runtime Bug Audit (2026-02-24)
+
+9 bugs identified via C++ cross-reference audit. 2 CRITICAL, 4 HIGH, 2 MEDIUM, 1 OK.
+
+| ID | Issue | Severity | Status | Resolution |
+|----|-------|----------|--------|------------|
+| F234 | No perspective division in project_world_to_screen() — always uses isometric view_tm, sprites never get perspective foreshortening. C++ render.cpp:1804-1846 applies per-vertex 1/distance scaling. | Critical | RESOLVED | Added perspective branch to project_world_to_screen() matching transform_vertex_perspective() logic. |
+| F235 | Elevation uses height-diff fallback instead of bit 15 — resolve.rs compute_elevation() falls back to height-difference heuristic when no bit-15 flags set. C++ render.cpp:3456 uses visual>>15. game_map_y8.a3d has ZERO bit-15 flags (4 unique visuals: 0,1,5,15), so pure bit-15 logic produces elevation=3 for all cells → real material table has empty glyphs at elv=3 → blank screen. Height-diff fallback is REQUIRED until bit-15 data is present. | Critical | DEFERRED | Reverted. Height-diff fallback retained. Pure bit-15 fix causes blank glyphs. Needs investigation of C++ terrain data flow. |
+| F236 | Diffuse hardcoded 0xFF in mesh_shader — render_mesh() writes diffuse=0xFF for all faces instead of computing Lambertian n·l from face normals. C++ render.cpp:1680 computes Diffuse(dzdx, dzdy) per triangle. | High | OPEN | Needs face normal computation and dot product with LIGHT_DIR. |
+| F237 | Golden output tests missing — VIS-02 permanently #[ignore], no C++ reference data in repo. Phase 5 Plan 06 infrastructure exists but no real baselines. | High | OPEN | Requires C++ engine dump utility to generate reference frames. See F153. |
+| F238 | Terrain shader missing HEIGHT_SCALE boost — C++ render.cpp:1602 adds HEIGHT_SCALE to height when bit 15 set, creating visual elevation steps. Rust TerrainShader.blend() already implements this correctly. | High | RESOLVED | Already implemented at terrain_shader.rs:58-62. Verified against C++. |
+| F239 | Frustum AABB 8x too large — terrain AABB is in visual-cell units but frustum planes are in camera-pos-space. Factor of HEIGHT_CELLS=4 per axis = 16x area mismatch. Culling is nearly useless. | High | OPEN | Fix: convert AABB to pos-space (divide XY by HEIGHT_CELLS) or convert frustum to visual-cell units. |
+| F240 | WASD movement world-space not yaw-relative — camera_input_system rotates by yaw already (camera.rs:397-403). C++ physics.cpp:1429 applies same rotation. | Medium | RESOLVED | Already implemented correctly at camera.rs:397-404. Verified against C++. |
+| F241 | Stages 4-5 stubbed — Shadow projection and water reflection stages are empty stubs. Deferred to Phase 6 per plan. | Medium | OPEN | Planned for Phase 6 (06-03-PLAN.md). Not a bug, expected sequencing. |
+| F242 | Vertex formula verified — terrain vertex computation matches C++ render.cpp:1723 formula: vx = patch_x * HEIGHT_CELLS + hx * VISUAL_CELLS. | OK | RESOLVED | Confirmed correct at terrain_shader.rs:115-116. |
 
 ### Round 13 Audit Findings (2026-02-21)
 
@@ -300,6 +316,11 @@
 | F230 | R18: TDD plans 06-01/06-02/07-05 lack explicit REFACTOR heading | Low | RESOLVED | Cosmetic; clippy clean serves same purpose. Informational, no fix. |
 | F231 | R18: 06-01 velocity clamping test lacks explicit expected value (MAX_VEL_AIR=27.0) | Low | RESOLVED | Added R18-F231 FIX with concrete clamping assertion. |
 | F232 | R18: 07-04 annotation density (61 tags, no APPENDIX) — repeat of F217 | Low | RESOLVED | Repeat finding; F217 already resolved as informational. |
+| F233 | Phase 6 runtime: forces.rs double-rotates input forces by yaw (input.rs already camera-relative) AND treats degrees as radians | Critical | OPEN | forces.rs:33 does `io.yaw.cos()` (radians) on a degrees value. Also redundant rotation since input.rs already rotates. Remove yaw rotation from accumulate_forces. |
+| F234 | Phase 6 runtime: character spawns at Startup before terrain loads async, falls through world | Critical | OPEN | spawn_player sets pos=[0,0,50] at Startup. Terrain loads async via AssetServer. Character has been falling for 100+ frames by the time terrain assembles. Need teleport-to-terrain system. |
+| F235 | Phase 6 runtime: sync_camera_to_player (PostUpdate) overrides camera_terrain_init_system (Update) every frame | High | OPEN | camera_terrain_init sets camera.pos[2] = terrain height, but sync_camera_to_player immediately writes camera.pos = physics_io.pos (underground). Camera never sees terrain. |
+| F236 | Phase 6 runtime: black screen — no terrain, world, or water visible at runtime despite 337 tests passing | Critical | OPEN | Compound of F234+F235: character+camera at wrong Z, terrain loads but camera below it. Tests pass because they test units in isolation, never a full runtime frame. |
+| F237 | Phase 6 runtime: duplicate query_character_sprites registration causes double SpriteQueue entries | Medium | RESOLVED | Fixed in commit 979de47: merged chain + set registration into single add_systems call. |
 
 ---
 
