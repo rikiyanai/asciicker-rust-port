@@ -59,12 +59,17 @@ fn apply_torque_to_camera(
 ///
 /// Runs in PostUpdate before SpritePush so sprites use updated camera pos.
 /// F235 FIX: Also recomputes view matrix so the pipeline sees updated position.
+/// F238 FIX: Camera Z is in raw u16 height units; physics Z is in world units
+/// (raw / HEIGHT_SCALE). Multiply by HEIGHT_SCALE to convert.
 fn sync_camera_to_player(
     physics_io: Res<PhysicsIO>,
     mut camera: ResMut<GameCamera>,
     config: Res<crate::render::config::RenderConfig>,
 ) {
-    camera.pos = [physics_io.pos[0], physics_io.pos[1], physics_io.pos[2]];
+    camera.pos[0] = physics_io.pos[0];
+    camera.pos[1] = physics_io.pos[1];
+    // Camera Z = raw height units. Physics Z = world units (raw / HEIGHT_SCALE).
+    camera.pos[2] = physics_io.pos[2] * crate::asset_loader::constants::HEIGHT_SCALE as f32;
     // Recompute view matrix after position change so render pipeline uses correct view
     let dw = config.sample_width() as f64;
     let dh = config.sample_height() as f64;
@@ -140,7 +145,7 @@ fn teleport_to_terrain_system(
         .interpolate_height(x as f64, y as f64)
         .map(|h| h as f32)
         .unwrap_or_else(|| {
-            // Fallback: find nearest patch center height
+            // Fallback: find nearest patch center height (raw u16 -> world units)
             let mut best_z = 0.0f32;
             let mut best_dist = f64::MAX;
             terrain.for_each_patch(|patch| {
@@ -153,7 +158,7 @@ fn teleport_to_terrain_system(
                         / crate::asset_loader::constants::HEIGHT_SCALE as f32;
                 }
             });
-            best_z
+            best_z // world units: raw / HEIGHT_SCALE
         });
 
     let spawn_z = terrain_z + 2.0; // Slightly above terrain surface

@@ -178,7 +178,8 @@ impl RuntimeTerrain {
             + h01 * (1.0 - fx) * fy
             + h11 * fx * fy;
 
-        Some(height * HEIGHT_SCALE as f64)
+        // Convert raw u16 height to world units (F238 FIX: was * HEIGHT_SCALE, must be /)
+        Some(height / HEIGHT_SCALE as f64)
     }
 
     // --- Private helpers ---
@@ -336,10 +337,11 @@ mod tests {
 
         let h = rt.interpolate_height(4.0, 4.0);
         assert!(h.is_some(), "Height at patch center must return Some");
-        let expected = 100.0 * HEIGHT_SCALE as f64;
+        // F238 FIX: interpolate_height returns world units (raw / HEIGHT_SCALE)
+        let expected = 100.0 / HEIGHT_SCALE as f64;
         assert!(
             (h.unwrap() - expected).abs() < 1e-6,
-            "Height should be 100 * HEIGHT_SCALE = {}, got {}",
+            "Height should be 100 / HEIGHT_SCALE = {}, got {}",
             expected,
             h.unwrap()
         );

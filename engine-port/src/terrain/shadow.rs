@@ -142,7 +142,11 @@ fn terrain_raycast_height(
 
         // P5-120 FIX: interpolate_height returns Option<f64>; None means
         // outside terrain bounds -- skip this step (no terrain to shadow from).
-        let Some(terrain_z) = terrain.interpolate_height(wx, wy) else {
+        // F238 FIX: interpolate_height returns world units (raw / HEIGHT_SCALE).
+        // Shadow coordinates use raw * HEIGHT_SCALE (matching sample_cell_center).
+        // Convert: (raw / HS) * HS² = raw * HS.
+        let hs_sq = HEIGHT_SCALE as f64 * HEIGHT_SCALE as f64;
+        let Some(terrain_z) = terrain.interpolate_height(wx, wy).map(|z| z * hs_sq) else {
             continue;
         };
 
@@ -223,7 +227,7 @@ mod tests {
 
         // The flat patch (x=1) should have SOME shadowed cells.
         // Rays from flat cells trace toward the light ([-1, +1, +2]) and hit
-        // the tall patch at x=0, which is at height 200*16=3200.
+        // the tall patch at x=0 (raw=200, shadow Z=200*16=3200).
         let flat = rt.get_patch_at(1, 0).expect("flat patch must exist");
         assert!(
             flat.dark != 0,
@@ -303,7 +307,7 @@ mod tests {
 
         // The flat east patch should have shadowed cells from the tall neighbor.
         // Rays from flat east cells trace toward light ([-1, 0, +1]) and encounter
-        // the tall patch at x=0 (height=64*16=1024) which occludes them.
+        // the tall patch at x=0 (raw=64, shadow Z=64*16=1024) which occludes them.
         let east_patch = rt.get_patch_at(1, 0).expect("east patch must exist");
         assert!(
             east_patch.dark != 0,
