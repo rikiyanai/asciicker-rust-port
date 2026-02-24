@@ -10,13 +10,13 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 ## Current Position
 
 Phase: 6 of 7 (Physics and Character)
-Plan: 1 of 3 in current phase (06-01 complete)
-Status: Phase 6 IN PROGRESS. Plan 06-01 complete (physics core). Ready for 06-02.
-Last activity: 2026-02-24 -- Completed 06-01: Physics core (collision, forces, geometry, FixedUpdate)
+Plan: 2 of 3 in current phase (06-02 complete)
+Status: Phase 6 IN PROGRESS. Plan 06-02 complete (character). Ready for 06-03.
+Last activity: 2026-02-24 -- Completed 06-02: Character state machine, equipment, input, animation, sprite query
 
-Progress: [###-------] 33%
+Progress: [######----] 67%
 
-**Note:** Phase 6 Plan 01 complete. 275 lib tests passing (35 new physics tests). PhysicsIO/PhysicsPlugin ready for 06-02 input/character.
+**Note:** Phase 6 Plan 02 complete. 324 lib tests passing (49 new character tests). CharacterPlugin with input/sprite query ready for 06-03.
 
 ## Performance Metrics
 
@@ -48,6 +48,7 @@ Progress: [###-------] 33%
 | Phase 05 P08 | 6min | 1 tasks | 1 files |
 | Phase 05 P07 | 10min | 2 tasks | 3 files |
 | Phase 06 P01 | 12min | 2 tasks | 8 files |
+| Phase 06 P02 | 13min | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -128,6 +129,12 @@ Recent decisions affecting current work:
 - 06-01: Unified gravity/buoyancy with static cnt=0.78 (wave modulation deferred)
 - 06-01: Collision search radius uses world_radius * 2 (entity) not world_height (R19-PERF)
 - 06-01: PhysicsIO Default has safe non-zero world_radius/world_height to prevent div-by-zero
+- 06-02: Block state is movement-locked, mutually exclusive with Attack, equipment guard in input.rs
+- 06-02: AnimationState Model B (frame counter, no Instant::now()) for deterministic tests
+- 06-02: camera_input_system gated via has_characters() custom run condition for spectator mode
+- 06-02: SpriteReq includes clr:u8 (default 0) for Phase 7 multiplayer forward-compatibility
+- 06-02: spawn_character() is single source of truth for character entity creation
+- 06-02: Dead state permanent (respawn deferred to Phase 7)
 
 ### Pending Todos
 
@@ -144,5 +151,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Completed 06-01-PLAN.md (physics core: collision, forces, geometry, FixedUpdate). 275 lib tests passing.
+Stopped at: Completed 06-02-PLAN.md (character: state machine, equipment, input, animation, sprite query). 324 lib tests passing.
 Resume file: None

@@ -145,8 +145,8 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 06-01-PLAN.md -- Physics core: collision, forces, PhysicsIO, FixedUpdate, collect_terrain_triangles + collect_world_triangles free functions (TDD, wave 1)
-- [ ] 06-02-PLAN.md -- Character: state machine (with Block), equipment, input (Q/E ownership), animation, sprite_query (TDD, wave 2)
+- [x] 06-01-PLAN.md -- Physics core: collision, forces, PhysicsIO, FixedUpdate, collect_terrain_triangles + collect_world_triangles free functions (TDD, wave 1)
+- [x] 06-02-PLAN.md -- Character: state machine (with Block), equipment, input (Q/E ownership), animation, sprite_query (TDD, wave 2)
 - [ ] 06-03-PLAN.md -- Water reflection (actual geometry re-query), Perlin ripple, GamePlugin (no sub-plugins), torque-to-camera, perf benchmark (wave 3)
 
 ### Phase 7: Game Systems
@@ -182,7 +182,7 @@ Note: Phases 3 and 4 are independent (both depend only on Phase 1) and can execu
 | 3.1 Audit Remediation | 1/1 | Complete    | 2026-02-20 |
 | 4. CPU Rasterizer Core | 4/4 | Complete | 2026-02-20 |
 | 5. Pipeline Integration | 8/8 | Complete | 2026-02-22 |
-| 6. Physics and Character | 0/3 | Planned | - |
+| 6. Physics and Character | 2/3 | In Progress | - |
 | 7. Game Systems | 0/5 | Planned | - |
 
 ## Developer Experience

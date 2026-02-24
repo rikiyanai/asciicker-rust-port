@@ -68,10 +68,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Character System
 
-- [ ] **CHAR-01**: Character state machine (idle, walk, run, attack, block, dead)
-- [ ] **CHAR-02**: 5D equipment sprite lookup (action x weapon x shield x helmet x armor x mount)
-- [ ] **CHAR-03**: Player input system (keyboard + mouse movement and actions)
-- [ ] **CHAR-04**: Animation system with frame timing
+- [x] **CHAR-01**: Character state machine (idle, walk, run, attack, block, dead)
+- [x] **CHAR-02**: 5D equipment sprite lookup (action x weapon x shield x helmet x armor x mount)
+- [x] **CHAR-03**: Player input system (keyboard + mouse movement and actions)
+- [x] **CHAR-04**: Animation system with frame timing
 
 ### Camera
 
@@ -201,10 +201,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PHYS-02 | Phase 6 | Complete |
 | PHYS-03 | Phase 6 | Complete |
 | PHYS-04 | Phase 6 | Complete |
-| CHAR-01 | Phase 6 | Pending |
-| CHAR-02 | Phase 6 | Pending |
-| CHAR-03 | Phase 6 | Pending |
-| CHAR-04 | Phase 6 | Pending |
+| CHAR-01 | Phase 6 | Complete |
+| CHAR-02 | Phase 6 | Complete |
+| CHAR-03 | Phase 6 | Complete |
+| CHAR-04 | Phase 6 | Complete |
 | FX-01 | Phase 6 | Pending |
 | FX-02 | Phase 6 | Pending |
 | AUD-01 | Phase 7 | Pending |
