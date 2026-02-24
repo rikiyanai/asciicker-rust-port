@@ -46,7 +46,13 @@ pub fn query_character_sprites(
 
         // 3. Screen position: project through camera
         // R19-M01 FIX: Use project_world_to_screen() (not view_tm * pos, which won't compile)
-        let pos_arr = [pos.x, pos.y, pos.z];
+        // F240 FIX: Transform Z is physics world units (raw / HEIGHT_SCALE).
+        // Camera view matrix expects raw u16 height units. Convert before projection.
+        let pos_arr = [
+            pos.x,
+            pos.y,
+            pos.z * crate::asset_loader::constants::HEIGHT_SCALE as f32,
+        ];
         let (screen_x, screen_y) = match project_world_to_screen(&pos_arr, &camera) {
             Some(coords) => coords, // (i32, i32)
             None => continue,       // behind camera, skip

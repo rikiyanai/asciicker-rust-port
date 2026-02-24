@@ -323,6 +323,7 @@
 | F237 | Phase 6 runtime: duplicate query_character_sprites registration causes double SpriteQueue entries | Medium | RESOLVED | Fixed in commit 979de47: merged chain + set registration into single add_systems call. |
 | F238 | Phase 6 runtime: interpolate_height returned height * HEIGHT_SCALE instead of / HEIGHT_SCALE; camera Z not scaled between physics/render coordinate systems | Critical | RESOLVED | interpolate_height: `* HEIGHT_SCALE` → `/ HEIGHT_SCALE`. sync_camera_to_player: multiply physics Z by HEIGHT_SCALE for camera. Shadow raycast: convert interpolate_height world units back to shadow coords (* HEIGHT_SCALE²). |
 | F239 | Phase 6 runtime: shadow tests broke after F238 interpolate_height fix (coordinate system mismatch) | Medium | RESOLVED | Shadow raycast at terrain_z comparison converts interpolate_height world units to shadow coordinate system (* HEIGHT_SCALE²). |
+| F240 | Phase 6 runtime: character sprite invisible — Transform.z in world units but project_world_to_screen expects raw u16 height units | High | RESOLVED | query_character_sprites converts pos.z * HEIGHT_SCALE before calling project_world_to_screen. |
 
 ---
 
