@@ -312,10 +312,10 @@ pub fn render_pipeline_system(
                 crate::world::instance::RuntimeInstance::Mesh {
                     mesh_id, tm, ..
                 } => {
-                    if inst.is_visible() {
-                        if let Some(mesh) = mesh_registry.loaded.get(mesh_id) {
-                            render_mesh(buf, buf_w, buf_h, mesh, tm, &camera);
-                        }
+                    if inst.is_visible()
+                        && let Some(mesh) = mesh_registry.loaded.get(mesh_id)
+                    {
+                        render_mesh(buf, buf_w, buf_h, mesh, tm, &camera);
                     }
                 }
                 crate::world::instance::RuntimeInstance::Sprite {

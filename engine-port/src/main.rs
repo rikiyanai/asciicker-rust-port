@@ -33,11 +33,10 @@ fn main() {
 }
 
 fn fps_title_system(diagnostics: Res<DiagnosticsStore>, mut windows: Query<&mut Window>) {
-    if let Some(fps) = diagnostics.get(&FrameTimeDiagnosticsPlugin::FPS) {
-        if let Some(value) = fps.smoothed() {
-            if let Ok(mut window) = windows.single_mut() {
-                window.title = format!("asciicker-engine | {:.0} fps", value);
-            }
-        }
+    if let Some(fps) = diagnostics.get(&FrameTimeDiagnosticsPlugin::FPS)
+        && let Some(value) = fps.smoothed()
+        && let Ok(mut window) = windows.single_mut()
+    {
+        window.title = format!("asciicker-engine | {:.0} fps", value);
     }
 }
