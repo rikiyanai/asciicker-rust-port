@@ -61,10 +61,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Physics
 
-- [ ] **PHYS-01**: Sphere-based TOI sweep collision (face/edge/vertex tests)
-- [ ] **PHYS-02**: 15ms fixed timestep via Bevy FixedUpdate (max 10 substeps)
-- [ ] **PHYS-03**: Gravity, buoyancy, and impulse forces
-- [ ] **PHYS-04**: Grounded detection for character state transitions
+- [x] **PHYS-01**: Sphere-based TOI sweep collision (face/edge/vertex tests)
+- [x] **PHYS-02**: 15ms fixed timestep via Bevy FixedUpdate (max 10 substeps)
+- [x] **PHYS-03**: Gravity, buoyancy, and impulse forces
+- [x] **PHYS-04**: Grounded detection for character state transitions
 
 ### Character System
 
@@ -197,10 +197,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CAM-02 | Phase 5 | Complete |
 | CAM-03 | Phase 5 | Complete |
 | VIS-02 | Phase 5 | Partial (infra done, ref data needed) |
-| PHYS-01 | Phase 6 | Pending |
-| PHYS-02 | Phase 6 | Pending |
-| PHYS-03 | Phase 6 | Pending |
-| PHYS-04 | Phase 6 | Pending |
+| PHYS-01 | Phase 6 | Complete |
+| PHYS-02 | Phase 6 | Complete |
+| PHYS-03 | Phase 6 | Complete |
+| PHYS-04 | Phase 6 | Complete |
 | CHAR-01 | Phase 6 | Pending |
 | CHAR-02 | Phase 6 | Pending |
 | CHAR-03 | Phase 6 | Pending |

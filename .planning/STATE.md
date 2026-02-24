@@ -5,18 +5,18 @@
 See: .planning/PROJECT.md (updated 2026-02-20)
 
 **Core value:** The CPU rasterizer must produce visually identical output to the C++ engine -- same glyphs, same colors, same depth ordering -- so that existing Asciicker worlds render correctly in the Rust port.
-**Current focus:** Phase 5: Pipeline Integration (next after Phase 3.1 audit remediation)
+**Current focus:** Phase 6: Physics and Character (sphere collision, forces, input, character state)
 
 ## Current Position
 
-Phase: 5 of 7 (Pipeline Integration) -- COMPLETE
-Plan: 8 of 8 in current phase (05-01 through 05-08 complete)
-Status: Phase 5 COMPLETE (all 8 plans executed, including gap closure 05-07 and 05-08). Ready for Phase 6.
-Last activity: 2026-02-22 -- Completed 05-08: VIS-02 status correction and unblock path
+Phase: 6 of 7 (Physics and Character)
+Plan: 1 of 3 in current phase (06-01 complete)
+Status: Phase 6 IN PROGRESS. Plan 06-01 complete (physics core). Ready for 06-02.
+Last activity: 2026-02-24 -- Completed 06-01: Physics core (collision, forces, geometry, FixedUpdate)
 
-Progress: [##########] 100%
+Progress: [###-------] 33%
 
-**Note:** Phase 5 ALL plans complete (05-01 through 05-08). 239 lib tests passing. VIS-02 honestly tracked as Partial.
+**Note:** Phase 6 Plan 01 complete. 275 lib tests passing (35 new physics tests). PhysicsIO/PhysicsPlugin ready for 06-02 input/character.
 
 ## Performance Metrics
 
@@ -47,6 +47,7 @@ Progress: [##########] 100%
 | Phase 05 P06 | 20min | 2 tasks | 4 files |
 | Phase 05 P08 | 6min | 1 tasks | 1 files |
 | Phase 05 P07 | 10min | 2 tasks | 3 files |
+| Phase 06 P01 | 12min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -123,6 +124,10 @@ Recent decisions affecting current work:
 - 05-06: R14-SYNTH-BAN enforced: all C++ reference tests are #[ignore], no synthetic baselines
 - 05-08: VIS-02 changed from [x] Complete to [ ] Partial -- infrastructure built but C++ reference data capture is outside Rust codebase scope
 - [Phase 05]: MeshRegistry.loaded lookup gates mesh rendering; unloaded meshes logged at trace level
+- 06-01: Used existing RuntimeWorld.query_sphere for BSP-accelerated mesh lookup (not linear iteration)
+- 06-01: Unified gravity/buoyancy with static cnt=0.78 (wave modulation deferred)
+- 06-01: Collision search radius uses world_radius * 2 (entity) not world_height (R19-PERF)
+- 06-01: PhysicsIO Default has safe non-zero world_radius/world_height to prevent div-by-zero
 
 ### Pending Todos
 
@@ -138,6 +143,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-02-22
-Stopped at: Completed 05-07-PLAN.md (asset deploy + mesh rendering wiring). 239 lib tests passing.
+Last session: 2026-02-24
+Stopped at: Completed 06-01-PLAN.md (physics core: collision, forces, geometry, FixedUpdate). 275 lib tests passing.
 Resume file: None
