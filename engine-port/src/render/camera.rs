@@ -311,12 +311,14 @@ impl GameCamera {
 
 // --- Bevy Systems ---
 
-/// Temporary input system for camera navigation.
+/// Spectator-mode input system for camera navigation.
 ///
-/// TODO(Phase 6): Q/E will be replaced with physics-driven rotation via PhysicsIO.torque.
-/// These direct yaw modifications are TEMPORARY for Phase 5 camera navigation only.
+/// Gated with `run_if(not(has_characters))` so it only runs when no Character
+/// entities exist (spectator/debug mode). When Character entities exist,
+/// `accumulate_player_input` (Phase 6) handles WASD and `apply_torque_to_camera`
+/// (Phase 6) handles Q/E yaw via PhysicsIO.torque.
 pub fn camera_input_system(mut camera: ResMut<GameCamera>, keyboard: Res<ButtonInput<KeyCode>>) {
-    // Q/E rotation (temporary — Phase 6 replaces with PhysicsIO.torque)
+    // Q/E rotation (spectator mode only — Phase 6 uses PhysicsIO.torque)
     if keyboard.just_pressed(KeyCode::KeyQ) {
         camera.yaw -= 45.0;
     }
@@ -324,7 +326,7 @@ pub fn camera_input_system(mut camera: ResMut<GameCamera>, keyboard: Res<ButtonI
         camera.yaw += 45.0;
     }
 
-    // Gather screen-relative input forces (matching C++ game.cpp:6175-6176)
+    // WASD movement (spectator mode only — Phase 6 uses accumulate_player_input)
     let mut x_force = 0.0f32;
     let mut y_force = 0.0f32;
     if keyboard.pressed(KeyCode::KeyD) {
@@ -355,6 +357,15 @@ pub fn camera_input_system(mut camera: ResMut<GameCamera>, keyboard: Res<ButtonI
         camera.pos[0] += (x_force * cos_yaw - y_force * sin_yaw) * speed;
         camera.pos[1] += (x_force * sin_yaw + y_force * cos_yaw) * speed;
     }
+}
+
+/// Run condition: returns true when no Character entities exist.
+///
+/// Used to gate camera_input_system so it only runs in spectator mode.
+/// R19-M12: Custom run condition (safer than `any_with_component` which may
+/// not exist in all Bevy 0.18 versions).
+pub fn has_characters(q: Query<(), With<crate::character::state_machine::Character>>) -> bool {
+    !q.is_empty()
 }
 
 /// System that recomputes the view matrix and frustum planes each frame.

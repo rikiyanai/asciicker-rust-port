@@ -17,7 +17,7 @@ pub mod types;
 use bevy::prelude::*;
 
 use assembly::{AssemblyState, MeshRegistry, a3d_assembly_system, load_a3d_scene, poll_akm_meshes};
-use camera::{GameCamera, camera_input_system, camera_update_system};
+use camera::{GameCamera, camera_input_system, camera_update_system, has_characters};
 use config::RenderConfig;
 use pipeline::{PipelineTiming, camera_terrain_init_system, render_pipeline_system};
 use sample_buffer::SampleBuffer;
@@ -59,7 +59,8 @@ impl Plugin for CpuRasterizerPlugin {
         app.add_systems(
             Update,
             (
-                camera_input_system,
+                camera_input_system
+                    .run_if(not(has_characters)),
                 camera_update_system,
                 a3d_assembly_system
                     .run_if(|assembly: Res<AssemblyState>| !assembly.assembled),
