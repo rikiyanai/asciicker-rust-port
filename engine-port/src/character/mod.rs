@@ -138,13 +138,9 @@ impl Plugin for CharacterPlugin {
             (
                 update_character_state,
                 advance_animation_system,
-                query_character_sprites,
+                query_character_sprites.in_set(CharacterSet::SpritePush),
             )
                 .chain(),
-        );
-        app.add_systems(
-            PostUpdate,
-            query_character_sprites.in_set(CharacterSet::SpritePush),
         );
 
         info!("CharacterPlugin registered");
