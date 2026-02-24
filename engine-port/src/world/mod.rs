@@ -10,7 +10,7 @@ use bevy::prelude::*;
 pub mod bsp;
 pub mod instance;
 
-use bsp::{build_bsp, query_bsp_sphere, query_world_frustum, BspItem, BspNode, VisibleInstance};
+use bsp::{BspItem, BspNode, VisibleInstance, build_bsp, query_bsp_sphere, query_world_frustum};
 use instance::{InstanceId, RuntimeInstance};
 
 use crate::asset_loader::a3d_world::A3dWorld;
@@ -57,11 +57,7 @@ impl RuntimeWorld {
                     (bbox[2] + bbox[3]) / 2.0,
                     (bbox[4] + bbox[5]) / 2.0,
                 ];
-                tree_items.push(BspItem {
-                    id,
-                    bbox,
-                    centroid,
-                });
+                tree_items.push(BspItem { id, bbox, centroid });
             } else {
                 flat_list.push(id);
             }
@@ -89,11 +85,7 @@ impl RuntimeWorld {
     ///
     /// Returns `VisibleInstance` for each visible instance (mesh or sprite).
     /// Instances without INST_VISIBLE are skipped.
-    pub fn query_visible(
-        &self,
-        planes: &[[f64; 4]],
-        camera_pos: [f64; 3],
-    ) -> Vec<VisibleInstance> {
+    pub fn query_visible(&self, planes: &[[f64; 4]], camera_pos: [f64; 3]) -> Vec<VisibleInstance> {
         let mut results = Vec::new();
 
         // Query BSP tree
@@ -189,9 +181,9 @@ impl RuntimeWorld {
         ];
 
         for plane in planes {
-            let all_outside = corners.iter().all(|c| {
-                plane[0] * c[0] + plane[1] * c[1] + plane[2] * c[2] + plane[3] < 0.0
-            });
+            let all_outside = corners
+                .iter()
+                .all(|c| plane[0] * c[0] + plane[1] * c[1] + plane[2] * c[2] + plane[3] < 0.0);
             if all_outside {
                 return false;
             }
@@ -359,7 +351,7 @@ mod tests {
             format_version: 1,
             instances: vec![
                 make_mesh_at(0.0, 0.0, 0.0, INST_VISIBLE | INST_USE_TREE), // visible
-                make_mesh_at(10.0, 0.0, 0.0, INST_USE_TREE),                // NOT visible
+                make_mesh_at(10.0, 0.0, 0.0, INST_USE_TREE),               // NOT visible
             ],
         };
 
@@ -375,7 +367,7 @@ mod tests {
             format_version: 1,
             instances: vec![
                 make_mesh_at(0.0, 0.0, 0.0, INST_VISIBLE | INST_USE_TREE), // in BSP
-                make_mesh_at(10.0, 0.0, 0.0, INST_VISIBLE),                 // in flat_list
+                make_mesh_at(10.0, 0.0, 0.0, INST_VISIBLE),                // in flat_list
             ],
         };
 
@@ -399,8 +391,8 @@ mod tests {
         let world = A3dWorld {
             format_version: 1,
             instances: vec![
-                make_mesh_at(0.0, 0.0, 0.0, INST_VISIBLE | INST_USE_TREE),    // near origin
-                make_mesh_at(100.0, 0.0, 0.0, INST_VISIBLE | INST_USE_TREE),  // far away
+                make_mesh_at(0.0, 0.0, 0.0, INST_VISIBLE | INST_USE_TREE), // near origin
+                make_mesh_at(100.0, 0.0, 0.0, INST_VISIBLE | INST_USE_TREE), // far away
             ],
         };
 
@@ -414,12 +406,10 @@ mod tests {
         );
 
         // Instance at x=100 (bbox [99,101]^3) should NOT be inside sphere of radius 5
-        let has_far = results
-            .iter()
-            .any(|inst| match inst {
-                RuntimeInstance::Mesh { tm, .. } => tm[12] > 50.0,
-                _ => false,
-            });
+        let has_far = results.iter().any(|inst| match inst {
+            RuntimeInstance::Mesh { tm, .. } => tm[12] > 50.0,
+            _ => false,
+        });
         assert!(!has_far, "Far instance should not be found");
     }
 
@@ -444,10 +434,7 @@ mod tests {
         let rt = RuntimeWorld::build_from_parsed(&world);
 
         // Item should be in flat_list
-        assert!(
-            rt.flat_list.len() >= 1,
-            "Item should be in flat_list"
-        );
+        assert!(rt.flat_list.len() >= 1, "Item should be in flat_list");
 
         // Item should still be visible in query_visible
         let results = rt.query_visible(&huge_frustum(), [0.0, 0.0, 0.0]);

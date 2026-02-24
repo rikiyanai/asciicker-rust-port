@@ -39,10 +39,7 @@ pub fn query_character_sprites(
         let pos = transform.translation;
 
         // 1. Sprite name from kind + action
-        let sprite_name = format!(
-            "{:?}_{:?}",
-            sprite_req.kind, sprite_req.action
-        ).to_lowercase();
+        let sprite_name = format!("{:?}_{:?}", sprite_req.kind, sprite_req.action).to_lowercase();
 
         // 2. Animation frame (R19-M02: already u32, no cast needed)
         let frame = anim_state.frame_index;
@@ -65,13 +62,13 @@ pub fn query_character_sprites(
 
         let entry = SpriteRenderEntry {
             dist,
-            screen_x,  // R19-M02: i32 from project_world_to_screen
-            screen_y,   // R19-M02: i32 from project_world_to_screen
+            screen_x, // R19-M02: i32 from project_world_to_screen
+            screen_y, // R19-M02: i32 from project_world_to_screen
             sprite_name,
             pos: [pos.x, pos.y, pos.z],
             yaw,
             anim: sprite_req.action as u32, // R19-M02: u32 field
-            frame,                           // R19-M02: u32, no cast
+            frame,                          // R19-M02: u32, no cast
         };
         sprite_queue.push(entry);
     }
@@ -120,13 +117,22 @@ mod tests {
 
         let queue = app.world().get_resource::<SpriteQueue>().unwrap();
         // Only the Character entity should produce an entry (decoy excluded)
-        assert_eq!(queue.len(), 1, "Only character entity should produce sprite entry, got {}", queue.len());
+        assert_eq!(
+            queue.len(),
+            1,
+            "Only character entity should produce sprite entry, got {}",
+            queue.len()
+        );
     }
 
     #[test]
     fn test_sprite_name_format() {
         // Verify sprite_name is lowercase kind_action
-        let req = SpriteReq { kind: SpriteKind::Human, action: ActionState::Attack, ..Default::default() };
+        let req = SpriteReq {
+            kind: SpriteKind::Human,
+            action: ActionState::Attack,
+            ..Default::default()
+        };
         let name = format!("{:?}_{:?}", req.kind, req.action).to_lowercase();
         assert_eq!(name, "human_attack");
     }

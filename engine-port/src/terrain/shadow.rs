@@ -93,8 +93,12 @@ fn compute_shadow_bitmasks(terrain: &RuntimeTerrain, light_dir: [f64; 3]) -> Vec
                 // P5-315 FIX: Use patch.x and patch.y for px/py
                 let cell_center = patch.sample_cell_center(u, v, px, py);
 
-                if terrain_raycast_height(terrain, &cell_center, &light_dir_scaled, MAX_SHADOW_STEPS)
-                {
+                if terrain_raycast_height(
+                    terrain,
+                    &cell_center,
+                    &light_dir_scaled,
+                    MAX_SHADOW_STEPS,
+                ) {
                     // R7-003 FIX: bit layout = u + v * VISUAL_CELLS
                     let cell_bit = u + v * VISUAL_CELLS;
                     dark |= 1u64 << cell_bit;

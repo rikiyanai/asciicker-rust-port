@@ -12,6 +12,7 @@ use std::time::Instant;
 use bevy::prelude::*;
 
 use crate::output::ascii_cell_grid::AsciiCellGrid;
+use crate::render::WaterConfig;
 use crate::render::assembly::{MeshRegistry, RuntimeMaterials};
 use crate::render::camera::GameCamera;
 use crate::render::config::RenderConfig;
@@ -22,7 +23,6 @@ use crate::render::sample_buffer::SampleBuffer;
 use crate::render::sprite_blit::{SpriteQueue, blit_sprite};
 use crate::render::types::AnsiCell;
 use crate::render::water;
-use crate::render::WaterConfig;
 use crate::terrain::RuntimeTerrain;
 use crate::world::RuntimeWorld;
 
@@ -32,7 +32,10 @@ use crate::world::RuntimeWorld;
 
 /// Per-stage timing data for the rendering pipeline (microseconds).
 #[derive(Resource, Default, Debug, Clone)]
-#[cfg_attr(feature = "inspector", derive(bevy_inspector_egui::prelude::InspectorOptions, Reflect))]
+#[cfg_attr(
+    feature = "inspector",
+    derive(bevy_inspector_egui::prelude::InspectorOptions, Reflect)
+)]
 pub struct PipelineTiming {
     /// Stage 1: CLEAR duration in microseconds.
     pub clear_us: u64,
@@ -88,9 +91,8 @@ pub fn project_world_to_screen(pos: &[f32; 3], camera: &GameCamera) -> Option<(i
     let eye_z = wz as f32 - camera.view_pos[2];
 
     // Distance along view direction (view_dir normalized by focal)
-    let viewer_dist = eye_x * camera.view_dir[0]
-        + eye_y * camera.view_dir[1]
-        + eye_z * camera.view_dir[2];
+    let viewer_dist =
+        eye_x * camera.view_dir[0] + eye_y * camera.view_dir[1] + eye_z * camera.view_dir[2];
 
     if viewer_dist <= 0.0 {
         return None; // behind camera
@@ -100,8 +102,7 @@ pub fn project_world_to_screen(pos: &[f32; 3], camera: &GameCamera) -> Option<(i
 
     // Base screen position WITHOUT translation, scaled by 1/distance
     let fx = (camera.mul[0] * wx + camera.mul[2] * wy) as f32 * recp_dist;
-    let fy = (camera.mul[1] * wx + camera.mul[3] * wy + camera.mul[5] * wz) as f32
-        * recp_dist;
+    let fy = (camera.mul[1] * wx + camera.mul[3] * wy + camera.mul[5] * wz) as f32 * recp_dist;
 
     // Translated offset with perspective
     let qx = (camera.add[0] as f32 - camera.view_ofs[0]) * recp_dist + camera.view_ofs[0];
@@ -228,14 +229,19 @@ pub fn render_pipeline_system(
 
     // One-time diagnostic: log camera, terrain, and material info
     {
-        static DIAG_LOGGED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+        static DIAG_LOGGED: std::sync::atomic::AtomicBool =
+            std::sync::atomic::AtomicBool::new(false);
         if terrain.root.is_some() && !DIAG_LOGGED.load(std::sync::atomic::Ordering::Relaxed) {
             DIAG_LOGGED.store(true, std::sync::atomic::Ordering::Relaxed);
             info!(
                 "Pipeline: camera pos={:?} yaw={} | terrain patches={} | grid={}x{} sample={}x{}",
-                camera.pos, camera.yaw, terrain.patch_count,
-                cell_grid.width, cell_grid.height,
-                sample_buffer.width, sample_buffer.height,
+                camera.pos,
+                camera.yaw,
+                terrain.patch_count,
+                cell_grid.width,
+                cell_grid.height,
+                sample_buffer.width,
+                sample_buffer.height,
             );
             // Material and height distribution across all patches
             let mut height_min = u16::MAX;
@@ -246,20 +252,32 @@ pub fn render_pipeline_system(
             terrain.for_each_patch(|patch| {
                 for row in &patch.height {
                     for &h in row {
-                        if h < height_min { height_min = h; }
-                        if h > height_max { height_max = h; }
+                        if h < height_min {
+                            height_min = h;
+                        }
+                        if h > height_max {
+                            height_max = h;
+                        }
                     }
                 }
                 for row in &patch.visual {
                     for &v in row {
-                        if v == 0 { visual_zero += 1; } else { visual_nonzero += 1; }
+                        if v == 0 {
+                            visual_zero += 1;
+                        } else {
+                            visual_nonzero += 1;
+                        }
                         unique_vis.insert(v);
                     }
                 }
             });
             info!(
                 "Terrain: heights [{},{}] | visual: {} zero, {} nonzero, {} unique indices",
-                height_min, height_max, visual_zero, visual_nonzero, unique_vis.len()
+                height_min,
+                height_max,
+                visual_zero,
+                visual_nonzero,
+                unique_vis.len()
             );
             // Log first few non-zero material colors
             if let Some(mats) = materials.as_ref() {
@@ -267,11 +285,16 @@ pub fn render_pipeline_system(
                 for idx in unique_vis.iter().take(8) {
                     if (*idx as usize) < mats.0.len() {
                         let mc = &mats.0[*idx as usize].shade[0][8]; // elevation 0, mid diffuse
-                        info!("Material[{}]: fg={:?} gl={} bg={:?}", idx, mc.fg, mc.gl, mc.bg);
+                        info!(
+                            "Material[{}]: fg={:?} gl={} bg={:?}",
+                            idx, mc.fg, mc.gl, mc.bg
+                        );
                         shown += 1;
                     }
                 }
-                if shown == 0 { info!("No material samples to show"); }
+                if shown == 0 {
+                    info!("No material samples to show");
+                }
             }
         }
     }
@@ -290,13 +313,7 @@ pub fn render_pipeline_system(
             terrain.query_visible(&camera.frustum_planes, |patch| {
                 _terrain_patch_count += 1;
                 crate::render::terrain_shader::render_patch(
-                    buf,
-                    buf_w,
-                    buf_h,
-                    patch,
-                    patch.x,
-                    patch.y,
-                    &camera,
+                    buf, buf_w, buf_h, patch, patch.x, patch.y, &camera,
                 );
             });
         }
@@ -313,9 +330,7 @@ pub fn render_pipeline_system(
         // For now, iterate ALL instances directly (matching terrain approach).
         for inst in world_data.instances.iter() {
             match inst {
-                crate::world::instance::RuntimeInstance::Mesh {
-                    mesh_id, tm, ..
-                } => {
+                crate::world::instance::RuntimeInstance::Mesh { mesh_id, tm, .. } => {
                     if inst.is_visible()
                         && let Some(mesh) = mesh_registry.loaded.get(mesh_id)
                     {
@@ -323,7 +338,12 @@ pub fn render_pipeline_system(
                     }
                 }
                 crate::world::instance::RuntimeInstance::Sprite {
-                    sprite_name, pos, yaw, anim, frame, ..
+                    sprite_name,
+                    pos,
+                    yaw,
+                    anim,
+                    frame,
+                    ..
                 } => {
                     if inst.is_visible() {
                         let dx = pos[0] - camera.view_pos[0];
@@ -331,42 +351,36 @@ pub fn render_pipeline_system(
                         let dist = dx * camera.view_dir[0] + dy * camera.view_dir[1];
 
                         if let Some((sx, sy)) = project_world_to_screen(pos, &camera) {
-                            sprite_queue.push(
-                                crate::render::sprite_blit::SpriteRenderEntry {
-                                    dist,
-                                    screen_x: sx,
-                                    screen_y: sy,
-                                    sprite_name: sprite_name.clone(),
-                                    pos: *pos,
-                                    yaw: *yaw,
-                                    anim: *anim as u32,
-                                    frame: *frame as u32,
-                                },
-                            );
+                            sprite_queue.push(crate::render::sprite_blit::SpriteRenderEntry {
+                                dist,
+                                screen_x: sx,
+                                screen_y: sy,
+                                sprite_name: sprite_name.clone(),
+                                pos: *pos,
+                                yaw: *yaw,
+                                anim: *anim as u32,
+                                frame: *frame as u32,
+                            });
                         }
                     }
                 }
-                crate::world::instance::RuntimeInstance::Item {
-                    pos, yaw, ..
-                } => {
+                crate::world::instance::RuntimeInstance::Item { pos, yaw, .. } => {
                     if inst.is_visible() {
                         let dx = pos[0] - camera.view_pos[0];
                         let dy = pos[1] - camera.view_pos[1];
                         let dist = dx * camera.view_dir[0] + dy * camera.view_dir[1];
 
                         if let Some((sx, sy)) = project_world_to_screen(pos, &camera) {
-                            sprite_queue.push(
-                                crate::render::sprite_blit::SpriteRenderEntry {
-                                    dist,
-                                    screen_x: sx,
-                                    screen_y: sy,
-                                    sprite_name: "item".to_string(),
-                                    pos: *pos,
-                                    yaw: *yaw,
-                                    anim: 0,
-                                    frame: 0,
-                                },
-                            );
+                            sprite_queue.push(crate::render::sprite_blit::SpriteRenderEntry {
+                                dist,
+                                screen_x: sx,
+                                screen_y: sy,
+                                sprite_name: "item".to_string(),
+                                pos: *pos,
+                                yaw: *yaw,
+                                anim: 0,
+                                frame: 0,
+                            });
                         }
                     }
                 }
@@ -451,21 +465,32 @@ pub fn render_pipeline_system(
         static RESOLVE_FRAME: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
         let frame = RESOLVE_FRAME.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         if materials.is_some() && frame < 3 {
-            let non_clear = sample_buffer.samples.iter()
+            let non_clear = sample_buffer
+                .samples
+                .iter()
                 .filter(|s| s.height != crate::render::sample_buffer::Sample::CLEAR_HEIGHT)
                 .count();
-            let mesh_samples = sample_buffer.samples.iter()
-                .filter(|s| s.height != crate::render::sample_buffer::Sample::CLEAR_HEIGHT
-                    && s.spare & crate::render::sample_buffer::spare_bits::MESH_FLAG != 0)
+            let mesh_samples = sample_buffer
+                .samples
+                .iter()
+                .filter(|s| {
+                    s.height != crate::render::sample_buffer::Sample::CLEAR_HEIGHT
+                        && s.spare & crate::render::sample_buffer::spare_bits::MESH_FLAG != 0
+                })
                 .count();
-            let non_space = cell_grid.char_indices.iter()
+            let non_space = cell_grid
+                .char_indices
+                .iter()
                 .filter(|&&c| c != 0 && c != 32)
                 .count();
             info!(
                 "Resolve[frame {}]: {}/{} samples filled ({} mesh), {}/{} glyphs visible, {} meshes loaded",
-                frame, non_clear, sample_buffer.samples.len(),
+                frame,
+                non_clear,
+                sample_buffer.samples.len(),
                 mesh_samples,
-                non_space, cell_grid.char_indices.len(),
+                non_space,
+                cell_grid.char_indices.len(),
                 mesh_registry.loaded.len(),
             );
         }
@@ -541,14 +566,8 @@ mod tests {
 
         let (sx, sy) = result.unwrap();
         // Should be near the center (240/2=120, 135/2=67 approximately)
-        assert!(
-            sx > 50 && sx < 200,
-            "Screen X {sx} should be near center"
-        );
-        assert!(
-            sy > 20 && sy < 120,
-            "Screen Y {sy} should be near center"
-        );
+        assert!(sx > 50 && sx < 200, "Screen X {sx} should be near center");
+        assert!(sy > 20 && sy < 120, "Screen Y {sy} should be near center");
     }
 
     #[test]
@@ -597,9 +616,33 @@ mod tests {
         // a custom view_tm, so we control exact pixel positions.
         let mesh = AkmMesh {
             vertices: vec![
-                AkmVertex { x: 0.0, y: 0.0, z: 0.0, r: 200, g: 100, b: 50, alpha: 255 },
-                AkmVertex { x: 1.0, y: 0.0, z: 0.0, r: 200, g: 100, b: 50, alpha: 255 },
-                AkmVertex { x: 0.0, y: 1.0, z: 0.0, r: 200, g: 100, b: 50, alpha: 255 },
+                AkmVertex {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                    r: 200,
+                    g: 100,
+                    b: 50,
+                    alpha: 255,
+                },
+                AkmVertex {
+                    x: 1.0,
+                    y: 0.0,
+                    z: 0.0,
+                    r: 200,
+                    g: 100,
+                    b: 50,
+                    alpha: 255,
+                },
+                AkmVertex {
+                    x: 0.0,
+                    y: 1.0,
+                    z: 0.0,
+                    r: 200,
+                    g: 100,
+                    b: 50,
+                    alpha: 255,
+                },
             ],
             faces: vec![AkmFace {
                 indices: [0, 1, 2],
@@ -626,10 +669,7 @@ mod tests {
 
         // Scale mesh up: vertices (0,0,0),(1,0,0),(0,1,0) -> (10,10,0),(110,10,0),(10,110,0)
         let instance_tm: [f64; 16] = [
-            100.0, 0.0,   0.0, 0.0,
-            0.0,   100.0, 0.0, 0.0,
-            0.0,   0.0,   100.0, 0.0,
-            10.0,  10.0,  0.0, 1.0,
+            100.0, 0.0, 0.0, 0.0, 0.0, 100.0, 0.0, 0.0, 0.0, 0.0, 100.0, 0.0, 10.0, 10.0, 0.0, 1.0,
         ];
 
         // Camera behind the mesh looking toward +Y (yaw=0)

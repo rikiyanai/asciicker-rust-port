@@ -83,9 +83,8 @@ pub fn transform_vertex_perspective(
     let eye_z = wz as f32 - camera.view_pos[2];
 
     // Distance along view direction (view_dir is normalized by focal)
-    let viewer_dist = eye_x * camera.view_dir[0]
-        + eye_y * camera.view_dir[1]
-        + eye_z * camera.view_dir[2];
+    let viewer_dist =
+        eye_x * camera.view_dir[0] + eye_y * camera.view_dir[1] + eye_z * camera.view_dir[2];
 
     if viewer_dist <= 0.0 {
         return None; // behind camera
@@ -95,8 +94,7 @@ pub fn transform_vertex_perspective(
 
     // Base screen position WITHOUT translation (from affine view matrix components)
     let fx = (camera.mul[0] * wx + camera.mul[2] * wy) as f32 * recp_dist;
-    let fy =
-        (camera.mul[1] * wx + camera.mul[3] * wy + camera.mul[5] * wz) as f32 * recp_dist;
+    let fy = (camera.mul[1] * wx + camera.mul[3] * wy + camera.mul[5] * wz) as f32 * recp_dist;
 
     // Apply translated offset with perspective
     let qx = (camera.add[0] as f32 - camera.view_ofs[0]) * recp_dist + camera.view_ofs[0];

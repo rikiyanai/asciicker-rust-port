@@ -25,12 +25,7 @@ pub struct SoupItem {
 /// The result is relative to `center` (sphere center in world space).
 ///
 /// In sphere space, the physics sphere has unit radius (1.0).
-pub fn to_sphere_space(
-    pos: &[f32; 3],
-    center: &[f32; 3],
-    mul_xy: f32,
-    mul_z: f32,
-) -> [f32; 3] {
+pub fn to_sphere_space(pos: &[f32; 3], center: &[f32; 3], mul_xy: f32, mul_z: f32) -> [f32; 3] {
     [
         (pos[0] - center[0]) * mul_xy,
         (pos[1] - center[1]) * mul_xy,

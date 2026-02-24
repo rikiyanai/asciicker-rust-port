@@ -240,9 +240,8 @@ fn test_game_map_y8_terrain_parse() {
 fn test_game_map_y8_material_parse() {
     let (_terrain, terrain_consumed) =
         parse_terrain_section(GAME_MAP_Y8_A3D).expect("terrain section should parse");
-    let (materials, mat_consumed) =
-        parse_material_section(&GAME_MAP_Y8_A3D[terrain_consumed..])
-            .expect("material section should parse");
+    let (materials, mat_consumed) = parse_material_section(&GAME_MAP_Y8_A3D[terrain_consumed..])
+        .expect("material section should parse");
     assert_eq!(materials.materials.len(), 256);
     assert_eq!(mat_consumed, 131_072);
 }
@@ -251,9 +250,8 @@ fn test_game_map_y8_material_parse() {
 fn test_game_map_y8_world_parse() {
     let (_terrain, terrain_consumed) =
         parse_terrain_section(GAME_MAP_Y8_A3D).expect("terrain section should parse");
-    let (_materials, mat_consumed) =
-        parse_material_section(&GAME_MAP_Y8_A3D[terrain_consumed..])
-            .expect("material section should parse");
+    let (_materials, mat_consumed) = parse_material_section(&GAME_MAP_Y8_A3D[terrain_consumed..])
+        .expect("material section should parse");
     let world = parse_world_section(&GAME_MAP_Y8_A3D[terrain_consumed + mat_consumed..])
         .expect("world section should parse");
     assert_eq!(world.instances.len(), 47, "game_map_y8 has 47 instances");
@@ -263,8 +261,7 @@ fn test_game_map_y8_world_parse() {
 #[test]
 fn test_game_map_y8_full_pipeline() {
     // All three sections must parse sequentially without panic
-    let (terrain, terrain_consumed) =
-        parse_terrain_section(GAME_MAP_Y8_A3D).expect("terrain");
+    let (terrain, terrain_consumed) = parse_terrain_section(GAME_MAP_Y8_A3D).expect("terrain");
     let (materials, mat_consumed) =
         parse_material_section(&GAME_MAP_Y8_A3D[terrain_consumed..]).expect("materials");
     let world =

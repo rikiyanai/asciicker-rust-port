@@ -119,8 +119,16 @@ mod tests {
         let io = default_io();
         let dt = 1.0 / 66.667;
         accumulate_forces(&mut state, &io, dt);
-        assert!(state.vel[2] < 0.0, "gravity must produce negative vel_z, got {}", state.vel[2]);
-        assert!(state.vel[2].abs() > 0.01, "vel_z must be significant, got {}", state.vel[2]);
+        assert!(
+            state.vel[2] < 0.0,
+            "gravity must produce negative vel_z, got {}",
+            state.vel[2]
+        );
+        assert!(
+            state.vel[2].abs() > 0.01,
+            "vel_z must be significant, got {}",
+            state.vel[2]
+        );
     }
 
     #[test]
@@ -132,8 +140,11 @@ mod tests {
         let dt = 1.0;
         accumulate_forces(&mut state, &io, dt);
         // vel[2] should be roughly -0.78 (clamped acc * dt=1.0)
-        assert!((state.vel[2] - (-0.78)).abs() < 0.05,
-            "gravity acc should be ~-0.78, got {}", state.vel[2]);
+        assert!(
+            (state.vel[2] - (-0.78)).abs() < 0.05,
+            "gravity acc should be ~-0.78, got {}",
+            state.vel[2]
+        );
     }
 
     #[test]
@@ -151,8 +162,10 @@ mod tests {
         apply_jump(&mut state, &mut io);
         assert!(!io.jump, "jump must be cleared after evaluation");
         assert!(state.vel[2] > 0.0, "vel_z must be positive after jump");
-        assert!((state.vel[2] - JUMP_VELOCITY).abs() < 0.01,
-            "vel_z should equal JUMP_VELOCITY");
+        assert!(
+            (state.vel[2] - JUMP_VELOCITY).abs() < 0.01,
+            "vel_z should equal JUMP_VELOCITY"
+        );
     }
 
     #[test]
@@ -168,8 +181,11 @@ mod tests {
         };
         apply_jump(&mut state, &mut io);
         assert!(!io.jump, "jump flag must be cleared even when airborne");
-        assert!((state.vel[2] - 0.0).abs() < 1e-6,
-            "vel_z should remain 0 when airborne, got {}", state.vel[2]);
+        assert!(
+            (state.vel[2] - 0.0).abs() < 1e-6,
+            "vel_z should remain 0 when airborne, got {}",
+            state.vel[2]
+        );
     }
 
     #[test]
@@ -180,18 +196,27 @@ mod tests {
             vel: [0.0, 0.0, -5.0],
             accum_contact: 2.0,
         };
-        let mut io = PhysicsIO { jump: true, ..default_io() };
+        let mut io = PhysicsIO {
+            jump: true,
+            ..default_io()
+        };
         apply_jump(&mut state, &mut io);
-        assert!((state.vel[2] - JUMP_VELOCITY).abs() < 0.01,
-            "falling: should SET to JUMP_VELOCITY, got {}", state.vel[2]);
+        assert!(
+            (state.vel[2] - JUMP_VELOCITY).abs() < 0.01,
+            "falling: should SET to JUMP_VELOCITY, got {}",
+            state.vel[2]
+        );
 
         // Rising case
         state.vel[2] = 3.0;
         state.accum_contact = 2.0;
         io.jump = true;
         apply_jump(&mut state, &mut io);
-        assert!((state.vel[2] - (3.0 + JUMP_VELOCITY)).abs() < 0.01,
-            "rising: should ADD JUMP_VELOCITY, got {}", state.vel[2]);
+        assert!(
+            (state.vel[2] - (3.0 + JUMP_VELOCITY)).abs() < 0.01,
+            "rising: should ADD JUMP_VELOCITY, got {}",
+            state.vel[2]
+        );
     }
 
     #[test]
@@ -216,8 +241,11 @@ mod tests {
         };
         update_grounded(&mut state, 1.0 / 66.667);
         // 1.05 * 0.9 = 0.945, below threshold
-        assert!(state.accum_contact < GROUNDED_THRESHOLD,
-            "should decay below threshold, got {}", state.accum_contact);
+        assert!(
+            state.accum_contact < GROUNDED_THRESHOLD,
+            "should decay below threshold, got {}",
+            state.accum_contact
+        );
     }
 
     #[test]
@@ -230,8 +258,11 @@ mod tests {
         let io = default_io();
         let dt = 1.0 / 66.667;
         accumulate_forces(&mut state, &io, dt);
-        assert!(state.vel[0] < 10.0,
-            "damping should reduce velocity, got {}", state.vel[0]);
+        assert!(
+            state.vel[0] < 10.0,
+            "damping should reduce velocity, got {}",
+            state.vel[0]
+        );
     }
 
     #[test]
@@ -246,8 +277,11 @@ mod tests {
         accumulate_forces(&mut state, &io, dt);
         // After clamping and damping, |vel_xy| should be <= MAX_VEL_AIR
         let speed = (state.vel[0] * state.vel[0] + state.vel[1] * state.vel[1]).sqrt();
-        assert!(speed <= MAX_VEL_AIR + 0.01,
-            "velocity should be clamped to MAX_VEL_AIR, got {}", speed);
+        assert!(
+            speed <= MAX_VEL_AIR + 0.01,
+            "velocity should be clamped to MAX_VEL_AIR, got {}",
+            speed
+        );
     }
 
     #[test]
@@ -277,15 +311,22 @@ mod tests {
         let dt = 1.0 / 66.667;
         accumulate_forces(&mut state, &io, dt);
         // With yaw=90deg, x_force should map to y direction
-        assert!(state.vel[1].abs() > state.vel[0].abs(),
-            "90deg yaw should rotate x_force to y, vel=[{}, {}]", state.vel[0], state.vel[1]);
+        assert!(
+            state.vel[1].abs() > state.vel[0].abs(),
+            "90deg yaw should rotate x_force to y, vel=[{}, {}]",
+            state.vel[0],
+            state.vel[1]
+        );
     }
 
     #[test]
     fn test_height_conversion() {
         // R16-F196: verify HEIGHT_SCALE conversion
         use crate::asset_loader::constants::HEIGHT_SCALE;
-        assert_eq!(16u16 as f32 / HEIGHT_SCALE as f32, 1.0,
-            "16 raw height units / HEIGHT_SCALE should equal 1.0 world unit");
+        assert_eq!(
+            16u16 as f32 / HEIGHT_SCALE as f32,
+            1.0,
+            "16 raw height units / HEIGHT_SCALE should equal 1.0 world unit"
+        );
     }
 }

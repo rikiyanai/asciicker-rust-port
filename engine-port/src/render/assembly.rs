@@ -60,8 +60,7 @@ pub struct RuntimeMaterials(pub Vec<Material>);
 /// Sets `AssemblyState.a3d_handle` to trigger the assembly system.
 /// TODO(Phase 7): Replace DEFAULT_SCENE_PATH with GameConfig resource.
 pub fn load_a3d_scene(mut assembly: ResMut<AssemblyState>, asset_server: Res<AssetServer>) {
-    let scene_path = std::env::var("A3D_MAP")
-        .unwrap_or_else(|_| "game_map_y8.a3d".to_string());
+    let scene_path = std::env::var("A3D_MAP").unwrap_or_else(|_| "game_map_y8.a3d".to_string());
     assembly.a3d_handle = Some(asset_server.load(&scene_path));
     info!("load_a3d_scene: loading '{}'", scene_path);
 }
@@ -167,10 +166,7 @@ pub fn a3d_assembly_system(
 ///
 /// Runs each frame until all meshes are loaded. Once `meshes` (pending) is
 /// empty, all queued meshes have been transferred to `loaded`.
-pub fn poll_akm_meshes(
-    mut mesh_registry: ResMut<MeshRegistry>,
-    akm_assets: Res<Assets<AkmMesh>>,
-) {
+pub fn poll_akm_meshes(mut mesh_registry: ResMut<MeshRegistry>, akm_assets: Res<Assets<AkmMesh>>) {
     if mesh_registry.meshes.is_empty() {
         return;
     }
@@ -357,8 +353,12 @@ mod tests {
                     } else {
                         '.'
                     },
-                    cell.fg[0], cell.fg[1], cell.fg[2],
-                    cell.bg[0], cell.bg[1], cell.bg[2],
+                    cell.fg[0],
+                    cell.fg[1],
+                    cell.fg[2],
+                    cell.bg[0],
+                    cell.bg[1],
+                    cell.bg[2],
                     cell.flags,
                 );
             }

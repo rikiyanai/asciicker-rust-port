@@ -138,13 +138,24 @@ mod tests {
             cam.yaw = 0.0;
         }
         {
-            let mut input = app.world_mut().get_resource_mut::<ButtonInput<KeyCode>>().unwrap();
+            let mut input = app
+                .world_mut()
+                .get_resource_mut::<ButtonInput<KeyCode>>()
+                .unwrap();
             input.press(KeyCode::KeyW);
         }
         app.update();
         let io = app.world().get_resource::<PhysicsIO>().unwrap();
-        assert!((io.y_force - 1.0).abs() < 0.01, "W at yaw=0 -> y_force=1.0, got {}", io.y_force);
-        assert!(io.x_force.abs() < 0.01, "W at yaw=0 -> x_force=0, got {}", io.x_force);
+        assert!(
+            (io.y_force - 1.0).abs() < 0.01,
+            "W at yaw=0 -> y_force=1.0, got {}",
+            io.y_force
+        );
+        assert!(
+            io.x_force.abs() < 0.01,
+            "W at yaw=0 -> x_force=0, got {}",
+            io.x_force
+        );
     }
 
     #[test]
@@ -155,14 +166,20 @@ mod tests {
             cam.yaw = 0.0;
         }
         {
-            let mut input = app.world_mut().get_resource_mut::<ButtonInput<KeyCode>>().unwrap();
+            let mut input = app
+                .world_mut()
+                .get_resource_mut::<ButtonInput<KeyCode>>()
+                .unwrap();
             input.press(KeyCode::KeyW);
             input.press(KeyCode::KeyD);
         }
         app.update();
         let io = app.world().get_resource::<PhysicsIO>().unwrap();
         let mag = (io.x_force * io.x_force + io.y_force * io.y_force).sqrt();
-        assert!((mag - 1.0).abs() < 0.01, "Diagonal should be normalized to ~1.0, got {mag}");
+        assert!(
+            (mag - 1.0).abs() < 0.01,
+            "Diagonal should be normalized to ~1.0, got {mag}"
+        );
     }
 
     #[test]
@@ -173,20 +190,30 @@ mod tests {
             cam.yaw = 0.0;
         }
         {
-            let mut input = app.world_mut().get_resource_mut::<ButtonInput<KeyCode>>().unwrap();
+            let mut input = app
+                .world_mut()
+                .get_resource_mut::<ButtonInput<KeyCode>>()
+                .unwrap();
             input.press(KeyCode::KeyW);
             input.press(KeyCode::ShiftLeft);
         }
         app.update();
         let io = app.world().get_resource::<PhysicsIO>().unwrap();
-        assert!((io.y_force - 0.5).abs() < 0.01, "Shift+W -> y_force=0.5, got {}", io.y_force);
+        assert!(
+            (io.y_force - 0.5).abs() < 0.01,
+            "Shift+W -> y_force=0.5, got {}",
+            io.y_force
+        );
     }
 
     #[test]
     fn test_space_sets_jump() {
         let mut app = make_input_app();
         {
-            let mut input = app.world_mut().get_resource_mut::<ButtonInput<KeyCode>>().unwrap();
+            let mut input = app
+                .world_mut()
+                .get_resource_mut::<ButtonInput<KeyCode>>()
+                .unwrap();
             input.press(KeyCode::Space);
         }
         app.update();
@@ -198,24 +225,38 @@ mod tests {
     fn test_q_sets_positive_torque() {
         let mut app = make_input_app();
         {
-            let mut input = app.world_mut().get_resource_mut::<ButtonInput<KeyCode>>().unwrap();
+            let mut input = app
+                .world_mut()
+                .get_resource_mut::<ButtonInput<KeyCode>>()
+                .unwrap();
             input.press(KeyCode::KeyQ);
         }
         app.update();
         let io = app.world().get_resource::<PhysicsIO>().unwrap();
-        assert!((io.torque - 1.0).abs() < 0.01, "Q -> torque=1.0, got {}", io.torque);
+        assert!(
+            (io.torque - 1.0).abs() < 0.01,
+            "Q -> torque=1.0, got {}",
+            io.torque
+        );
     }
 
     #[test]
     fn test_e_sets_negative_torque() {
         let mut app = make_input_app();
         {
-            let mut input = app.world_mut().get_resource_mut::<ButtonInput<KeyCode>>().unwrap();
+            let mut input = app
+                .world_mut()
+                .get_resource_mut::<ButtonInput<KeyCode>>()
+                .unwrap();
             input.press(KeyCode::KeyE);
         }
         app.update();
         let io = app.world().get_resource::<PhysicsIO>().unwrap();
-        assert!((io.torque - (-1.0)).abs() < 0.01, "E -> torque=-1.0, got {}", io.torque);
+        assert!(
+            (io.torque - (-1.0)).abs() < 0.01,
+            "E -> torque=-1.0, got {}",
+            io.torque
+        );
     }
 
     #[test]
@@ -229,16 +270,25 @@ mod tests {
             cam.yaw = 90.0;
         }
         {
-            let mut input = app.world_mut().get_resource_mut::<ButtonInput<KeyCode>>().unwrap();
+            let mut input = app
+                .world_mut()
+                .get_resource_mut::<ButtonInput<KeyCode>>()
+                .unwrap();
             input.press(KeyCode::KeyW);
         }
         app.update();
         let io = app.world().get_resource::<PhysicsIO>().unwrap();
         // R17-F220: yaw=90, cos≈0, sin≈1, W=raw_y=1.0 -> x_force = -1.0
-        assert!((io.x_force - (-1.0)).abs() < 0.01,
-            "yaw=90, W -> x_force=-1.0, got {}", io.x_force);
-        assert!(io.y_force.abs() < 0.01,
-            "yaw=90, W -> y_force≈0, got {}", io.y_force);
+        assert!(
+            (io.x_force - (-1.0)).abs() < 0.01,
+            "yaw=90, W -> x_force=-1.0, got {}",
+            io.x_force
+        );
+        assert!(
+            io.y_force.abs() < 0.01,
+            "yaw=90, W -> y_force≈0, got {}",
+            io.y_force
+        );
     }
 
     #[test]
@@ -247,20 +297,30 @@ mod tests {
         // Spawn character with shield
         app.world_mut().spawn((
             Character,
-            SpriteReq { shield: Shield::RegularShield, ..Default::default() },
+            SpriteReq {
+                shield: Shield::RegularShield,
+                ..Default::default()
+            },
             ActionState::None,
             AnimationState::default(),
             Transform::default(),
         ));
         {
-            let mut input = app.world_mut().get_resource_mut::<ButtonInput<KeyCode>>().unwrap();
+            let mut input = app
+                .world_mut()
+                .get_resource_mut::<ButtonInput<KeyCode>>()
+                .unwrap();
             input.press(KeyCode::KeyF);
         }
         app.update();
         // Check ActionState changed to Block
         let mut query = app.world_mut().query::<&ActionState>();
         let action = *query.single(app.world()).expect("player entity");
-        assert_eq!(action, ActionState::Block, "F with shield should transition to Block");
+        assert_eq!(
+            action,
+            ActionState::Block,
+            "F with shield should transition to Block"
+        );
     }
 
     #[test]
@@ -276,13 +336,20 @@ mod tests {
             Transform::default(),
         ));
         {
-            let mut input = app.world_mut().get_resource_mut::<ButtonInput<KeyCode>>().unwrap();
+            let mut input = app
+                .world_mut()
+                .get_resource_mut::<ButtonInput<KeyCode>>()
+                .unwrap();
             input.press(KeyCode::KeyF);
         }
         app.update();
         let mut query = app.world_mut().query::<&ActionState>();
         let action = *query.single(app.world()).expect("player entity");
-        assert_eq!(action, ActionState::None, "F without shield should stay None");
+        assert_eq!(
+            action,
+            ActionState::None,
+            "F without shield should stay None"
+        );
     }
 
     #[test]
@@ -290,17 +357,27 @@ mod tests {
         let mut app = make_input_app();
         // First frame: press W
         {
-            let mut input = app.world_mut().get_resource_mut::<ButtonInput<KeyCode>>().unwrap();
+            let mut input = app
+                .world_mut()
+                .get_resource_mut::<ButtonInput<KeyCode>>()
+                .unwrap();
             input.press(KeyCode::KeyW);
         }
         app.update();
         // Second frame: release W (clear_just_pressed)
         {
-            let mut input = app.world_mut().get_resource_mut::<ButtonInput<KeyCode>>().unwrap();
+            let mut input = app
+                .world_mut()
+                .get_resource_mut::<ButtonInput<KeyCode>>()
+                .unwrap();
             input.release(KeyCode::KeyW);
         }
         app.update();
         let io = app.world().get_resource::<PhysicsIO>().unwrap();
-        assert!(io.y_force.abs() < 0.01, "Forces should reset when W released, got {}", io.y_force);
+        assert!(
+            io.y_force.abs() < 0.01,
+            "Forces should reset when W released, got {}",
+            io.y_force
+        );
     }
 }

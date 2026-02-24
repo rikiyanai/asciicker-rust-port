@@ -184,8 +184,8 @@ pub fn render_patch(
 
                             // 3. Base screen position WITHOUT translation
                             let fx = (camera.mul[0] * wx + camera.mul[2] * wy) as f32;
-                            let fy = (camera.mul[1] * wx + camera.mul[3] * wy
-                                + camera.mul[5] * wz) as f32;
+                            let fy = (camera.mul[1] * wx + camera.mul[3] * wy + camera.mul[5] * wz)
+                                as f32;
 
                             // 4. Scale by 1/dist
                             let fx = fx * recp_dist;
@@ -205,10 +205,18 @@ pub fn render_patch(
                             let iz = wz.floor() as i32;
 
                             let mut cull = 0i32;
-                            if ix < 0 { cull |= 1; }
-                            if ix > buf_w { cull |= 2; }
-                            if iy < 0 { cull |= 4; }
-                            if iy > buf_h { cull |= 8; }
+                            if ix < 0 {
+                                cull |= 1;
+                            }
+                            if ix > buf_w {
+                                cull |= 2;
+                            }
+                            if iy < 0 {
+                                cull |= 4;
+                            }
+                            if iy > buf_h {
+                                cull |= 8;
+                            }
 
                             [ix, iy, iz, cull]
                         } else {
@@ -217,13 +225,21 @@ pub fn render_patch(
                     };
 
                     let sv00 = interp(fu0, fv0, &mut behind_camera);
-                    if behind_camera { continue; }
+                    if behind_camera {
+                        continue;
+                    }
                     let sv10 = interp(fu1, fv0, &mut behind_camera);
-                    if behind_camera { continue; }
+                    if behind_camera {
+                        continue;
+                    }
                     let sv01 = interp(fu0, fv1, &mut behind_camera);
-                    if behind_camera { continue; }
+                    if behind_camera {
+                        continue;
+                    }
                     let sv11 = interp(fu1, fv1, &mut behind_camera);
-                    if behind_camera { continue; }
+                    if behind_camera {
+                        continue;
+                    }
 
                     // Check diag bit to determine triangle split direction
                     let quad_idx = hx + hy * HEIGHT_CELLS;
@@ -231,40 +247,12 @@ pub fn render_patch(
 
                     if diag_bit {
                         // Split: (00, 10, 11) and (00, 11, 01)
-                        rasterize(
-                            buf,
-                            buf_w,
-                            buf_h,
-                            &shader,
-                            [&sv00, &sv10, &sv11],
-                            false,
-                        );
-                        rasterize(
-                            buf,
-                            buf_w,
-                            buf_h,
-                            &shader,
-                            [&sv00, &sv11, &sv01],
-                            false,
-                        );
+                        rasterize(buf, buf_w, buf_h, &shader, [&sv00, &sv10, &sv11], false);
+                        rasterize(buf, buf_w, buf_h, &shader, [&sv00, &sv11, &sv01], false);
                     } else {
                         // Split: (00, 10, 01) and (10, 11, 01)
-                        rasterize(
-                            buf,
-                            buf_w,
-                            buf_h,
-                            &shader,
-                            [&sv00, &sv10, &sv01],
-                            false,
-                        );
-                        rasterize(
-                            buf,
-                            buf_w,
-                            buf_h,
-                            &shader,
-                            [&sv10, &sv11, &sv01],
-                            false,
-                        );
+                        rasterize(buf, buf_w, buf_h, &shader, [&sv00, &sv10, &sv01], false);
+                        rasterize(buf, buf_w, buf_h, &shader, [&sv10, &sv11, &sv01], false);
                     }
                 }
             }
@@ -329,10 +317,7 @@ mod tests {
 
         assert_eq!(sample.visual, 42, "Should write material index");
         assert_eq!(sample.diffuse, 200, "Should write diffuse");
-        assert_eq!(
-            sample.spare, 0,
-            "Terrain must have spare=0 (no MESH_FLAG)"
-        );
+        assert_eq!(sample.spare, 0, "Terrain must have spare=0 (no MESH_FLAG)");
         assert_eq!(sample.height, 100.0, "Should write depth");
     }
 
@@ -549,13 +534,21 @@ mod tests {
         let sv01 = transform_vertex([base_x, base_y + 4.0, 100.0], &camera.view_tm);
         eprintln!(
             "TEST: base=({},{}) sv00=({},{},{}) sv10=({},{},{}) sv01=({},{},{})",
-            base_x, base_y,
-            sv00[0], sv00[1], sv00[2],
-            sv10[0], sv10[1], sv10[2],
-            sv01[0], sv01[1], sv01[2],
+            base_x,
+            base_y,
+            sv00[0],
+            sv00[1],
+            sv00[2],
+            sv10[0],
+            sv10[1],
+            sv10[2],
+            sv01[0],
+            sv01[1],
+            sv01[2],
         );
-        let area = 2 * ((sv10[0] - sv00[0]) * (sv01[1] - sv00[1])
-            - (sv10[1] - sv00[1]) * (sv01[0] - sv00[0]));
+        let area = 2
+            * ((sv10[0] - sv00[0]) * (sv01[1] - sv00[1])
+                - (sv10[1] - sv00[1]) * (sv01[0] - sv00[0]));
         eprintln!("TEST: triangle area={}, non_clear={}", area, non_clear);
 
         assert!(

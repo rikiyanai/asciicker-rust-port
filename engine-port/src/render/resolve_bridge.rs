@@ -111,12 +111,7 @@ pub trait GlyphSelector {
 pub struct AutoMatGlyphSelector;
 
 impl GlyphSelector for AutoMatGlyphSelector {
-    fn select_glyph(
-        &mut self,
-        _buf: &SampleBuffer,
-        _cx: usize,
-        _cy: usize,
-    ) -> Option<u8> {
+    fn select_glyph(&mut self, _buf: &SampleBuffer, _cx: usize, _cy: usize) -> Option<u8> {
         None
     }
 }
@@ -182,11 +177,7 @@ pub fn resolve_to_grid<G: GlyphSelector>(
             let cell = &resolve_buf[i];
 
             // Check glyph selector for override
-            let gl = match glyph_selector.select_glyph(
-                sample_buffer,
-                cx as usize,
-                cy as usize,
-            ) {
+            let gl = match glyph_selector.select_glyph(sample_buffer, cx as usize, cy as usize) {
                 Some(glyph) => glyph,
                 None => cell.gl,
             };
@@ -246,7 +237,11 @@ mod tests {
             for gi in 0..6u8 {
                 for bi in 0..6u8 {
                     let idx = 16 + 36 * ri as usize + 6 * gi as usize + bi as usize;
-                    let expected = [levels[ri as usize], levels[gi as usize], levels[bi as usize]];
+                    let expected = [
+                        levels[ri as usize],
+                        levels[gi as usize],
+                        levels[bi as usize],
+                    ];
                     assert_eq!(
                         XTERM_256_PALETTE[idx], expected,
                         "Palette mismatch at index {} (r={}, g={}, b={})",
@@ -352,7 +347,10 @@ mod tests {
         let mut selector = AutoMatGlyphSelector;
         let buf = SampleBuffer::new(4, 4);
         let result = selector.select_glyph(&buf, 0, 0);
-        assert_eq!(result, None, "AutoMatGlyphSelector should always return None");
+        assert_eq!(
+            result, None,
+            "AutoMatGlyphSelector should always return None"
+        );
     }
 
     #[test]
@@ -360,12 +358,7 @@ mod tests {
         // Custom GlyphSelector that returns a specific glyph
         struct TestGlyphSelector;
         impl GlyphSelector for TestGlyphSelector {
-            fn select_glyph(
-                &mut self,
-                _buf: &SampleBuffer,
-                _cx: usize,
-                _cy: usize,
-            ) -> Option<u8> {
+            fn select_glyph(&mut self, _buf: &SampleBuffer, _cx: usize, _cy: usize) -> Option<u8> {
                 Some(b'X')
             }
         }
@@ -397,8 +390,7 @@ mod tests {
         // Cell (1, 1) should have the overridden glyph 'X'
         let idx = 1 * 4 + 1;
         assert_eq!(
-            grid.char_indices[idx],
-            b'X' as u16,
+            grid.char_indices[idx], b'X' as u16,
             "GlyphSelector override should set glyph to 'X'"
         );
 

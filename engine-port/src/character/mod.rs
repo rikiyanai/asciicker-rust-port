@@ -78,16 +78,14 @@ fn advance_animation_system(
 
 /// The ONLY function that creates character entities via Commands.
 /// All character spawning (player, NPC) MUST use this.
-pub fn spawn_character(
-    commands: &mut Commands,
-    position: Vec3,
-    equipment: SpriteReq,
-) -> Entity {
-    commands.spawn((
-        Character,
-        equipment,
-        Transform::from_xyz(position.x, position.y, position.z),
-    )).id()
+pub fn spawn_character(commands: &mut Commands, position: Vec3, equipment: SpriteReq) -> Entity {
+    commands
+        .spawn((
+            Character,
+            equipment,
+            Transform::from_xyz(position.x, position.y, position.z),
+        ))
+        .id()
 }
 
 /// Startup system: spawn the player character.
@@ -108,7 +106,11 @@ fn spawn_player(
     // MUST set PhysicsIO.pos to spawn coords (physics starts at [0,0,0] otherwise)
     physics_io.pos = [spawn_x, spawn_y, spawn_z];
 
-    let _entity = spawn_character(&mut commands, Vec3::new(spawn_x, spawn_y, spawn_z), SpriteReq::default());
+    let _entity = spawn_character(
+        &mut commands,
+        Vec3::new(spawn_x, spawn_y, spawn_z),
+        SpriteReq::default(),
+    );
     // Entity ID used in Phase 7 for player-specific tagging (Replication component)
 }
 
@@ -133,7 +135,11 @@ impl Plugin for CharacterPlugin {
         // PostUpdate (after physics, before render)
         app.add_systems(
             PostUpdate,
-            (update_character_state, advance_animation_system, query_character_sprites)
+            (
+                update_character_state,
+                advance_animation_system,
+                query_character_sprites,
+            )
                 .chain(),
         );
         app.add_systems(
@@ -162,9 +168,21 @@ mod tests {
         app.update();
 
         let world = app.world();
-        assert!(world.get::<ActionState>(entity).is_some(), "ActionState should be auto-inserted");
-        assert!(world.get::<SpriteReq>(entity).is_some(), "SpriteReq should be auto-inserted");
-        assert!(world.get::<AnimationState>(entity).is_some(), "AnimationState should be auto-inserted");
-        assert!(world.get::<Transform>(entity).is_some(), "Transform should be auto-inserted");
+        assert!(
+            world.get::<ActionState>(entity).is_some(),
+            "ActionState should be auto-inserted"
+        );
+        assert!(
+            world.get::<SpriteReq>(entity).is_some(),
+            "SpriteReq should be auto-inserted"
+        );
+        assert!(
+            world.get::<AnimationState>(entity).is_some(),
+            "AnimationState should be auto-inserted"
+        );
+        assert!(
+            world.get::<Transform>(entity).is_some(),
+            "Transform should be auto-inserted"
+        );
     }
 }

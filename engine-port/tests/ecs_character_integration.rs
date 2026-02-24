@@ -5,8 +5,8 @@
 
 use bevy::prelude::*;
 
-use asciicker_engine::character::{ActionState, AnimationState, Character, SpriteReq};
 use asciicker_engine::character::equipment::Shield;
+use asciicker_engine::character::{ActionState, AnimationState, Character, SpriteReq};
 use asciicker_engine::physics::PhysicsIO;
 use asciicker_engine::render::camera::GameCamera;
 use asciicker_engine::render::sprite_blit::SpriteQueue;
@@ -25,9 +25,7 @@ fn make_character_test_app() -> App {
     // it calls spawn_player which requires RuntimeTerrain)
     app.add_systems(
         PreUpdate,
-        (
-            asciicker_engine::character::input::accumulate_player_input,
-        ),
+        (asciicker_engine::character::input::accumulate_player_input,),
     );
     app.add_systems(
         PostUpdate,
@@ -108,7 +106,10 @@ fn test_input_system_modifies_physics_io() {
     // Spawn character for block input query
     app.world_mut().spawn((
         Character,
-        SpriteReq { shield: Shield::RegularShield, ..Default::default() },
+        SpriteReq {
+            shield: Shield::RegularShield,
+            ..Default::default()
+        },
         AnimationState::default(),
         ActionState::None,
         Transform::default(),
@@ -120,7 +121,10 @@ fn test_input_system_modifies_physics_io() {
         cam.yaw = 0.0;
     }
     {
-        let mut input = app.world_mut().get_resource_mut::<ButtonInput<KeyCode>>().unwrap();
+        let mut input = app
+            .world_mut()
+            .get_resource_mut::<ButtonInput<KeyCode>>()
+            .unwrap();
         input.press(KeyCode::KeyW);
     }
 

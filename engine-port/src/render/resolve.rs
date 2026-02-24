@@ -75,10 +75,8 @@ pub fn resolve(
             let (_avg_height, _height_count) = average_height(s00, s10, s01, s11);
 
             // Sum of all 4 diffuse values (C++ render.cpp:3449 keeps individual dif[4])
-            let diffuse_sum = s00.diffuse as u32
-                + s10.diffuse as u32
-                + s01.diffuse as u32
-                + s11.diffuse as u32;
+            let diffuse_sum =
+                s00.diffuse as u32 + s10.diffuse as u32 + s01.diffuse as u32 + s11.diffuse as u32;
 
             // Combined spare flags (OR of all 4)
             let combined_spare = s00.spare | s10.spare | s01.spare | s11.spare;
@@ -121,7 +119,6 @@ pub fn resolve(
             };
         }
     }
-
 }
 
 /// Check if a sample is at clear height (sky).
@@ -148,7 +145,6 @@ fn average_height(s00: &Sample, s10: &Sample, s01: &Sample, s11: &Sample) -> (f3
         (Sample::CLEAR_HEIGHT, 0)
     }
 }
-
 
 /// Get the dominant sample (first non-clear, or fallback to s00).
 #[inline]
@@ -281,11 +277,7 @@ fn compute_elevation(samples: &[Sample], dw: i32, sx: i32, sy: i32) -> u8 {
     // When no bit-15 flags exist (e_lo=0, e_hi=0), both are <=1 → elevation=3.
     // This IS correct C++ behavior — material shade[3] is the "low flat" entry.
     if e_lo <= 1 {
-        if e_hi <= 1 {
-            3
-        } else {
-            2
-        }
+        if e_hi <= 1 { 3 } else { 2 }
     } else if e_hi <= 1 {
         0
     } else {

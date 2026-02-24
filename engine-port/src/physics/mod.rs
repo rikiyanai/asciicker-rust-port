@@ -15,7 +15,7 @@ pub mod soup;
 use crate::asset_loader::constants::{HEIGHT_CELLS, HEIGHT_SCALE, VISUAL_CELLS};
 use crate::terrain::RuntimeTerrain;
 use crate::world::RuntimeWorld;
-use collision::{check_collision, CollisionResult};
+use collision::{CollisionResult, check_collision};
 use constants::*;
 use geometry::{collect_terrain_triangles, collect_world_triangles};
 use soup::SoupItem;
@@ -122,11 +122,9 @@ impl Plugin for PhysicsPlugin {
         // Formula-derived defaults (Human character)
         let height_cells: f32 = 7.0;
         let radius_cells: f32 = 2.0;
-        let world_height = height_cells * 2.0 / 3.0
-            / (30.0_f32.to_radians().cos())
-            * HEIGHT_SCALE as f32;
-        let world_radius =
-            radius_cells / (3.0 * HEIGHT_CELLS as f32) * VISUAL_CELLS as f32;
+        let world_height =
+            height_cells * 2.0 / 3.0 / (30.0_f32.to_radians().cos()) * HEIGHT_SCALE as f32;
+        let world_radius = radius_cells / (3.0 * HEIGHT_CELLS as f32) * VISUAL_CELLS as f32;
 
         app.insert_resource(PhysicsIO {
             world_radius,
@@ -259,9 +257,14 @@ fn collision_sweep_system(
                 earliest_nrm[1] * mul_xy,
                 earliest_nrm[2] * mul_z,
             ];
-            let nrm_len = (slide_nrm[0].powi(2) + slide_nrm[1].powi(2) + slide_nrm[2].powi(2)).sqrt();
+            let nrm_len =
+                (slide_nrm[0].powi(2) + slide_nrm[1].powi(2) + slide_nrm[2].powi(2)).sqrt();
             let slide_normal = if nrm_len > 1e-9 {
-                [slide_nrm[0] / nrm_len, slide_nrm[1] / nrm_len, slide_nrm[2] / nrm_len]
+                [
+                    slide_nrm[0] / nrm_len,
+                    slide_nrm[1] / nrm_len,
+                    slide_nrm[2] / nrm_len,
+                ]
             } else {
                 [0.0, 0.0, 1.0]
             };

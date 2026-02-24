@@ -8,10 +8,10 @@ use bevy::prelude::warn;
 
 use crate::asset_loader::constants::{HEIGHT_CELLS, HEIGHT_SCALE, VISUAL_CELLS};
 use crate::terrain::RuntimeTerrain;
-use crate::world::instance::RuntimeInstance;
 use crate::world::RuntimeWorld;
+use crate::world::instance::RuntimeInstance;
 
-use super::soup::{to_sphere_space, SoupItem};
+use super::soup::{SoupItem, to_sphere_space};
 
 /// Compute triangle normal from three vertices. Returns `[nx, ny, nz, w]`
 /// where the plane equation is `nx*x + ny*y + nz*z + w = 0`.
@@ -263,10 +263,7 @@ mod tests {
     #[test]
     fn test_collect_terrain_triangles_multiple_patches() {
         let terrain_data = A3dTerrain {
-            patches: vec![
-                make_flat_patch(0, 0, 160),
-                make_flat_patch(1, 0, 160),
-            ],
+            patches: vec![make_flat_patch(0, 0, 160), make_flat_patch(1, 0, 160)],
         };
         let terrain = RuntimeTerrain::build_from_parsed(&terrain_data);
 

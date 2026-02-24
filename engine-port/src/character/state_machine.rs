@@ -45,8 +45,14 @@ impl ActionState {
     pub fn can_transition_to(&self, target: ActionState) -> bool {
         match target {
             ActionState::None => true,
-            ActionState::Attack => !matches!(self, ActionState::Fall | ActionState::Stand | ActionState::Dead | ActionState::Block),
-            ActionState::Block => !matches!(self, ActionState::Fall | ActionState::Stand | ActionState::Dead | ActionState::Attack),
+            ActionState::Attack => !matches!(
+                self,
+                ActionState::Fall | ActionState::Stand | ActionState::Dead | ActionState::Block
+            ),
+            ActionState::Block => !matches!(
+                self,
+                ActionState::Fall | ActionState::Stand | ActionState::Dead | ActionState::Attack
+            ),
             ActionState::Fall => !matches!(self, ActionState::Dead),
             ActionState::Stand => matches!(self, ActionState::Fall | ActionState::Dead),
             ActionState::Dead => true,
@@ -110,8 +116,19 @@ mod tests {
 
     #[test]
     fn test_none_always_allowed() {
-        for state in [ActionState::None, ActionState::Attack, ActionState::Block, ActionState::Fall, ActionState::Stand, ActionState::Dead] {
-            assert!(state.can_transition_to(ActionState::None), "Should always transition to None from {:?}", state);
+        for state in [
+            ActionState::None,
+            ActionState::Attack,
+            ActionState::Block,
+            ActionState::Fall,
+            ActionState::Stand,
+            ActionState::Dead,
+        ] {
+            assert!(
+                state.can_transition_to(ActionState::None),
+                "Should always transition to None from {:?}",
+                state
+            );
         }
     }
 
@@ -170,8 +187,19 @@ mod tests {
 
     #[test]
     fn test_dead_from_any_state() {
-        for state in [ActionState::None, ActionState::Attack, ActionState::Block, ActionState::Fall, ActionState::Stand, ActionState::Dead] {
-            assert!(state.can_transition_to(ActionState::Dead), "Should transition to Dead from {:?}", state);
+        for state in [
+            ActionState::None,
+            ActionState::Attack,
+            ActionState::Block,
+            ActionState::Fall,
+            ActionState::Stand,
+            ActionState::Dead,
+        ] {
+            assert!(
+                state.can_transition_to(ActionState::Dead),
+                "Should transition to Dead from {:?}",
+                state
+            );
         }
     }
 
@@ -192,7 +220,10 @@ mod tests {
     #[test]
     fn test_attack_auto_transitions_to_none() {
         let mut state = ActionState::Attack;
-        let anim = AnimationState { frame_index: 8, elapsed_frames: 8 };
+        let anim = AnimationState {
+            frame_index: 8,
+            elapsed_frames: 8,
+        };
         assert!(state.check_animation_complete(&anim));
         assert_eq!(state, ActionState::None);
     }
@@ -200,7 +231,10 @@ mod tests {
     #[test]
     fn test_stand_auto_transitions_to_none() {
         let mut state = ActionState::Stand;
-        let anim = AnimationState { frame_index: 5, elapsed_frames: 5 };
+        let anim = AnimationState {
+            frame_index: 5,
+            elapsed_frames: 5,
+        };
         assert!(state.check_animation_complete(&anim));
         assert_eq!(state, ActionState::None);
     }
@@ -208,7 +242,10 @@ mod tests {
     #[test]
     fn test_fall_no_auto_transition() {
         let mut state = ActionState::Fall;
-        let anim = AnimationState { frame_index: 100, elapsed_frames: 100 };
+        let anim = AnimationState {
+            frame_index: 100,
+            elapsed_frames: 100,
+        };
         assert!(!state.check_animation_complete(&anim));
         assert_eq!(state, ActionState::Fall);
     }

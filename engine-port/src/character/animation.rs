@@ -71,7 +71,8 @@ impl AnimationState {
                     self.elapsed_frames = 0;
                 } else {
                     // Walk: frame from player_stp
-                    self.frame_index = (((player_stp + STEP_OFFSET) & STEP_MASK) / STEP_DIVISOR) as u32;
+                    self.frame_index =
+                        (((player_stp + STEP_OFFSET) & STEP_MASK) / STEP_DIVISOR) as u32;
                     self.elapsed_frames = 0; // reset for any subsequent action
                 }
             }
@@ -184,26 +185,38 @@ mod tests {
 
     #[test]
     fn test_dead_frozen() {
-        let mut anim = AnimationState { frame_index: 3, elapsed_frames: 3 };
+        let mut anim = AnimationState {
+            frame_index: 3,
+            elapsed_frames: 3,
+        };
         anim.advance(ActionState::Dead, -1, 1_000_000);
         assert_eq!(anim.frame_index, 3, "Dead should freeze at last frame");
     }
 
     #[test]
     fn test_is_attack_complete() {
-        let anim = AnimationState { frame_index: 8, elapsed_frames: 8 };
+        let anim = AnimationState {
+            frame_index: 8,
+            elapsed_frames: 8,
+        };
         assert!(anim.is_attack_complete());
     }
 
     #[test]
     fn test_is_stand_complete() {
-        let anim = AnimationState { frame_index: 5, elapsed_frames: 5 };
+        let anim = AnimationState {
+            frame_index: 5,
+            elapsed_frames: 5,
+        };
         assert!(anim.is_stand_complete());
     }
 
     #[test]
     fn test_reset() {
-        let mut anim = AnimationState { frame_index: 5, elapsed_frames: 10 };
+        let mut anim = AnimationState {
+            frame_index: 5,
+            elapsed_frames: 10,
+        };
         anim.reset();
         assert_eq!(anim.frame_index, 0);
         assert_eq!(anim.elapsed_frames, 0);

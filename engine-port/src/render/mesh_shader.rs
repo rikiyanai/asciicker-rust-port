@@ -80,9 +80,7 @@ fn compute_face_diffuse(
 
     // Lambertian n·l (C++ render.cpp:1134)
     let mut df = inv_len
-        * (inx * light_dir[0] as f64
-            + iny * light_dir[1] as f64
-            + inz * light_dir[2] as f64);
+        * (inx * light_dir[0] as f64 + iny * light_dir[1] as f64 + inz * light_dir[2] as f64);
 
     // Ambient blend (C++ render.cpp:1138)
     let amb = light_ambient as f64;
@@ -182,7 +180,11 @@ pub fn render_mesh(
         let avg_g = ((vert0.g as u16 + vert1.g as u16 + vert2.g as u16) / 3) as u8;
         let avg_b = ((vert0.b as u16 + vert1.b as u16 + vert2.b as u16) / 3) as u8;
 
-        let rgb555 = pack_rgb555(rgb8_to_rgb5(avg_r), rgb8_to_rgb5(avg_g), rgb8_to_rgb5(avg_b));
+        let rgb555 = pack_rgb555(
+            rgb8_to_rgb5(avg_r),
+            rgb8_to_rgb5(avg_g),
+            rgb8_to_rgb5(avg_b),
+        );
 
         // Face normal lighting (C++ render.cpp:1115-1146).
         let diffuse = compute_face_diffuse(

@@ -61,11 +61,7 @@ pub fn check_collision(
     vel: &[f32; 3],
 ) -> CollisionResult {
     // Point on sphere surface closest to plane at t=0
-    let col = [
-        pos[0] - nrm[0],
-        pos[1] - nrm[1],
-        pos[2] - nrm[2],
-    ];
+    let col = [pos[0] - nrm[0], pos[1] - nrm[1], pos[2] - nrm[2]];
 
     let vel_dot_nrm = -(vel[0] * nrm[0] + vel[1] * nrm[1] + vel[2] * nrm[2]);
 
@@ -102,15 +98,39 @@ pub fn check_collision(
 
     // Barycentric containment test
     let edge = [
-        [tri[1][0] - tri[0][0], tri[1][1] - tri[0][1], tri[1][2] - tri[0][2]],
-        [tri[2][0] - tri[1][0], tri[2][1] - tri[1][1], tri[2][2] - tri[1][2]],
-        [tri[0][0] - tri[2][0], tri[0][1] - tri[2][1], tri[0][2] - tri[2][2]],
+        [
+            tri[1][0] - tri[0][0],
+            tri[1][1] - tri[0][1],
+            tri[1][2] - tri[0][2],
+        ],
+        [
+            tri[2][0] - tri[1][0],
+            tri[2][1] - tri[1][1],
+            tri[2][2] - tri[1][2],
+        ],
+        [
+            tri[0][0] - tri[2][0],
+            tri[0][1] - tri[2][1],
+            tri[0][2] - tri[2][2],
+        ],
     ];
 
     let vect = [
-        [contact[0] - tri[0][0], contact[1] - tri[0][1], contact[2] - tri[0][2]],
-        [contact[0] - tri[1][0], contact[1] - tri[1][1], contact[2] - tri[1][2]],
-        [contact[0] - tri[2][0], contact[1] - tri[2][1], contact[2] - tri[2][2]],
+        [
+            contact[0] - tri[0][0],
+            contact[1] - tri[0][1],
+            contact[2] - tri[0][2],
+        ],
+        [
+            contact[0] - tri[1][0],
+            contact[1] - tri[1][1],
+            contact[2] - tri[1][2],
+        ],
+        [
+            contact[0] - tri[2][0],
+            contact[1] - tri[2][1],
+            contact[2] - tri[2][2],
+        ],
     ];
 
     let c0 = cross3(&edge[0], &vect[0]);
@@ -127,7 +147,10 @@ pub fn check_collision(
         if plane_t > 1.0 {
             return CollisionResult::Miss;
         }
-        return CollisionResult::Hit { toi: plane_t, contact };
+        return CollisionResult::Hit {
+            toi: plane_t,
+            contact,
+        };
     }
 
     // Face test failed: try vertex then edge (R19-M01: vertex before edge)
@@ -138,11 +161,7 @@ pub fn check_collision(
     let a_coeff = dot3(vel, vel);
     if a_coeff > 0.0 {
         for vertex in tri {
-            let p_ps = [
-                pos[0] - vertex[0],
-                pos[1] - vertex[1],
-                pos[2] - vertex[2],
-            ];
+            let p_ps = [pos[0] - vertex[0], pos[1] - vertex[1], pos[2] - vertex[2]];
 
             let b_coeff = 2.0 * dot3(&p_ps, vel);
             let c_coeff = dot3(&p_ps, &p_ps) - 1.0;
@@ -165,11 +184,7 @@ pub fn check_collision(
             continue; // Degenerate edge
         }
 
-        let p_pc = [
-            pos[0] - tri[c][0],
-            pos[1] - tri[c][1],
-            pos[2] - tri[c][2],
-        ];
+        let p_pc = [pos[0] - tri[c][0], pos[1] - tri[c][1], pos[2] - tri[c][2]];
 
         let vc_dot_p_pc = dot3(&edge[c], &p_pc);
 
@@ -216,7 +231,10 @@ pub fn check_collision(
     }
 
     if best_t <= 1.0 {
-        CollisionResult::Hit { toi: best_t, contact: best_contact }
+        CollisionResult::Hit {
+            toi: best_t,
+            contact: best_contact,
+        }
     } else {
         CollisionResult::Miss
     }
@@ -228,11 +246,7 @@ mod tests {
 
     /// Helper: flat triangle on z=0 plane, facing up (+Z).
     fn flat_triangle() -> ([[f32; 3]; 3], [f32; 4]) {
-        let tri = [
-            [0.0, 0.0, 0.0],
-            [10.0, 0.0, 0.0],
-            [0.0, 10.0, 0.0],
-        ];
+        let tri = [[0.0, 0.0, 0.0], [10.0, 0.0, 0.0], [0.0, 10.0, 0.0]];
         let nrm = [0.0, 0.0, 1.0, 0.0]; // z=0 plane, normal = +Z
         (tri, nrm)
     }
@@ -260,7 +274,10 @@ mod tests {
         // Moving away from plane (upward from above)
         let pos = [3.0, 3.0, 2.0];
         let vel = [0.0, 0.0, 4.0]; // moving UP
-        assert!(matches!(check_collision(&tri, &nrm, &pos, &vel), CollisionResult::Miss));
+        assert!(matches!(
+            check_collision(&tri, &nrm, &pos, &vel),
+            CollisionResult::Miss
+        ));
     }
 
     #[test]
@@ -269,7 +286,10 @@ mod tests {
         // Moving parallel to plane (horizontal)
         let pos = [3.0, 3.0, 2.0];
         let vel = [1.0, 0.0, 0.0];
-        assert!(matches!(check_collision(&tri, &nrm, &pos, &vel), CollisionResult::Miss));
+        assert!(matches!(
+            check_collision(&tri, &nrm, &pos, &vel),
+            CollisionResult::Miss
+        ));
     }
 
     #[test]
@@ -282,8 +302,12 @@ mod tests {
             CollisionResult::Hit { toi, contact } => {
                 assert!(toi >= 0.0 && toi <= 1.0, "toi={toi} out of range");
                 // Contact should be at or near vertex (0,0,0)
-                let dist_to_v0 = (contact[0].powi(2) + contact[1].powi(2) + contact[2].powi(2)).sqrt();
-                assert!(dist_to_v0 < 1.0, "contact should be near vertex 0, dist={dist_to_v0}");
+                let dist_to_v0 =
+                    (contact[0].powi(2) + contact[1].powi(2) + contact[2].powi(2)).sqrt();
+                assert!(
+                    dist_to_v0 < 1.0,
+                    "contact should be near vertex 0, dist={dist_to_v0}"
+                );
             }
             CollisionResult::Miss => {
                 // Vertex/edge might not trigger depending on approach angle.
@@ -296,11 +320,7 @@ mod tests {
     #[test]
     fn test_edge_hit() {
         // Triangle in XZ plane, sphere moving toward edge from outside
-        let tri = [
-            [0.0, 0.0, 0.0],
-            [10.0, 0.0, 0.0],
-            [5.0, 0.0, 10.0],
-        ];
+        let tri = [[0.0, 0.0, 0.0], [10.0, 0.0, 0.0], [5.0, 0.0, 10.0]];
         // Normal pointing in +Y
         let nrm = [0.0, 1.0, 0.0, 0.0];
         // Sphere at y=2, moving toward edge (bottom edge y=0)
@@ -311,7 +331,11 @@ mod tests {
         match check_collision(&tri, &nrm, &pos, &vel) {
             CollisionResult::Hit { toi, contact } => {
                 assert!(toi >= 0.0 && toi <= 1.0, "toi={toi}");
-                assert!(contact[1].abs() < 0.1, "contact y near 0, got {}", contact[1]);
+                assert!(
+                    contact[1].abs() < 0.1,
+                    "contact y near 0, got {}",
+                    contact[1]
+                );
             }
             CollisionResult::Miss => {
                 // Edge hit depends on exact geometry. The test validates the
@@ -330,7 +354,10 @@ mod tests {
         let vel = [0.0, 0.0, -1.0]; // moving down
         match check_collision(&tri, &nrm, &pos, &vel) {
             CollisionResult::Hit { toi, .. } => {
-                assert!((toi - 0.0).abs() < 0.01, "embedded should have toi ~0, got {toi}");
+                assert!(
+                    (toi - 0.0).abs() < 0.01,
+                    "embedded should have toi ~0, got {toi}"
+                );
             }
             CollisionResult::Miss => panic!("Embedded case should produce Hit"),
         }
@@ -342,7 +369,10 @@ mod tests {
         // Sphere deeply embedded: center at z=-2, surface at z=-3, dist = -3 < -1
         let pos = [3.0, 3.0, -2.0];
         let vel = [0.0, 0.0, -1.0];
-        assert!(matches!(check_collision(&tri, &nrm, &pos, &vel), CollisionResult::Miss));
+        assert!(matches!(
+            check_collision(&tri, &nrm, &pos, &vel),
+            CollisionResult::Miss
+        ));
     }
 
     #[test]
@@ -351,7 +381,10 @@ mod tests {
         // Sphere too far away: plane_t > 1
         let pos = [3.0, 3.0, 100.0];
         let vel = [0.0, 0.0, -1.0]; // Only moves 1 unit, needs ~99
-        assert!(matches!(check_collision(&tri, &nrm, &pos, &vel), CollisionResult::Miss));
+        assert!(matches!(
+            check_collision(&tri, &nrm, &pos, &vel),
+            CollisionResult::Miss
+        ));
     }
 
     #[test]
@@ -360,7 +393,10 @@ mod tests {
         let miss = CollisionResult::Miss;
         assert!(matches!(miss, CollisionResult::Miss));
 
-        let hit = CollisionResult::Hit { toi: 0.5, contact: [1.0, 2.0, 3.0] };
+        let hit = CollisionResult::Hit {
+            toi: 0.5,
+            contact: [1.0, 2.0, 3.0],
+        };
         if let CollisionResult::Hit { toi, contact } = hit {
             assert!((toi - 0.5).abs() < 1e-6);
             assert_eq!(contact, [1.0, 2.0, 3.0]);
@@ -370,11 +406,7 @@ mod tests {
     #[test]
     fn test_sphere_space_scaling_affects_collision() {
         // A larger triangle in sphere space should still produce hits
-        let tri = [
-            [0.0, 0.0, 0.0],
-            [100.0, 0.0, 0.0],
-            [0.0, 100.0, 0.0],
-        ];
+        let tri = [[0.0, 0.0, 0.0], [100.0, 0.0, 0.0], [0.0, 100.0, 0.0]];
         let nrm = [0.0, 0.0, 1.0, 0.0];
         let pos = [30.0, 30.0, 2.0];
         let vel = [0.0, 0.0, -4.0];

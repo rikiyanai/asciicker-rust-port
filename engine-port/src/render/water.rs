@@ -12,7 +12,7 @@
 use noise::{Fbm, MultiFractal, NoiseFn, Perlin}; // MultiFractal provides set_octaves()
 
 use crate::render::camera::GameCamera;
-use crate::render::sample_buffer::{spare_bits, Sample, SampleBuffer};
+use crate::render::sample_buffer::{Sample, SampleBuffer, spare_bits};
 use crate::render::types::AnsiCell;
 use crate::terrain::RuntimeTerrain;
 use crate::world::RuntimeWorld;
@@ -244,15 +244,28 @@ mod tests {
 
         // At least one cell should have shifted
         let shifted = (cell1.fg != original_fg1) || (cell2.fg != 100);
-        assert!(shifted, "Ripple should produce color shifts for at least one cell");
+        assert!(
+            shifted,
+            "Ripple should produce color shifts for at least one cell"
+        );
 
         // The two cells at different positions should get different shifts
         // (verifies noise varies spatially, not uniform)
         // Note: they COULD coincidentally get the same shift, so we test multiple positions
         let mut different_found = false;
         for x in 0..20 {
-            let mut ca = AnsiCell { fg: 100, bk: 16, gl: b'#', spare: 0xFF };
-            let mut cb = AnsiCell { fg: 100, bk: 16, gl: b'#', spare: 0xFF };
+            let mut ca = AnsiCell {
+                fg: 100,
+                bk: 16,
+                gl: b'#',
+                spare: 0xFF,
+            };
+            let mut cb = AnsiCell {
+                fg: 100,
+                bk: 16,
+                gl: b'#',
+                spare: 0xFF,
+            };
             apply_water_ripple(&fbm, &mut ca, x, 0, 1.0);
             apply_water_ripple(&fbm, &mut cb, x + 10, 5, 1.0);
             if ca.fg != cb.fg {
@@ -260,7 +273,10 @@ mod tests {
                 break;
             }
         }
-        assert!(different_found, "Different positions should produce different color shifts");
+        assert!(
+            different_found,
+            "Different positions should produce different color shifts"
+        );
     }
 
     #[test]
@@ -269,7 +285,10 @@ mod tests {
         let water_z: f64 = 5.0;
         let original_z: f64 = 3.0;
         let reflected_z = 2.0 * water_z - original_z;
-        assert!((reflected_z - 7.0).abs() < 1e-10, "Reflected Z should be 7.0, got {reflected_z}");
+        assert!(
+            (reflected_z - 7.0).abs() < 1e-10,
+            "Reflected Z should be 7.0, got {reflected_z}"
+        );
 
         // Surface point reflects to itself
         let surface_z = water_z;
@@ -341,7 +360,10 @@ mod tests {
         apply_water_ripple_pass(&samples, &mut cells, grid_w, grid_h, 1.0);
 
         // Cell (0,0) should be unchanged (no reflection flag)
-        assert_eq!(cells[0].fg, original_fgs[0], "Non-reflected cell should be unchanged");
+        assert_eq!(
+            cells[0].fg, original_fgs[0],
+            "Non-reflected cell should be unchanged"
+        );
 
         // Cell (1,1) may have changed (has reflection flag)
         // (It might not change if noise at that position is exactly 0, but that's unlikely)
@@ -353,8 +375,18 @@ mod tests {
         // Different times should produce different results for the same position
         let fbm = Fbm::<Perlin>::default().set_octaves(4);
 
-        let mut cell_t0 = AnsiCell { fg: 100, bk: 16, gl: b'#', spare: 0xFF };
-        let mut cell_t1 = AnsiCell { fg: 100, bk: 16, gl: b'#', spare: 0xFF };
+        let mut cell_t0 = AnsiCell {
+            fg: 100,
+            bk: 16,
+            gl: b'#',
+            spare: 0xFF,
+        };
+        let mut cell_t1 = AnsiCell {
+            fg: 100,
+            bk: 16,
+            gl: b'#',
+            spare: 0xFF,
+        };
 
         apply_water_ripple(&fbm, &mut cell_t0, 10, 10, 0.0);
         apply_water_ripple(&fbm, &mut cell_t1, 10, 10, 5.0);
@@ -390,7 +422,10 @@ mod tests {
 
         // Verify our code matches the buggy behavior
         // The apply_water_ripple function uses the buggy decomposition
-        assert_eq!(cb_buggy, cb_correct, "For c=100: cr==cg so bug is invisible");
+        assert_eq!(
+            cb_buggy, cb_correct,
+            "For c=100: cr==cg so bug is invisible"
+        );
         assert_eq!(cb_buggy2, 8, "For c=150: buggy cb should be 8");
         assert_eq!(cb_correct2, 2, "For c=150: correct cb should be 2");
     }

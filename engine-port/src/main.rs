@@ -12,6 +12,12 @@ use asciicker_engine::world::WorldPlugin;
 
 fn main() {
     let mut app = App::new();
+    // IMPORTANT: Each plugin is registered independently.
+    // None of these plugins add each other as sub-plugins.
+    // GamePlugin/PhysicsPlugin/CharacterPlugin only add their
+    // own resources and systems -- Bevy panics on duplicate plugins.
+    // CpuRasterizerPlugin BEFORE AsciiOutputPlugin -- AsciiOutputPlugin
+    // needs RenderConfig (inserted by CpuRasterizerPlugin.build()).
     app.add_plugins(DefaultPlugins)
         .add_plugins((
             FrameTimeDiagnosticsPlugin::default(),

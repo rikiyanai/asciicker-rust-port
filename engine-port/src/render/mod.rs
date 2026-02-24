@@ -63,10 +63,7 @@ pub struct WaterConfig {
 ///
 /// Registered in Update by CpuRasterizerPlugin (owns WaterConfig resource).
 /// Update always precedes PostUpdate -- no explicit ordering needed.
-fn advance_water_time_system(
-    time: Res<Time>,
-    mut water_config: ResMut<WaterConfig>,
-) {
+fn advance_water_time_system(time: Res<Time>, mut water_config: ResMut<WaterConfig>) {
     water_config.ripple_time += time.delta_secs();
 }
 
@@ -93,11 +90,9 @@ impl Plugin for CpuRasterizerPlugin {
         app.add_systems(
             Update,
             (
-                camera_input_system
-                    .run_if(not(has_characters)),
+                camera_input_system.run_if(not(has_characters)),
                 camera_update_system,
-                a3d_assembly_system
-                    .run_if(|assembly: Res<AssemblyState>| !assembly.assembled),
+                a3d_assembly_system.run_if(|assembly: Res<AssemblyState>| !assembly.assembled),
                 poll_akm_meshes,
                 camera_terrain_init_system,
             )
@@ -111,8 +106,7 @@ impl Plugin for CpuRasterizerPlugin {
         // This enables cross-plugin ordering: CharacterSet::SpritePush.before(RenderSet::Pipeline)
         app.add_systems(
             PostUpdate,
-            render_pipeline_system
-                .in_set(RenderSet::Pipeline),
+            render_pipeline_system.in_set(RenderSet::Pipeline),
         );
         // 1-frame display latency: PostUpdate (pipeline writes cell_grid) -> Render schedule
         // (GPU reads cell_grid). Standard Bevy behavior. Not a bug.

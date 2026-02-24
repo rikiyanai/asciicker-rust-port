@@ -62,7 +62,10 @@ pub struct SpriteQueue {
 impl SpriteQueue {
     /// Push a sprite entry onto the queue.
     pub fn push(&mut self, entry: SpriteRenderEntry) {
-        debug_assert!(!entry.dist.is_nan(), "SpriteRenderEntry.dist must not be NaN");
+        debug_assert!(
+            !entry.dist.is_nan(),
+            "SpriteRenderEntry.dist must not be NaN"
+        );
         self.entries.push(entry);
     }
 
@@ -119,8 +122,8 @@ pub fn blit_sprite(
         ux,
         uy,
         b'S' as u16,
-        [255, 255, 0, 255],  // yellow foreground
-        [64, 0, 64, 255],    // dark purple background
+        [255, 255, 0, 255], // yellow foreground
+        [64, 0, 64, 255],   // dark purple background
     );
 }
 

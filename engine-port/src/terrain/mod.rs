@@ -16,7 +16,7 @@ use crate::asset_loader::a3d_terrain::A3dTerrain;
 use crate::asset_loader::constants::{HEIGHT_CELLS, HEIGHT_SCALE, VISUAL_CELLS};
 
 use patch_runtime::RuntimePatch;
-use quadtree::{build_quadtree, query_terrain_frustum, QuadNode};
+use quadtree::{QuadNode, build_quadtree, query_terrain_frustum};
 
 // ---------------------------------------------------------------------------
 // RuntimeTerrain Resource
@@ -79,7 +79,14 @@ impl RuntimeTerrain {
     {
         if let Some(ref root) = self.root {
             let planes_vec: Vec<[f64; 4]> = planes.to_vec();
-            query_terrain_frustum(root, self.level, self.base_x, self.base_y, &planes_vec, &mut callback);
+            query_terrain_frustum(
+                root,
+                self.level,
+                self.base_x,
+                self.base_y,
+                &planes_vec,
+                &mut callback,
+            );
         }
     }
 
@@ -295,10 +302,7 @@ mod tests {
 
     #[test]
     fn test_get_patch_at_existing() {
-        let patches = vec![
-            make_patch(5, 3, 100),
-            make_patch(6, 3, 200),
-        ];
+        let patches = vec![make_patch(5, 3, 100), make_patch(6, 3, 200)];
         let rt = make_runtime_terrain(&patches);
 
         let p = rt.get_patch_at(5, 3);
@@ -382,7 +386,10 @@ mod tests {
 
         // Verify dark was set
         rt.for_each_patch(|p| {
-            assert_eq!(p.dark, 0xFFFF_FFFF_FFFF_FFFF, "dark must be set by for_each_patch_mut");
+            assert_eq!(
+                p.dark, 0xFFFF_FFFF_FFFF_FFFF,
+                "dark must be set by for_each_patch_mut"
+            );
         });
     }
 }

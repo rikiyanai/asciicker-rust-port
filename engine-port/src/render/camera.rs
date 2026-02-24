@@ -306,7 +306,6 @@ impl GameCamera {
         self.frustum_planes
             .push(plane_from_points(&focus_node, &corner_lr, &corner_ll));
     }
-
 }
 
 // --- Bevy Systems ---
@@ -620,7 +619,8 @@ mod tests {
 
         // All planes should have nonzero normals
         for (i, plane) in cam.frustum_planes.iter().enumerate() {
-            let normal_len = (plane[0] * plane[0] + plane[1] * plane[1] + plane[2] * plane[2]).sqrt();
+            let normal_len =
+                (plane[0] * plane[0] + plane[1] * plane[1] + plane[2] * plane[2]).sqrt();
             assert!(
                 normal_len > 0.01,
                 "Frustum plane {i} should have nonzero normal, got len={normal_len}"
