@@ -6,6 +6,9 @@
 //!
 //! GamePlugin only adds game-level resources and cross-plugin sync systems.
 
+pub mod menu;
+pub mod state;
+
 use bevy::prelude::*;
 
 use crate::character::equipment::SpriteReq;
