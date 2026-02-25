@@ -1,4 +1,5 @@
 pub mod asset_loader;
+pub mod audio;
 pub mod character;
 pub mod core;
 pub mod game;

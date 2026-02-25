@@ -239,6 +239,7 @@ dependencies = [
  "anyhow",
  "bevy",
  "bevy-inspector-egui",
+ "bevy_kira_audio",
  "bevy_mod_debugdump",
  "bytemuck",
  "criterion",
@@ -335,6 +336,12 @@ checksum = "8b75356056920673b02621b35afd0f7dda9306d03c79a30f5c56c44cf256e3de"
 dependencies = [
  "portable-atomic",
 ]
+
+[[package]]
+name = "atomic-arena"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "73e8ed45f88ed32e6827a96b62d8fd4086d72defc754c5c6bd08470c1aaf648e"
 
 [[package]]
 name = "atomic-waker"
@@ -1014,6 +1021,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_kira_audio"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4648e87419cbe93e322e3d9e13de2bc7365f4af5e838bd50d2f91e364831181b"
+dependencies = [
+ "anyhow",
+ "bevy",
+ "bevy_math",
+ "glam 0.25.0",
+ "kira",
+ "mint",
+ "parking_lot",
+ "thiserror 2.0.18",
+ "uuid",
+]
+
+[[package]]
 name = "bevy_light"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1074,7 +1098,7 @@ dependencies = [
  "arrayvec",
  "bevy_reflect",
  "derive_more",
- "glam",
+ "glam 0.30.10",
  "itertools 0.14.0",
  "libm",
  "rand 0.9.2",
@@ -1233,7 +1257,7 @@ dependencies = [
  "downcast-rs 2.0.2",
  "erased-serde",
  "foldhash 0.2.0",
- "glam",
+ "glam 0.30.10",
  "indexmap",
  "inventory",
  "petgraph",
@@ -1293,7 +1317,7 @@ dependencies = [
  "downcast-rs 2.0.2",
  "encase",
  "fixedbitset",
- "glam",
+ "glam 0.30.10",
  "image",
  "indexmap",
  "js-sys",
@@ -2443,6 +2467,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "encoding_rs"
+version = "0.8.35"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75030f3c4f45dafd7586dd6780965a8c7e8e285a5ecb86713e63a79c5b2766f3"
+dependencies = [
+ "cfg-if",
+]
+
+[[package]]
 name = "epaint"
 version = "0.33.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2820,6 +2853,12 @@ dependencies = [
 
 [[package]]
 name = "glam"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "151665d9be52f9bb40fc7966565d39666f2d1e69233571b71b87791c7e0528b3"
+
+[[package]]
+name = "glam"
 version = "0.30.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19fc433e8437a212d1b6f1e68c7824af3aed907da60afa994e7f542d18d12aa9"
@@ -2827,6 +2866,7 @@ dependencies = [
  "bytemuck",
  "encase",
  "libm",
+ "mint",
  "rand 0.9.2",
  "serde_core",
 ]
@@ -3010,7 +3050,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29a164ceff4500f2a72b1d21beaa8aa8ad83aec2b641844c659b190cb3ea2e0b"
 dependencies = [
  "constgebra",
- "glam",
+ "glam 0.30.10",
  "tinyvec",
 ]
 
@@ -3185,6 +3225,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
 
 [[package]]
+name = "kira"
+version = "0.10.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e7f96b236a2d8b1ecebcd0e4e81462405392699e261f852cf930ea150f15abd"
+dependencies = [
+ "atomic-arena",
+ "cpal",
+ "glam 0.30.10",
+ "mint",
+ "paste",
+ "rtrb",
+ "send_wrapper",
+ "symphonia",
+ "triple_buffer",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3356,6 +3413,12 @@ dependencies = [
  "adler2",
  "simd-adler32",
 ]
+
+[[package]]
+name = "mint"
+version = "0.5.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e53debba6bda7a793e5f99b8dacf19e626084f525f7829104ba9898f367d85ff"
 
 [[package]]
 name = "moxcms"
@@ -4455,6 +4518,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c20b6793b5c2fa6553b250154b78d6d0db37e72700ae35fad9387a46f487c97"
 
 [[package]]
+name = "rtrb"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7204ed6420f698836b76d4d5c2ec5dec7585fd5c3a788fd1cde855d1de598239"
+
+[[package]]
 name = "rustc-hash"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4770,6 +4839,77 @@ dependencies = [
 ]
 
 [[package]]
+name = "symphonia"
+version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5773a4c030a19d9bfaa090f49746ff35c75dfddfa700df7a5939d5e076a57039"
+dependencies = [
+ "lazy_static",
+ "symphonia-codec-vorbis",
+ "symphonia-core",
+ "symphonia-format-ogg",
+ "symphonia-metadata",
+]
+
+[[package]]
+name = "symphonia-codec-vorbis"
+version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f025837c309cd69ffef572750b4a2257b59552c5399a5e49707cc5b1b85d1c73"
+dependencies = [
+ "log",
+ "symphonia-core",
+ "symphonia-utils-xiph",
+]
+
+[[package]]
+name = "symphonia-core"
+version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ea00cc4f79b7f6bb7ff87eddc065a1066f3a43fe1875979056672c9ef948c2af"
+dependencies = [
+ "arrayvec",
+ "bitflags 1.3.2",
+ "bytemuck",
+ "lazy_static",
+ "log",
+]
+
+[[package]]
+name = "symphonia-format-ogg"
+version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b4955c67c1ed3aa8ae8428d04ca8397fbef6a19b2b051e73b5da8b1435639cb"
+dependencies = [
+ "log",
+ "symphonia-core",
+ "symphonia-metadata",
+ "symphonia-utils-xiph",
+]
+
+[[package]]
+name = "symphonia-metadata"
+version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36306ff42b9ffe6e5afc99d49e121e0bd62fe79b9db7b9681d48e29fa19e6b16"
+dependencies = [
+ "encoding_rs",
+ "lazy_static",
+ "log",
+ "symphonia-core",
+]
+
+[[package]]
+name = "symphonia-utils-xiph"
+version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee27c85ab799a338446b68eec77abf42e1a6f1bb490656e121c6e27bfbab9f16"
+dependencies = [
+ "symphonia-core",
+ "symphonia-metadata",
+]
+
+[[package]]
 name = "syn"
 version = "2.0.117"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5052,6 +5192,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "triple_buffer"
+version = "8.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "420466259f9fa5decc654c490b9ab538400e5420df8237f84ecbe20368bcf72b"
+dependencies = [
+ "crossbeam-utils",
+]
+
+[[package]]
 name = "ttf-parser"
 version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5128,6 +5277,7 @@ checksum = "b672338555252d43fd2240c714dc444b8c6fb0a5c5335e65a07bba7742735ddb"
 dependencies = [
  "getrandom 0.4.1",
  "js-sys",
+ "rand 0.9.2",
  "serde_core",
  "wasm-bindgen",
 ]

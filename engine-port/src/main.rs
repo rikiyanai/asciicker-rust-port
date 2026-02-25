@@ -2,6 +2,7 @@ use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 use bevy::prelude::*;
 
 use asciicker_engine::asset_loader::AssetLoaderPlugin;
+use asciicker_engine::audio::AsciickerAudioPlugin;
 use asciicker_engine::character::CharacterPlugin;
 use asciicker_engine::game::GamePlugin;
 use asciicker_engine::output::AsciiOutputPlugin;
@@ -28,6 +29,7 @@ fn main() {
             AsciiOutputPlugin,
             PhysicsPlugin,
             CharacterPlugin,
+            AsciickerAudioPlugin,
             GamePlugin,
         ))
         .add_systems(Update, fps_title_system);
