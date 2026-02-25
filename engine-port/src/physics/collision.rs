@@ -240,6 +240,63 @@ pub fn check_collision(
     }
 }
 
+/// Ray-triangle intersection using the Möller-Trumbore algorithm.
+///
+/// Returns Option<toi> if the ray intersects the triangle within [0, max_dist].
+pub fn ray_triangle_intersection(
+    origin: &[f32; 3],
+    dir: &[f32; 3],
+    tri: &[[f32; 3]; 3],
+    max_dist: f32,
+) -> Option<f32> {
+    const EPSILON: f32 = 1e-6;
+
+    let edge1 = [
+        tri[1][0] - tri[0][0],
+        tri[1][1] - tri[0][1],
+        tri[1][2] - tri[0][2],
+    ];
+    let edge2 = [
+        tri[2][0] - tri[0][0],
+        tri[2][1] - tri[0][1],
+        tri[2][2] - tri[0][2],
+    ];
+
+    let h = cross3(dir, &edge2);
+    let a = dot3(&edge1, &h);
+
+    if a > -EPSILON && a < EPSILON {
+        return None; // Parallel
+    }
+
+    let f = 1.0 / a;
+    let s = [
+        origin[0] - tri[0][0],
+        origin[1] - tri[0][1],
+        origin[2] - tri[0][2],
+    ];
+    let u = f * dot3(&s, &h);
+
+    if !(0.0..=1.0).contains(&u) {
+        return None;
+    }
+
+    let q = cross3(&s, &edge1);
+    let v = f * dot3(dir, &q);
+
+    if v < 0.0 || u + v > 1.0 {
+        return None;
+    }
+
+    let t = f * dot3(&edge2, &q);
+
+    if t > EPSILON && t < max_dist {
+        Some(t)
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -416,5 +473,33 @@ mod tests {
             }
             CollisionResult::Miss => panic!("Should hit large triangle"),
         }
+    }
+
+    #[test]
+    fn test_ray_triangle_hit() {
+        let tri = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];
+        let origin = [0.2, 0.2, 1.0];
+        let dir = [0.0, 0.0, -1.0];
+        let hit = ray_triangle_intersection(&origin, &dir, &tri, 2.0);
+        assert!(hit.is_some());
+        assert!((hit.unwrap() - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_ray_triangle_miss_parallel() {
+        let tri = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];
+        let origin = [0.2, 0.2, 1.0];
+        let dir = [1.0, 0.0, 0.0];
+        let hit = ray_triangle_intersection(&origin, &dir, &tri, 2.0);
+        assert!(hit.is_none());
+    }
+
+    #[test]
+    fn test_ray_triangle_miss_outside() {
+        let tri = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]];
+        let origin = [2.0, 2.0, 1.0];
+        let dir = [0.0, 0.0, -1.0];
+        let hit = ray_triangle_intersection(&origin, &dir, &tri, 2.0);
+        assert!(hit.is_none());
     }
 }

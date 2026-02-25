@@ -218,7 +218,7 @@ Phases with well-documented patterns (skip research-phase):
 - Bevy custom post-processing example — ViewNode + fullscreen shader pattern
 - Mage Core source (local, MIT licensed) — 4-texture ASCII rendering in wgpu, shader.wgsl, render.rs
 - Mage Core shader.wgsl — WGSL fullscreen quad with font atlas compositing (direct code review)
-- C++ Asciicker source (~82K lines, /Users/r/Downloads/asciicker-Y9-2/) — feature/architecture ground truth
+- C++ Asciicker source (~82K lines, (ORIGINAL GAME)asciicker-Y9-2-main/) — feature/architecture ground truth
 - C++ skill packs (engine-render.md, world-loading.md, physics-system/SKILL.md, game-mechanics/SKILL.md) — trap catalogue
 - HANDOFF_ENGINE_AUDIT.md — file inventory, 34 analysis outputs, architecture audit
 - Alex Harri shape vectors (alexharri.com/blog/ascii-rendering, Jan 2026) — 6D glyph matching technique

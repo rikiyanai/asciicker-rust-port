@@ -36,6 +36,30 @@
 | R41 | 4 | Reflection palette path untested | MEDIUM | PLANNED - Phase 3.1 Task 3 |
 | R42 | 4 | Elevation thresholds approximate | MEDIUM | SELF-RESOLVES - Phase 5 tunes with real terrain data |
 | R43 | 4 | No SampleBuffer boundary/edge-case tests | LOW | PLANNED - Phase 3.1 Task 3 |
+| R66 | 8 | Multi-level proximity detection fails in 2D | MEDIUM | PLANNED - 08-01 (Use 3D SpatialGrid) |
+| R67 | 8 | NPC equipment randomization drift from C++ | LOW | PLANNED - 08-02 (Match probability logic) |
+| R68 | 8 | AI proximity query performance bottleneck | MEDIUM | PLANNED - 08-03 (Limit query frequency) |
+| R69 | 8 | Melee hit detection multi-fire bug | LOW | PLANNED - 08-04 (Use hit_tested flag) |
+| R70 | 9 | Missing item assets cause rendering panics | LOW | PLANNED - 09-01 (Graceful asset fallback) |
+| R71 | 9 | Inventory grid alignment mismatch with Font1 | MEDIUM | PLANNED - 09-02 (Explicit character layout) |
+| R72 | 9 | Item interactions lack authoritative validation | LOW | PLANNED - 09-03 (Server check in Phase 12) |
+| R73 | 9 | Equipment sprite lookup out-of-bounds | LOW | PLANNED - 09-04 (Index validation) |
+| R74 | 10 | HUD bars drift during window resize | LOW | PLANNED - 10-01 (Anchored coordinates) |
+| R75 | 10 | Talk bubble visual overlap/clutter | MEDIUM | PLANNED - 10-02 (Depth sorting/fade) |
+| R76 | 10 | Minimap terrain sampling performance lag | LOW | PLANNED - 10-03 (Fixed radius sampling) |
+| R77 | 10 | Unprojection precision loss at distance | MEDIUM | PLANNED - 10-04 (Use epsilon thresholds) |
+| R78 | 11 | Menu nesting complexity leads to user confusion | LOW | PLANNED - 11-01 (Limit depth to 4) |
+| R79 | 11 | CPU-based menu dithering frame drops | MEDIUM | PLANNED - 11-02 (Optimize rendering loop) |
+| R80 | 11 | Config file corruption on save/load | LOW | PLANNED - 11-03 (Use safe defaults) |
+| R81 | 11 | Gamepad mapping UI scope creep | MEDIUM | PLANNED - 11-04 (Marked as optional) |
+| R82 | 12 | Replication bandwidth saturation | MEDIUM | PLANNED - 12-01 (Use delta compression) |
+| R83 | 12 | Network combat latency (ghost hits) | MEDIUM | PLANNED - 12-02 (Client prediction) |
+| R84 | 12 | Inventory sync state explosion | LOW | PLANNED - 12-03 (Replicate changes only) |
+| R85 | 12 | Movement reconciliation visual snapping | HIGH | PLANNED - 12-04 (Smooth interpolation) |
+| R86 | 12 | Remote player interpolation jitter | MEDIUM | PLANNED - 12-05 (Tune target buffer) |
+| R87 | 13 | Lua script sandbox breakout | MEDIUM | PLANNED - 13-01 (Strip unsafe libraries) |
+| R88 | 13 | Script API world query performance lag | MEDIUM | PLANNED - 13-02 (Batch query results) |
+| R89 | 13 | Hot-reload file watcher redundant triggers | LOW | PLANNED - 13-03 (Debounce write events) |
 
 ## Critical Path for Phase 5
 

@@ -107,7 +107,7 @@ Each task was committed atomically:
 - golden_pipeline.rs had already been partially updated by a prior session (panic replaced with asset_path.exists() assertion). Merged the plan's comment updates with the existing code.
 
 ## User Setup Required
-- **Manual step:** Each developer must copy `game_map_y8.a3d` to `engine-port/assets/` from the C++ source tree at `/Users/r/Downloads/asciicker-Y9-2/a3d/game_map_y8.a3d`. The file is .gitignored and not committed.
+- **Manual step:** Each developer must copy `game_map_y8.a3d` to `engine-port/assets/` from the C++ source tree at `(ORIGINAL GAME)asciicker-Y9-2-main/a3d/game_map_y8.a3d`. The file is .gitignored and not committed.
 
 ## Next Phase Readiness
 - GAP-1 (missing asset) and GAP-2 (mesh rendering not wired) are closed

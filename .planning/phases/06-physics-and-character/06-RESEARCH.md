@@ -530,16 +530,16 @@ fn accumulate_player_input(
 ## Sources
 
 ### Primary (HIGH confidence)
-- `/Users/r/Downloads/asciicker-Y9-2/physics.h` - PhysicsIO struct, public API (120 lines, fully documented)
-- `/Users/r/Downloads/asciicker-Y9-2/physics.cpp` - Full collision implementation (2350 lines, read lines 1-2352)
-- `/Users/r/Downloads/asciicker-Y9-2/game.h` - Character/Human structs, ACTION/WEAPON/SHIELD/HELMET/ARMOR/MOUNT enums, SpriteReq, Game struct (567 lines)
-- `/Users/r/Downloads/asciicker-Y9-2/game.cpp` - GetSprite (lines 3531-3662), SetAction* (lines 4853-4998), Game::Render physics IO (lines 5634-5860)
-- `/Users/r/Downloads/asciicker-Y9-2/render.cpp` - Stage 5 Reflection (lines 3266-3374), Perlin water ripple (lines 3860-3903)
-- `/Users/r/Downloads/asciicker-Y9-2/sprite.h` - Sprite/Frame/Anim structs (110 lines)
-- `/Users/r/Downloads/asciicker-Y9-2/water.cpp` - Water design notes (planning only, no implementation)
-- `/Users/r/Projects/asciicker rust port/docs/skills/physics-system.md` - Physics skill pack
-- `/Users/r/Projects/asciicker rust port/docs/skills/game-mechanics.md` - Game mechanics skill pack
-- `/Users/r/Projects/asciicker rust port/docs/skills/engine-render.md` - Render pipeline skill pack
+- `(ORIGINAL GAME)asciicker-Y9-2-main/physics.h` - PhysicsIO struct, public API (120 lines, fully documented)
+- `(ORIGINAL GAME)asciicker-Y9-2-main/physics.cpp` - Full collision implementation (2350 lines, read lines 1-2352)
+- `(ORIGINAL GAME)asciicker-Y9-2-main/game.h` - Character/Human structs, ACTION/WEAPON/SHIELD/HELMET/ARMOR/MOUNT enums, SpriteReq, Game struct (567 lines)
+- `(ORIGINAL GAME)asciicker-Y9-2-main/game.cpp` - GetSprite (lines 3531-3662), SetAction* (lines 4853-4998), Game::Render physics IO (lines 5634-5860)
+- `(ORIGINAL GAME)asciicker-Y9-2-main/render.cpp` - Stage 5 Reflection (lines 3266-3374), Perlin water ripple (lines 3860-3903)
+- `(ORIGINAL GAME)asciicker-Y9-2-main/sprite.h` - Sprite/Frame/Anim structs (110 lines)
+- `(ORIGINAL GAME)asciicker-Y9-2-main/water.cpp` - Water design notes (planning only, no implementation)
+- `./docs/skills/physics-system.md` - Physics skill pack
+- `./docs/skills/game-mechanics.md` - Game mechanics skill pack
+- `./docs/skills/engine-render.md` - Render pipeline skill pack
 
 ### Secondary (MEDIUM confidence)
 - [Bevy FixedUpdate documentation](https://bevy-cheatbook.github.io/fundamentals/fixed-timestep.html) - Default 64Hz, configurable via Time::<Fixed>

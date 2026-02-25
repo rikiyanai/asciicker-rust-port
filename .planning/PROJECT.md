@@ -43,6 +43,12 @@ The CPU rasterizer must produce visually identical output to the C++ engine — 
 - [ ] Water rendering with reflective surface
 - [ ] Weather effects (rain, snow)
 - [ ] Main menu and game state management
+- [ ] NPC AI and autonomous combat behavior (NPC-01 to NPC-08)
+- [ ] Grid-based inventory and world item interaction (ITEM-01 to ITEM-04)
+- [ ] HUD status bars, minimap, and chat UI (HUD-01 to HUD-04)
+- [ ] Hierarchical menu system and settings persistence (FMENU-01 to FMENU-04)
+- [ ] Full multiplayer networking with prediction and reconciliation (FNET-01 to FNET-05)
+- [ ] Embedded NPC scripting with Lua hot-reloading (SCRIPT-01 to SCRIPT-03)
 
 ### Out of Scope
 
@@ -55,7 +61,7 @@ The CPU rasterizer must produce visually identical output to the C++ engine — 
 ## Context
 
 ### C++ Reference
-- Original codebase: `/Users/r/Downloads/asciicker-Y9-2/` (~82K lines, 48 files)
+- Original codebase: `(ORIGINAL GAME)asciicker-Y9-2-main/` (~82K lines, 48 files)
 - Comprehensive architecture documentation in `docs/arch/` (30+ per-file analyses)
 - 4 skill packs documenting C++ subsystem internals (engine-render, world-loading, physics-system, game-mechanics)
 
@@ -67,8 +73,8 @@ The CPU rasterizer must produce visually identical output to the C++ engine — 
 - **Audio**: bevy_kira_audio for 16-track mixer
 
 ### Reference Implementations
-- **Mage Core**: `/Users/r/Projects/ascii research/Mage-core` (~2000 lines Rust, v0.2.0, GPU-accelerated ASCII rendering)
-- **Alex Harri**: `/Users/r/Projects/ascii research/alexharri-ascii` (TypeScript/WebGL2, 6D shape-vector matching with k-d tree)
+- **Mage Core**: `../reference/Mage-core` (~2000 lines Rust, v0.2.0, GPU-accelerated ASCII rendering)
+- **Alex Harri**: `../reference/alexharri-ascii` (TypeScript/WebGL2, 6D shape-vector matching with k-d tree)
 
 ### Existing Skeleton
 - `asciicker-rust/` directory has ~385 LOC Bevy 0.18.0 skeleton (does NOT compile — 4 missing modules)

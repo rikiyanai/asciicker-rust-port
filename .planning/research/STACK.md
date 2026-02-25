@@ -62,7 +62,7 @@ bevy = { version = "0.18", default-features = false, features = [
 |-----------|----------|-----|------------|
 | **auto_mat (initial)** | Hand-rolled lookup tables | Direct port of C++ `auto_mat` shade/glyph arrays. These are static lookup tables (~500 entries). Must match C++ values exactly. Start here for first-render milestone. | HIGH |
 | **Alex Harri 6D k-d tree (upgrade)** | kiddo 5.2 | Kiddo is the fastest k-d tree library in Rust. Supports arbitrary dimensions (we need 2D initially, then 6D). ImmutableKdTree variant is perfect for our use case: build once from 256 CP437 shape vectors, query per-cell during RESOLVE. Zero-copy serialization via rkyv for fast startup. | HIGH |
-| **Shape vector computation** | Hand-rolled (port from TypeScript reference) | Alex Harri's shape-vector computation divides each glyph cell into regions and computes coverage. Port from TypeScript reference implementation at `/Users/r/Projects/ascii research/alexharri-ascii`. ~300 lines. | MEDIUM |
+| **Shape vector computation** | Hand-rolled (port from TypeScript reference) | Alex Harri's shape-vector computation divides each glyph cell into regions and computes coverage. Port from TypeScript reference implementation at `../reference/alexharri-ascii`. ~300 lines. | MEDIUM |
 
 ### Binary Format Parsing
 
@@ -302,7 +302,7 @@ The Mage Core reference implementation (v0.2.0) uses raw wgpu + winit, NOT Bevy.
 - [kiddo 5.2.2 docs.rs](https://docs.rs/crate/kiddo/latest) -- K-d tree for glyph matching (HIGH confidence)
 - [nom 8.0 docs.rs](https://docs.rs/crate/nom/latest) -- Binary parser combinators (HIGH confidence)
 - [rayon 1.11 docs.rs](https://docs.rs/crate/rayon/latest) -- Data parallelism (HIGH confidence)
-- [Mage Core source](file:///Users/r/Projects/ascii%20research/Mage-core/) -- Reference 4-texture ASCII rendering implementation, MIT licensed (HIGH confidence, local reference)
+- [Mage Core source](../ascii%20research/Mage-core/) -- Reference 4-texture ASCII rendering implementation, MIT licensed (HIGH confidence, local reference)
 - [Bevy Profiling Guide](https://github.com/bevyengine/bevy/blob/main/docs/profiling.md) -- Tracy + puffin integration (HIGH confidence)
 
 ---

@@ -9,7 +9,7 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 
 ## Current Position
 
-Phase: 6 of 7 (Physics and Character) -- COMPLETE
+Phase: 6 of 15 (Physics and Character) -- COMPLETE
 Plan: 3 of 3 in current phase (06-03 complete -- phase done)
 Status: Phase 6 COMPLETE. All 3 plans executed. Ready for Phase 7.
 Last activity: 2026-02-24 -- Completed 06-03: Water reflection, Perlin ripple, GamePlugin, schedule migration, benchmarks

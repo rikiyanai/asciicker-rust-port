@@ -16,7 +16,7 @@ use crate::asset_loader::a3d_terrain::A3dTerrain;
 use crate::asset_loader::constants::{HEIGHT_CELLS, HEIGHT_SCALE, VISUAL_CELLS};
 
 use patch_runtime::RuntimePatch;
-use quadtree::{QuadNode, build_quadtree, query_terrain_frustum};
+use quadtree::{QuadNode, build_quadtree, query_terrain_frustum, query_terrain_ray};
 
 // ---------------------------------------------------------------------------
 // RuntimeTerrain Resource
@@ -180,6 +180,35 @@ impl RuntimeTerrain {
 
         // Convert raw u16 height to world units (F238 FIX: was * HEIGHT_SCALE, must be /)
         Some(height / HEIGHT_SCALE as f64)
+    }
+
+    /// Raycast against the terrain quadtree.
+    ///
+    /// Returns Option<toi> for the first hit within [0, max_dist].
+    pub fn raycast_terrain(&self, origin: Vec3, direction: Vec3, max_dist: f32) -> Option<f32> {
+        if let Some(ref root) = self.root {
+            let origin_arr = [origin.x as f64, origin.y as f64, origin.z as f64];
+            let dir = direction.normalize();
+            let inv_dir = [1.0 / dir.x as f64, 1.0 / dir.y as f64, 1.0 / dir.z as f64];
+            let dir_f32 = [dir.x, dir.y, dir.z];
+            let origin_f32 = [origin.x, origin.y, origin.z];
+
+            query_terrain_ray(
+                root,
+                self.level,
+                self.base_x,
+                self.base_y,
+                origin_arr,
+                inv_dir,
+                max_dist as f64,
+                &mut |patch, current_max| {
+                    patch.ray_intersect(origin_f32, dir_f32, current_max as f32)
+                        .map(|t| t as f64)
+                },
+            ).map(|t| t as f32)
+        } else {
+            None
+        }
     }
 
     // --- Private helpers ---

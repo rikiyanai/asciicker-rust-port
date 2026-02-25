@@ -375,6 +375,103 @@ where
 }
 
 // ---------------------------------------------------------------------------
+// Ray query
+// ---------------------------------------------------------------------------
+
+/// Ray query on the terrain quadtree.
+///
+/// Traverses the quadtree, culling branches whose AABB does not intersect the ray.
+/// Callback returns Option<toi> for a hit on a patch.
+pub fn query_terrain_ray<F>(
+    node: &QuadNode,
+    level: i32,
+    bx: i32,
+    by: i32,
+    origin: [f64; 3],
+    inv_dir: [f64; 3],
+    max_dist: f64,
+    callback: &mut F,
+) -> Option<f64>
+where
+    F: FnMut(&RuntimePatch, f64) -> Option<f64>,
+{
+    let size = (1i32 << level) as f64;
+    let x0 = bx as f64;
+    let y0 = by as f64;
+    let x1 = x0 + size;
+    let y1 = y0 + size;
+
+    let (lo, hi) = node.height_bounds();
+    let z0 = lo as f64 / HEIGHT_SCALE as f64;
+    let z1 = (hi as f64 + HEIGHT_SCALE as f64) / HEIGHT_SCALE as f64;
+
+    // Ray vs node AABB test
+    let mut tmin = 0.0f64;
+    let mut tmax = max_dist;
+
+    // X axis
+    let tx1 = (x0 - origin[0]) * inv_dir[0];
+    let tx2 = (x1 - origin[0]) * inv_dir[0];
+    tmin = tmin.max(tx1.min(tx2));
+    tmax = tmax.min(tx1.max(tx2));
+
+    // Y axis
+    let ty1 = (y0 - origin[1]) * inv_dir[1];
+    let ty2 = (y1 - origin[1]) * inv_dir[1];
+    tmin = tmin.max(ty1.min(ty2));
+    tmax = tmax.min(ty1.max(ty2));
+
+    // Z axis
+    let tz1 = (z0 - origin[2]) * inv_dir[2];
+    let tz2 = (z1 - origin[2]) * inv_dir[2];
+    tmin = tmin.max(tz1.min(tz2));
+    tmax = tmax.min(tz1.max(tz2));
+
+    if tmax < tmin || tmin > max_dist {
+        return None;
+    }
+
+    match node {
+        QuadNode::Leaf(patch) => callback(patch, max_dist),
+        QuadNode::Interior { children, .. } => {
+            let half = 1i32 << (level - 1);
+            let mid_x = bx + half;
+            let mid_y = by + half;
+
+            let child_offsets = [
+                (bx, by),       // NW
+                (mid_x, by),    // NE
+                (bx, mid_y),    // SW
+                (mid_x, mid_y), // SE
+            ];
+
+            // Order children by distance along ray? For now, just visit all candidates.
+            let mut best_toi = None;
+            let mut current_max = max_dist;
+
+            for (i, child) in children.iter().enumerate() {
+                if let Some(child_node) = child {
+                    if let Some(toi) = query_terrain_ray(
+                        child_node,
+                        level - 1,
+                        child_offsets[i].0,
+                        child_offsets[i].1,
+                        origin,
+                        inv_dir,
+                        current_max,
+                        callback,
+                    ) {
+                        best_toi = Some(toi);
+                        current_max = toi;
+                    }
+                }
+            }
+            best_toi
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 

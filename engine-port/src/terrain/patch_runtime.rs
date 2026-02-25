@@ -7,6 +7,7 @@ use crate::asset_loader::a3d_terrain::TerrainPatch;
 use crate::asset_loader::constants::{
     HEIGHT_CELLS, HEIGHT_CELLS_PLUS_ONE, HEIGHT_SCALE, VISUAL_CELLS,
 };
+use crate::physics::collision::ray_triangle_intersection;
 
 /// A runtime terrain patch with precomputed height bounds and shadow state.
 ///
@@ -124,6 +125,60 @@ impl RuntimePatch {
         let world_z = height * HEIGHT_SCALE as f64;
 
         [world_x, world_y, world_z]
+    }
+
+    /// Intersect a ray with the patch's triangle grid.
+    ///
+    /// Returns Option<toi> for the first hit within [0, max_dist].
+    pub fn ray_intersect(&self, origin: [f32; 3], dir: [f32; 3], max_dist: f32) -> Option<f32> {
+        let mut best_toi = None;
+        let mut current_max = max_dist;
+
+        // Patch covers 4x4 quads. Vertices are 5x5.
+        // Vertex spacing is VISUAL_CELLS / HEIGHT_CELLS = 8 / 4 = 2.0 units.
+        let spacing = (VISUAL_CELLS / HEIGHT_CELLS) as f32;
+        let px = self.x as f32 * VISUAL_CELLS as f32;
+        let py = self.y as f32 * VISUAL_CELLS as f32;
+
+        for y in 0..HEIGHT_CELLS {
+            for x in 0..HEIGHT_CELLS {
+                let x0 = px + x as f32 * spacing;
+                let y0 = py + y as f32 * spacing;
+                let x1 = x0 + spacing;
+                let y1 = y0 + spacing;
+
+                let h00 = self.height[y][x] as f32 / HEIGHT_SCALE as f32;
+                let h10 = self.height[y][x + 1] as f32 / HEIGHT_SCALE as f32;
+                let h01 = self.height[y + 1][x] as f32 / HEIGHT_SCALE as f32;
+                let h11 = self.height[y + 1][x + 1] as f32 / HEIGHT_SCALE as f32;
+
+                let v00 = [x0, y0, h00];
+                let v10 = [x1, y0, h10];
+                let v01 = [x0, y1, h01];
+                let v11 = [x1, y1, h11];
+
+                // Triangle orientation from diag bitfield (1 bit per quad)
+                let bit = 1 << (y * HEIGHT_CELLS + x);
+                let (tri1, tri2) = if self.diag & bit != 0 {
+                    // Split /
+                    ([[v00, v10, v11], [v00, v11, v01]])
+                } else {
+                    // Split \
+                    ([[v00, v10, v01], [v10, v11, v01]])
+                };
+
+                if let Some(toi) = ray_triangle_intersection(&origin, &dir, &tri1, current_max) {
+                    best_toi = Some(toi);
+                    current_max = toi;
+                }
+                if let Some(toi) = ray_triangle_intersection(&origin, &dir, &tri2, current_max) {
+                    best_toi = Some(toi);
+                    current_max = toi;
+                }
+            }
+        }
+
+        best_toi
     }
 }
 

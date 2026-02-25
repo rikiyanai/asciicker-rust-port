@@ -4,7 +4,9 @@
 //! runtime representations with bounding boxes and flag accessors.
 //! Instance flags control visibility and BSP membership.
 
+use bevy::prelude::*;
 use crate::asset_loader::a3d_world::WorldInstance;
+use crate::asset_loader::akm_mesh::AkmMesh;
 
 // --- Instance Flags (matches C++ INST_FLAGS enum) ---
 
@@ -29,6 +31,7 @@ pub type Bbox = [f64; 6];
 pub enum RuntimeInstance {
     Mesh {
         mesh_id: String,
+        mesh_handle: Handle<AkmMesh>,
         inst_name: String,
         tm: [f64; 16],
         bbox: Bbox,
@@ -108,7 +111,7 @@ impl RuntimeInstance {
     ///
     /// Panics if a `WorldInstance::Mesh` has a `tm` vector with length != 16
     /// (F033 FIX: validate tm length before copying).
-    pub fn from_world_instance(wi: &WorldInstance) -> Self {
+    pub fn from_world_instance(wi: &WorldInstance, asset_server: Option<&AssetServer>) -> Self {
         match wi {
             WorldInstance::Mesh {
                 mesh_id,
@@ -124,8 +127,14 @@ impl RuntimeInstance {
                     );
                 });
                 let bbox = compute_transformed_unit_cube_bbox(&tm_arr);
+                let mesh_handle = if let Some(server) = asset_server {
+                    server.load(format!("meshes/{mesh_id}"))
+                } else {
+                    Handle::default()
+                };
                 RuntimeInstance::Mesh {
                     mesh_id: mesh_id.clone(),
+                    mesh_handle,
                     inst_name: inst_name.clone(),
                     tm: tm_arr,
                     bbox,
@@ -228,7 +237,7 @@ mod tests {
             flags: INST_VISIBLE | INST_USE_TREE,
             story_id: -1,
         };
-        let ri = RuntimeInstance::from_world_instance(&wi);
+        let ri = RuntimeInstance::from_world_instance(&wi, None);
         assert!(ri.is_visible());
         assert!(ri.uses_tree());
         assert!(!ri.is_item());
@@ -253,7 +262,7 @@ mod tests {
             flags: INST_VISIBLE,
             story_id: -1,
         };
-        let ri = RuntimeInstance::from_world_instance(&wi);
+        let ri = RuntimeInstance::from_world_instance(&wi, None);
         assert!(ri.is_visible());
         assert!(!ri.uses_tree());
 
@@ -272,7 +281,7 @@ mod tests {
             flags: INST_VISIBLE,
             story_id: -1,
         };
-        let ri = RuntimeInstance::from_world_instance(&wi);
+        let ri = RuntimeInstance::from_world_instance(&wi, None);
         assert!(ri.is_item());
         // Items never have USE_TREE (P5-066 FIX)
         assert!(!ri.uses_tree());
@@ -300,7 +309,7 @@ mod tests {
             flags: 0,
             story_id: -1,
         };
-        let ri = RuntimeInstance::from_world_instance(&wi);
+        let ri = RuntimeInstance::from_world_instance(&wi, None);
         assert!(!ri.is_visible());
         assert!(!ri.uses_tree());
         assert_eq!(ri.flags(), 0);
@@ -322,7 +331,7 @@ mod tests {
             flags: INST_VISIBLE | INST_USE_TREE,
             story_id: -1,
         };
-        let ri = RuntimeInstance::from_world_instance(&wi);
+        let ri = RuntimeInstance::from_world_instance(&wi, None);
         let bb = ri.bbox();
         // X: 10 + 2*[-1,1] = [8, 12]
         assert!((bb[0] - 8.0).abs() < 1e-9);
