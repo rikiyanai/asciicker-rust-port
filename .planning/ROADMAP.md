@@ -162,7 +162,7 @@ Plans:
 **Plans**: 5 plans
 
 Plans:
-- [ ] 07-01-PLAN.md -- Audio: bevy_kira_audio 0.25, 16-track DynamicAudioChannels mixer (wave 1)
+- [x] 07-01-PLAN.md -- Audio: bevy_kira_audio 0.25, 16-track DynamicAudioChannels mixer (wave 1)
 - [ ] 07-02-PLAN.md -- Game state machine (Loading/Playing/Paused) and main menu (wave 1)
 - [ ] 07-03-PLAN.md -- Networking: bevy_replicon 0.38, binary protocol, server/client (wave 2)
 - [ ] 07-04-PLAN.md -- Visual quality: Alex Harri 6D shape-vector + Font1 3 skins (TDD, wave 3)
@@ -182,8 +182,8 @@ Note: Phases 3 and 4 are independent (both depend only on Phase 1) and can execu
 | 3.1 Audit Remediation | 1/1 | Complete    | 2026-02-20 |
 | 4. CPU Rasterizer Core | 4/4 | Complete | 2026-02-20 |
 | 5. Pipeline Integration | 8/8 | Complete | 2026-02-22 |
-| 6. Physics and Character | 3/3 | In Progress | - |
-| 7. Game Systems | 0/5 | Planned | - |
+| 6. Physics and Character | 3/3 | Complete | 2026-02-24 |
+| 7. Game Systems | 1/5 | In Progress | - |
 
 ## Developer Experience
 

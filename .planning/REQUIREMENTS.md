@@ -86,8 +86,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Audio
 
-- [ ] **AUD-01**: bevy_kira_audio integration with basic sound effect playback
-- [ ] **AUD-02**: 16-track audio mixer matching C++ engine architecture
+- [x] **AUD-01**: bevy_kira_audio integration with basic sound effect playback
+- [x] **AUD-02**: 16-track audio mixer matching C++ engine architecture
 
 ### Networking
 
@@ -207,8 +207,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CHAR-04 | Phase 6 | Complete |
 | FX-01 | Phase 6 | Complete |
 | FX-02 | Phase 6 | Complete |
-| AUD-01 | Phase 7 | Pending |
-| AUD-02 | Phase 7 | Pending |
+| AUD-01 | Phase 7 | Complete |
+| AUD-02 | Phase 7 | Complete |
 | NET-01 | Phase 7 | Pending |
 | NET-02 | Phase 7 | Pending |
 | GAME-01 | Phase 7 | Pending |

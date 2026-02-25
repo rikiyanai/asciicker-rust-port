@@ -5,25 +5,25 @@
 See: .planning/PROJECT.md (updated 2026-02-20)
 
 **Core value:** The CPU rasterizer must produce visually identical output to the C++ engine -- same glyphs, same colors, same depth ordering -- so that existing Asciicker worlds render correctly in the Rust port.
-**Current focus:** Phase 6 COMPLETE. Ready for Phase 7: Game Systems.
+**Current focus:** Phase 7 in progress: Game Systems.
 
 ## Current Position
 
-Phase: 6 of 7 (Physics and Character) -- COMPLETE
-Plan: 3 of 3 in current phase (06-03 complete -- phase done)
-Status: Phase 6 COMPLETE. All 3 plans executed. Ready for Phase 7.
-Last activity: 2026-02-24 -- Completed 06-03: Water reflection, Perlin ripple, GamePlugin, schedule migration, benchmarks
+Phase: 7 of 7 (Game Systems)
+Plan: 2 of 5 in current phase (07-02 complete)
+Status: Phase 7 in progress. Plans 07-01, 07-02 complete. 3 plans remaining.
+Last activity: 2026-02-25 -- Completed 07-02: GameState FSM (MainMenu/Loading/Playing/Paused), main menu, state-gated gameplay systems
 
-Progress: [########--] 80%
+Progress: [#########=] 88%
 
-**Note:** Phase 6 complete. 337 lib tests passing (13 new water+game tests). GamePlugin wires cross-plugin sync. Ready for Phase 7.
+**Note:** 07-02 complete. 379 lib tests passing (14 new state/menu tests). GameState controls all system execution flow.
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 20
+- Total plans completed: 22
 - Average duration: ~7 min
-- Total execution time: ~2.0 hours
+- Total execution time: ~2.6 hours
 
 **By Phase:**
 
@@ -37,8 +37,8 @@ Progress: [########--] 80%
 | 5 - Pipeline Integration | 8 | 93 min | ~12 min |
 
 **Recent Trend:**
-- Last 5 plans: 05-04, 05-05, 05-06, 05-07, 05-08
-- Trend: Consistent ~6-20 min per plan
+- Last 5 plans: 06-01, 06-02, 06-03, 07-01, 07-02
+- Trend: Consistent ~6-25 min per plan
 
 *Updated after each plan completion*
 | Phase 05 P01 | 17min | 2 tasks | 5 files |
@@ -50,6 +50,8 @@ Progress: [########--] 80%
 | Phase 06 P01 | 12min | 2 tasks | 8 files |
 | Phase 06 P02 | 13min | 2 tasks | 11 files |
 | Phase 06 P03 | 25min | 2 tasks | 32 files |
+| Phase 07 P01 | 16min | 2 tasks | 6 files |
+| Phase 07 P02 | 18min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -142,6 +144,14 @@ Recent decisions affecting current work:
 - 06-03: C++ RGB cube decomposition bug replicated intentionally for visual fidelity (R19-F07)
 - 06-03: Linear torque model: yaw += torque * 45.0 * dt (deliberate simplification)
 - 06-03: GamePlugin does NOT add sub-plugins -- main.rs registers all independently
+- 07-01: Volume stored as linear amplitude (0.0-1.0), converted to kira::Decibels at play time
+- 07-01: Startup system creates all 16 DynamicAudioChannels (not lazy init)
+- 07-01: AsciickerAudioPlugin registered BEFORE GamePlugin in main.rs (R17-F214)
+- 07-01: PlaySoundEvent drained unconditionally (P7-055) to prevent accumulation
+- 07-02: configure_sets from GamePlugin gates RenderSet::Pipeline on Playing (avoids modifying CpuRasterizerPlugin)
+- 07-02: RenderSet::WaterTime set added for cross-plugin gating of advance_water_time_system
+- 07-02: Escape from any non-Playing/Paused state returns to MainMenu (R19-005 stuck-state fallback)
+- 07-02: advance_loading_progress checks BOTH AssemblyState.assembled AND terrain.root.is_some()
 
 ### Pending Todos
 
@@ -152,11 +162,11 @@ Recent decisions affecting current work:
 
 ### Blockers/Concerns
 
-- bevy_kira_audio must be 0.25 (not 0.24) for Bevy 0.18 compatibility
-- bevy_replicon_renet2 must be 0.13 for Bevy 0.18 compatibility (Phase 7, not blocking now)
+- ~~bevy_kira_audio must be 0.25 (not 0.24) for Bevy 0.18 compatibility~~ RESOLVED in 07-01
+- bevy_replicon_renet2 must be 0.13 for Bevy 0.18 compatibility (Phase 7, Plan 07-03)
 
 ## Session Continuity
 
-Last session: 2026-02-24
-Stopped at: Completed 06-03-PLAN.md (water reflection, Perlin ripple, GamePlugin, schedule migration, benchmarks). Phase 6 COMPLETE. 337 lib tests passing.
+Last session: 2026-02-25
+Stopped at: Completed 07-02-PLAN.md (GameState FSM, main menu, state-gated gameplay systems). 379 lib tests passing.
 Resume file: None
