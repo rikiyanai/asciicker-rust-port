@@ -324,6 +324,7 @@
 | F238 | Phase 6 runtime: interpolate_height returned height * HEIGHT_SCALE instead of / HEIGHT_SCALE; camera Z not scaled between physics/render coordinate systems | Critical | RESOLVED | interpolate_height: `* HEIGHT_SCALE` → `/ HEIGHT_SCALE`. sync_camera_to_player: multiply physics Z by HEIGHT_SCALE for camera. Shadow raycast: convert interpolate_height world units back to shadow coords (* HEIGHT_SCALE²). |
 | F239 | Phase 6 runtime: shadow tests broke after F238 interpolate_height fix (coordinate system mismatch) | Medium | RESOLVED | Shadow raycast at terrain_z comparison converts interpolate_height world units to shadow coordinate system (* HEIGHT_SCALE²). |
 | F240 | Phase 6 runtime: character sprite invisible — Transform.z in world units but project_world_to_screen expects raw u16 height units | High | RESOLVED | query_character_sprites converts pos.z * HEIGHT_SCALE before calling project_world_to_screen. |
+| F241 | Phase 6 runtime: water level 0x8000 (32768 raw) far above terrain [0,817], reflection pass overwrites entire frame producing black screen | Critical | RESOLVED | C++ game uses water=55 (raw u16), not 0x8000 (format constant). sync_water_to_render converts world units * HEIGHT_SCALE. |
 
 ---
 
