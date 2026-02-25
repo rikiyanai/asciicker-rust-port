@@ -8,8 +8,12 @@ use bevy::prelude::*;
 /// Render pipeline system sets.
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RenderSet {
-    /// The main render pipeline system.
+    /// The main render pipeline system (PostUpdate).
     Pipeline,
+    /// Water ripple time advancement (Update).
+    /// R8-XP-002: Gated on GameState::Playing by GamePlugin to avoid
+    /// unnecessary ripple_time advancement during MainMenu/Loading.
+    WaterTime,
 }
 
 /// Character system sets.

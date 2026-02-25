@@ -1,10 +1,14 @@
-//! Game plugin: wires physics + character + render + camera yaw sync.
+//! Game plugin: wires physics + character + render + camera yaw sync + game state machine.
 //!
 //! CRITICAL: GamePlugin does NOT add PhysicsPlugin, CharacterPlugin, or
 //! CpuRasterizerPlugin as sub-plugins. main.rs registers all plugins
 //! independently. Bevy panics on duplicate plugin registration.
 //!
-//! GamePlugin only adds game-level resources and cross-plugin sync systems.
+//! GamePlugin adds game-level resources, cross-plugin sync systems, and the
+//! game state machine (GameState with MainMenu/Loading/Playing/Paused).
+//!
+//! P7-014 FIX: All Phase 6 gameplay systems are gated on in_state(GameState::Playing)
+//! so they do not run during MainMenu or Loading states.
 
 pub mod menu;
 pub mod state;
@@ -16,8 +20,11 @@ use crate::character::state_machine::Character;
 use crate::physics::{PhysicsIO, PhysicsState};
 use crate::render::WaterConfig;
 use crate::render::camera::GameCamera;
-use crate::system_sets::CharacterSet;
+use crate::system_sets::{CharacterSet, RenderSet};
 use crate::terrain::RuntimeTerrain;
+
+use state::GameState;
+use menu::MainMenu;
 
 // ---------------------------------------------------------------------------
 // Resources
@@ -190,13 +197,85 @@ pub struct GamePlugin;
 
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
+        // ---------------------------------------------------------------
+        // Game state machine (Phase 7 Plan 02)
+        // ---------------------------------------------------------------
+        app.init_state::<GameState>();
+        app.init_resource::<MainMenu>();
+
+        // OnEnter/OnExit for Loading state
+        app.add_systems(OnEnter(GameState::Loading), state::on_enter_loading);
+        app.add_systems(OnExit(GameState::Loading), state::on_exit_loading);
+
+        // OnEnter for Playing state
+        app.add_systems(OnEnter(GameState::Playing), state::on_enter_playing);
+
+        // Loading state systems: advance progress + check completion + render loading screen
+        app.add_systems(
+            Update,
+            (
+                state::advance_loading_progress_system,
+                state::check_loading_complete,
+                state::render_loading_screen,
+            )
+                .chain()
+                .run_if(in_state(GameState::Loading)),
+        );
+
+        // MainMenu state systems: navigation, activation, rendering
+        app.add_systems(
+            Update,
+            (
+                menu::menu_navigation,
+                menu::menu_activate,
+                menu::render_menu,
+            )
+                .chain()
+                .run_if(in_state(GameState::MainMenu)),
+        );
+
+        // Pause toggle: runs in both Playing and Paused states
+        app.add_systems(
+            Update,
+            state::toggle_pause.run_if(
+                in_state(GameState::Playing).or(in_state(GameState::Paused)),
+            ),
+        );
+
+        // ---------------------------------------------------------------
+        // P7-038 FIX: Gate RenderSet::Pipeline on GameState::Playing.
+        // This prevents render_pipeline_system from clearing AsciiCellGrid
+        // during MainMenu (which would overwrite render_menu output).
+        // RenderSet::Pipeline is labeled by CpuRasterizerPlugin; we configure
+        // its run condition from GamePlugin without modifying CpuRasterizerPlugin.
+        // ---------------------------------------------------------------
+        app.configure_sets(
+            PostUpdate,
+            RenderSet::Pipeline.run_if(in_state(GameState::Playing)),
+        );
+
+        // R8-XP-002 FIX: Gate advance_water_time_system on Playing state.
+        // Prevents unnecessary ripple_time advancement during MainMenu/Loading.
+        app.configure_sets(
+            Update,
+            RenderSet::WaterTime.run_if(in_state(GameState::Playing)),
+        );
+
+        // ---------------------------------------------------------------
         // Game-domain resources
+        // ---------------------------------------------------------------
         // C++ default: water = 55 (raw u16 height units). World units = 55 / HEIGHT_SCALE.
         // Source: game_app.cpp:2061, game_web.cpp:911, mainmenu.cpp "ak.setWater(55)"
         app.insert_resource(WaterLevel(55.0 / crate::asset_loader::constants::HEIGHT_SCALE as f32));
-        // GameState deferred to Phase 7 Plan 02
+
+        // ---------------------------------------------------------------
+        // P7-014 FIX: Gate ALL Phase 6 systems on GameState::Playing.
+        // This prevents physics sync, camera, and water systems from
+        // running during MainMenu or Loading states.
+        // ---------------------------------------------------------------
 
         // PreUpdate: sync water + mount to physics (after character input)
+        // Gated on Playing state so physics doesn't run during menu.
         app.configure_sets(
             PreUpdate,
             CharacterSet::PreUpdateInput.before(GameSet::PhysicsSync),
@@ -205,10 +284,12 @@ impl Plugin for GamePlugin {
             PreUpdate,
             (sync_water_to_physics, sync_mount_to_physics)
                 .chain()
-                .in_set(GameSet::PhysicsSync),
+                .in_set(GameSet::PhysicsSync)
+                .run_if(in_state(GameState::Playing)),
         );
 
         // Update: torque -> camera yaw, water -> render config, terrain teleport
+        // All gated on Playing state.
         app.add_systems(
             Update,
             (
@@ -216,28 +297,33 @@ impl Plugin for GamePlugin {
                 apply_torque_to_camera,
                 sync_water_to_render,
             )
-                .chain(),
+                .chain()
+                .run_if(in_state(GameState::Playing)),
         );
 
         // PostUpdate: cross-plugin ordering for render pipeline
         app.configure_sets(
             PostUpdate,
-            CharacterSet::SpritePush.before(crate::system_sets::RenderSet::Pipeline),
+            CharacterSet::SpritePush.before(RenderSet::Pipeline),
         );
 
         // PostUpdate: sync physics output to camera + character transform
+        // Gated on Playing state.
         app.add_systems(
             PostUpdate,
-            sync_camera_to_player.before(CharacterSet::SpritePush),
+            sync_camera_to_player
+                .before(CharacterSet::SpritePush)
+                .run_if(in_state(GameState::Playing)),
         );
         app.add_systems(
             PostUpdate,
             sync_physics_to_character
                 .before(CharacterSet::SpritePush)
-                .in_set(CharacterSet::PhysicsSync),
+                .in_set(CharacterSet::PhysicsSync)
+                .run_if(in_state(GameState::Playing)),
         );
 
-        info!("GamePlugin registered (water sync, torque, camera follow, schedule ordering)");
+        info!("GamePlugin registered (state machine, menu, water sync, torque, camera follow)");
     }
 }
 
@@ -370,6 +456,35 @@ mod tests {
         transform.translation.z = pos[2];
 
         assert_eq!(transform.translation, Vec3::new(5.0, 10.0, 15.0));
+    }
+
+    #[test]
+    fn test_game_state_default_starts_at_main_menu() {
+        // GameState::MainMenu is the default state on startup
+        assert_eq!(GameState::default(), GameState::MainMenu);
+    }
+
+    #[test]
+    fn test_game_state_all_four_variants_exist() {
+        // Verify all 4 GameState variants compile and are distinct
+        let states = [
+            GameState::MainMenu,
+            GameState::Loading,
+            GameState::Playing,
+            GameState::Paused,
+        ];
+        for i in 0..states.len() {
+            for j in (i + 1)..states.len() {
+                assert_ne!(states[i], states[j]);
+            }
+        }
+    }
+
+    #[test]
+    fn test_main_menu_default_has_two_items() {
+        let menu = MainMenu::default();
+        assert_eq!(menu.items.len(), 2);
+        assert_eq!(menu.selected_index, 0);
     }
 
 }

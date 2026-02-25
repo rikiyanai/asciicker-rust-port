@@ -100,7 +100,8 @@ impl Plugin for CpuRasterizerPlugin {
         );
 
         // Water time advances in Update (before PostUpdate render reads it)
-        app.add_systems(Update, advance_water_time_system);
+        // R8-XP-002: Labeled with RenderSet::WaterTime so GamePlugin can gate on Playing state.
+        app.add_systems(Update, advance_water_time_system.in_set(RenderSet::WaterTime));
 
         // R19-F04 FIX: render_pipeline_system in PostUpdate with RenderSet::Pipeline label.
         // This enables cross-plugin ordering: CharacterSet::SpritePush.before(RenderSet::Pipeline)
