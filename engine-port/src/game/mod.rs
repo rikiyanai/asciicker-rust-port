@@ -132,6 +132,7 @@ fn teleport_to_terrain_system(
     mut physics_io: ResMut<PhysicsIO>,
     mut physics_state: ResMut<PhysicsState>,
     mut camera: ResMut<GameCamera>,
+    water_level: Res<WaterLevel>,
     mut initialized: Local<bool>,
 ) {
     if *initialized || terrain.root.is_none() {
@@ -163,7 +164,7 @@ fn teleport_to_terrain_system(
             best_z // world units: raw / HEIGHT_SCALE
         });
 
-    let spawn_z = terrain_z + 2.0; // Slightly above terrain surface
+    let spawn_z = (terrain_z + 2.0).max(water_level.0 + 2.0); // Clamp above water
 
     physics_io.pos = [x, y, spawn_z];
     // Reset velocity (stop falling)
@@ -173,8 +174,8 @@ fn teleport_to_terrain_system(
     camera.pos = [x, y, spawn_z];
 
     info!(
-        "F234 FIX: Teleported player to terrain surface z={:.1} (terrain_z={:.1}) at ({:.1}, {:.1})",
-        spawn_z, terrain_z, x, y
+        "F234 FIX: Teleported player to terrain surface z={:.1} (terrain_z={:.1}, water={:.1}) at ({:.1}, {:.1})",
+        spawn_z, terrain_z, water_level.0, x, y
     );
 }
 
@@ -367,4 +368,5 @@ mod tests {
 
         assert_eq!(transform.translation, Vec3::new(5.0, 10.0, 15.0));
     }
+
 }

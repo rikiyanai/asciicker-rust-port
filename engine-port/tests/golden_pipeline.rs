@@ -96,6 +96,7 @@ fn run_pipeline(
             patch.x,
             patch.y,
             &camera,
+            None,
         );
     });
 

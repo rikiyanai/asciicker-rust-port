@@ -75,10 +75,21 @@ pub fn render_water_reflections(
     let buf_h = sample_buffer.height as i32;
 
     if terrain.root.is_some() {
-        // Build a flipped camera for the terrain shader
+        // F242 FIX: Save pre-reflection heights to identify underwater cells.
+        // After the reflection render, we can't tell which cells were originally
+        // underwater vs above-water, so we save heights before rendering.
+        let pre_heights: Vec<f32> = sample_buffer.samples.iter().map(|s| s.height).collect();
+        let pre_spares: Vec<u8> = sample_buffer.samples.iter().map(|s| s.spare).collect();
+
+        // Build a flipped camera for the terrain shader.
+        // F242 FIX: Set perspective=false so render_patch uses the flipped view_tm
+        // via transform_vertex(). In perspective mode, render_patch ignores view_tm
+        // and uses view_pos/view_dir/mul/add/view_ofs (which are NOT flipped),
+        // making the reflection render a complete no-op.
         let mut flipped_camera = camera.clone();
         flipped_camera.view_tm = flipped_tm;
         flipped_camera.frustum_planes = flipped_planes.clone();
+        flipped_camera.perspective = false;
 
         terrain.query_visible(&flipped_planes, |patch| {
             crate::render::terrain_shader::render_patch(
@@ -89,18 +100,31 @@ pub fn render_water_reflections(
                 patch.x,
                 patch.y,
                 &flipped_camera,
+                None, // No water clamping in reflection mode
             );
         });
-    }
 
-    // Step 4: World mesh reflections (TODO: re-query world with flipped frustum)
-    // For MVP, terrain reflections are the primary visual. Mesh reflections
-    // can be added when BSP frustum culling is fixed (same issue as Stage 3).
+        // Step 4: World mesh reflections (TODO: re-query world with flipped frustum)
+        // For MVP, terrain reflections are the primary visual. Mesh reflections
+        // can be added when BSP frustum culling is fixed (same issue as Stage 3).
 
-    // Step 5: Mark reflected samples with spare bit
-    for sample in sample_buffer.samples.iter_mut() {
-        if sample.height > Sample::CLEAR_HEIGHT {
-            sample.spare |= spare_bits::REFLECTION; // 0x03
+        // Step 5: Mark ONLY underwater terrain cells with REFLECTION spare bit.
+        // F242 FIX: Previous code marked ALL non-clear samples, causing water
+        // ripple on trees/meshes instead of water areas only.
+        //
+        // Underwater = original terrain height was below water_z AND was terrain
+        // (not mesh, not clear). The z-buffer naturally prevents the reflection
+        // render from overwriting above-water terrain (reflected z < original z
+        // for terrain above water_z).
+        for (i, sample) in sample_buffer.samples.iter_mut().enumerate() {
+            let pre_h = pre_heights[i];
+            let pre_spare = pre_spares[i];
+            let was_terrain = pre_spare & spare_bits::MESH_FLAG == 0;
+            let was_underwater = pre_h > Sample::CLEAR_HEIGHT && pre_h <= water_z;
+
+            if was_terrain && was_underwater {
+                sample.spare |= spare_bits::REFLECTION;
+            }
         }
     }
 }
@@ -429,4 +453,5 @@ mod tests {
         assert_eq!(cb_buggy2, 8, "For c=150: buggy cb should be 8");
         assert_eq!(cb_correct2, 2, "For c=150: correct cb should be 2");
     }
+
 }

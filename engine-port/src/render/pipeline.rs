@@ -312,8 +312,13 @@ pub fn render_pipeline_system(
         if terrain.root.is_some() {
             terrain.query_visible(&camera.frustum_planes, |patch| {
                 _terrain_patch_count += 1;
+                let wz = if water_config.water_z > f32::NEG_INFINITY {
+                    Some(water_config.water_z)
+                } else {
+                    None
+                };
                 crate::render::terrain_shader::render_patch(
-                    buf, buf_w, buf_h, patch, patch.x, patch.y, &camera,
+                    buf, buf_w, buf_h, patch, patch.x, patch.y, &camera, wz,
                 );
             });
         }
@@ -406,6 +411,39 @@ pub fn render_pipeline_system(
     }
     timing.reflection_us = t4.elapsed().as_micros() as u64;
 
+    // F242 diagnostic: log water state for first frame
+    {
+        static WATER_DIAG: std::sync::atomic::AtomicBool =
+            std::sync::atomic::AtomicBool::new(false);
+        if terrain.root.is_some() && !WATER_DIAG.load(std::sync::atomic::Ordering::Relaxed) {
+            WATER_DIAG.store(true, std::sync::atomic::Ordering::Relaxed);
+            let underwater = sample_buffer
+                .samples
+                .iter()
+                .filter(|s| {
+                    s.height > crate::render::sample_buffer::Sample::CLEAR_HEIGHT
+                        && s.height < water_config.water_z
+                })
+                .count();
+            let reflected = sample_buffer
+                .samples
+                .iter()
+                .filter(|s| {
+                    s.spare & crate::render::sample_buffer::spare_bits::PARITY_MASK
+                        == crate::render::sample_buffer::spare_bits::REFLECTION
+                })
+                .count();
+            info!(
+                "F242 water: water_z={} camera_z={} underwater_samples={} reflected_samples={} reflection_us={}",
+                water_config.water_z,
+                camera.pos[2],
+                underwater,
+                reflected,
+                timing.reflection_us,
+            );
+        }
+    }
+
     // STEP 5: Stage 6 RESOLVE
     // R19-F02/F09 FIX: 3-step split -- resolve -> water ripple -> RGBA conversion.
     // DO NOT call resolve_to_grid as single function (ripple must run between
@@ -441,7 +479,10 @@ pub fn render_pipeline_system(
         }
 
         // Step 3: Glyph selection + RGBA conversion to cell_grid
+        // F242: For REFLECTION cells, apply blue water tint to make water
+        // visually distinct from normal terrain.
         let mut glyph_sel = AutoMatGlyphSelector;
+        let sample_w = sample_buffer.width as usize;
         for cy in 0..ascii_h {
             for cx in 0..ascii_w {
                 let i = cy * ascii_w + cx;
@@ -450,8 +491,37 @@ pub fn render_pipeline_system(
                     Some(glyph) => glyph,
                     None => cell.gl,
                 };
-                let fg_rgb = XTERM_256_PALETTE[cell.fg as usize];
-                let bk_rgb = XTERM_256_PALETTE[cell.bk as usize];
+                let mut fg_rgb = XTERM_256_PALETTE[cell.fg as usize];
+                let mut bk_rgb = XTERM_256_PALETTE[cell.bk as usize];
+
+                // Check if this cell corresponds to a reflected (water) sample
+                let sx = 2 + 2 * cx;
+                let sy = 2 + 2 * cy;
+                let sample_idx = sy * sample_w + sx;
+                if sample_idx < sample_buffer.samples.len() {
+                    let sample = &sample_buffer.samples[sample_idx];
+                    if sample.spare & crate::render::sample_buffer::spare_bits::PARITY_MASK
+                        == crate::render::sample_buffer::spare_bits::REFLECTION
+                    {
+                        // Water tint: blend toward dark blue (0, 30, 80)
+                        // 40% original + 60% water tint for bg (dominant water color)
+                        // 60% original + 40% water tint for fg (keep reflected detail)
+                        const WATER_R: u8 = 0;
+                        const WATER_G: u8 = 30;
+                        const WATER_B: u8 = 80;
+                        bk_rgb = [
+                            ((bk_rgb[0] as u16 * 40 + WATER_R as u16 * 60) / 100) as u8,
+                            ((bk_rgb[1] as u16 * 40 + WATER_G as u16 * 60) / 100) as u8,
+                            ((bk_rgb[2] as u16 * 40 + WATER_B as u16 * 60) / 100) as u8,
+                        ];
+                        fg_rgb = [
+                            ((fg_rgb[0] as u16 * 60 + WATER_R as u16 * 40) / 100) as u8,
+                            ((fg_rgb[1] as u16 * 60 + WATER_G as u16 * 40) / 100) as u8,
+                            ((fg_rgb[2] as u16 * 60 + WATER_B as u16 * 40) / 100) as u8,
+                        ];
+                    }
+                }
+
                 cell_grid.char_indices[i] = gl as u16;
                 cell_grid.fg_colors[i] = [fg_rgb[0], fg_rgb[1], fg_rgb[2], 255];
                 cell_grid.bg_colors[i] = [bk_rgb[0], bk_rgb[1], bk_rgb[2], 255];

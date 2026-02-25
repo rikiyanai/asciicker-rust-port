@@ -130,6 +130,10 @@ impl Plugin for PhysicsPlugin {
             world_radius,
             world_height,
             water: f32::NEG_INFINITY,
+            // F242 FIX: Match GameCamera default pos [0, 15, 0] so teleport
+            // lands at terrain (0,15) where height > water_z (not (0,0) which
+            // is underwater — terrain_z * HEIGHT_SCALE < water_z=55).
+            pos: [0.0, 15.0, 0.0],
             ..Default::default()
         });
         app.insert_resource(PhysicsState::default());

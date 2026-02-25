@@ -90,6 +90,7 @@ pub fn render_patch(
     patch_x: i32,
     patch_y: i32,
     camera: &GameCamera,
+    water_z: Option<f32>,
 ) {
     let view_tm = &camera.view_tm;
 
@@ -99,15 +100,25 @@ pub fn render_patch(
     for hy in 0..HEIGHT_CELLS {
         for hx in 0..HEIGHT_CELLS {
             // Get 4 corner heights for this quad
-            let h00 = patch.height[hy][hx] as f64;
-            let h10 = patch.height[hy][hx + 1] as f64;
-            let h01 = patch.height[hy + 1][hx] as f64;
-            let h11 = patch.height[hy + 1][hx + 1] as f64;
+            let h00_raw = patch.height[hy][hx] as f64;
+            let h10_raw = patch.height[hy][hx + 1] as f64;
+            let h01_raw = patch.height[hy + 1][hx] as f64;
+            let h11_raw = patch.height[hy + 1][hx + 1] as f64;
 
-            // Compute per-quad Lambertian diffuse (C++ render.cpp:1680-1686)
-            let dzdx = (h10 - h00) as i32;
-            let dzdy = (h01 - h00) as i32;
+            // Compute per-quad Lambertian diffuse from RAW heights (before water clamp)
+            let dzdx = (h10_raw - h00_raw) as i32;
+            let dzdy = (h01_raw - h00_raw) as i32;
             let diffuse_base = compute_diffuse(dzdx, dzdy);
+
+            // Clamp vertex heights to water_z for projection. This makes underwater
+            // terrain project as a flat surface at water level, filling screen space
+            // that would otherwise be black. C++ render.cpp:1584 equivalent.
+            let (h00, h10, h01, h11) = if let Some(wz) = water_z {
+                let wz = wz as f64;
+                (h00_raw.max(wz), h10_raw.max(wz), h01_raw.max(wz), h11_raw.max(wz))
+            } else {
+                (h00_raw, h10_raw, h01_raw, h11_raw)
+            };
 
             // Compute world-space vertex positions.
             // C++ formula: vx = x * HEIGHT_CELLS + dx * VISUAL_CELLS (render.cpp:1723)
@@ -366,7 +377,7 @@ mod tests {
         let buf_h = 48;
         let mut buf = vec![Sample::clear_state(); (buf_w * buf_h) as usize];
 
-        render_patch(&mut buf, buf_w, buf_h, &patch, 0, 0, &camera);
+        render_patch(&mut buf, buf_w, buf_h, &patch, 0, 0, &camera, None);
 
         // Count non-clear samples
         let non_clear = buf
@@ -407,7 +418,7 @@ mod tests {
         let buf_h = 48;
         let mut buf = vec![Sample::clear_state(); (buf_w * buf_h) as usize];
 
-        render_patch(&mut buf, buf_w, buf_h, &patch, 0, 0, &camera);
+        render_patch(&mut buf, buf_w, buf_h, &patch, 0, 0, &camera, None);
 
         // Collect all unique visual values from non-clear samples
         let visuals: std::collections::HashSet<u16> = buf
@@ -453,7 +464,7 @@ mod tests {
         let buf_h = 48;
         let mut buf = vec![Sample::clear_state(); (buf_w * buf_h) as usize];
 
-        render_patch(&mut buf, buf_w, buf_h, &patch, 0, 0, &camera);
+        render_patch(&mut buf, buf_w, buf_h, &patch, 0, 0, &camera, None);
 
         // Collect diffuse values from non-clear samples
         let diffuse_values: std::collections::HashSet<u8> = buf
@@ -483,7 +494,7 @@ mod tests {
         let buf_h = 48;
         let mut buf = vec![Sample::clear_state(); (buf_w * buf_h) as usize];
 
-        render_patch(&mut buf, buf_w, buf_h, &patch, 0, 0, &camera);
+        render_patch(&mut buf, buf_w, buf_h, &patch, 0, 0, &camera, None);
 
         for s in &buf {
             if s.height != Sample::CLEAR_HEIGHT {
@@ -517,7 +528,7 @@ mod tests {
         let mut buf = vec![Sample::clear_state(); (buf_w * buf_h) as usize];
 
         // Render patch at grid (0, 15) — near the camera
-        render_patch(&mut buf, buf_w, buf_h, &patch, 0, 15, &camera);
+        render_patch(&mut buf, buf_w, buf_h, &patch, 0, 15, &camera, None);
 
         let non_clear = buf
             .iter()

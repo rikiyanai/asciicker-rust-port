@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3.1: Audit Remediation** - Fix Critical/High severity code-level risks from Phases 1-3 audit before Phase 5 integration (INSERTED)
 - [x] **Phase 4: CPU Rasterizer Core** - SampleBuffer, triangle/line rasterization, materials, color quantization, and RESOLVE stage
 - [x] **Phase 5: Pipeline Integration** - Full 6-stage rendering pipeline producing real scene output from .a3d world files
-- [x] **Phase 6: Physics and Character** - Sphere collision, character state machine, player input, water, and effects
+- [ ] **Phase 6: Physics and Character** - Sphere collision, character state machine, player input, water, and effects
 - [ ] **Phase 7: Game Systems** - Audio, networking, weather, menus, and visual quality polish
 
 ## Phase Details
@@ -182,7 +182,7 @@ Note: Phases 3 and 4 are independent (both depend only on Phase 1) and can execu
 | 3.1 Audit Remediation | 1/1 | Complete    | 2026-02-20 |
 | 4. CPU Rasterizer Core | 4/4 | Complete | 2026-02-20 |
 | 5. Pipeline Integration | 8/8 | Complete | 2026-02-22 |
-| 6. Physics and Character | 3/3 | Complete | 2026-02-24 |
+| 6. Physics and Character | 3/3 | In Progress | - |
 | 7. Game Systems | 0/5 | Planned | - |
 
 ## Developer Experience
