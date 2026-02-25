@@ -87,8 +87,10 @@ fn sync_water_to_physics(water_level: Res<WaterLevel>, mut physics_io: ResMut<Ph
 /// Sync WaterLevel to WaterConfig.water_z for render pipeline reflection.
 ///
 /// Runs in Update (before PostUpdate render reads it).
+/// WaterLevel is in physics world units. Render uses raw u16 height units
+/// (matching camera.pos[2]). Multiply by HEIGHT_SCALE to convert.
 fn sync_water_to_render(water_level: Res<WaterLevel>, mut water_config: ResMut<WaterConfig>) {
-    water_config.water_z = water_level.0;
+    water_config.water_z = water_level.0 * crate::asset_loader::constants::HEIGHT_SCALE as f32;
 }
 
 /// Sync physics output to character entity Transform.
@@ -185,7 +187,8 @@ pub struct GamePlugin;
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
         // Game-domain resources
-        app.insert_resource(WaterLevel(f32::NEG_INFINITY));
+        // C++ default: water = 0x8000 (32768 raw u16). World units = 32768 / HEIGHT_SCALE = 2048.
+        app.insert_resource(WaterLevel(32768.0 / crate::asset_loader::constants::HEIGHT_SCALE as f32));
         // GameState deferred to Phase 7 Plan 02
 
         // PreUpdate: sync water + mount to physics (after character input)
@@ -243,9 +246,9 @@ mod tests {
 
     #[test]
     fn test_water_level_syncs_to_physics() {
+        // WaterLevel is in world units, passes directly to PhysicsIO.water
         let water_level = WaterLevel(5.0);
         let mut physics_io = PhysicsIO::default();
-        assert_eq!(physics_io.water, f32::NEG_INFINITY);
 
         physics_io.water = water_level.0;
         assert_eq!(physics_io.water, 5.0);
@@ -253,14 +256,16 @@ mod tests {
 
     #[test]
     fn test_water_level_syncs_to_render() {
+        use crate::asset_loader::constants::HEIGHT_SCALE;
+        // WaterLevel is in world units. Render needs raw u16 (multiply by HEIGHT_SCALE).
         let water_level = WaterLevel(10.0);
         let mut water_config = WaterConfig {
             water_z: f32::NEG_INFINITY,
             ripple_time: 0.0,
         };
 
-        water_config.water_z = water_level.0;
-        assert_eq!(water_config.water_z, 10.0);
+        water_config.water_z = water_level.0 * HEIGHT_SCALE as f32;
+        assert_eq!(water_config.water_z, 10.0 * HEIGHT_SCALE as f32);
     }
 
     #[test]
