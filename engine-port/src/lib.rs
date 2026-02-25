@@ -3,6 +3,7 @@ pub mod audio;
 pub mod character;
 pub mod core;
 pub mod game;
+pub mod network;
 pub mod output;
 pub mod physics;
 pub mod render;

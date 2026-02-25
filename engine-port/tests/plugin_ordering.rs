@@ -67,6 +67,7 @@ fn all_plugins_init_in_main_order() {
         MinimalPlugins,
         AssetPlugin::default(),
         bevy::image::ImagePlugin::default(),
+        bevy::state::app::StatesPlugin,
     ));
     app.add_plugins((
         AssetLoaderPlugin,

@@ -5,6 +5,7 @@ use asciicker_engine::asset_loader::AssetLoaderPlugin;
 use asciicker_engine::audio::AsciickerAudioPlugin;
 use asciicker_engine::character::CharacterPlugin;
 use asciicker_engine::game::GamePlugin;
+use asciicker_engine::network::NetworkPlugin;
 use asciicker_engine::output::AsciiOutputPlugin;
 use asciicker_engine::physics::PhysicsPlugin;
 use asciicker_engine::render::CpuRasterizerPlugin;
@@ -30,6 +31,7 @@ fn main() {
             PhysicsPlugin,
             CharacterPlugin,
             AsciickerAudioPlugin,
+            NetworkPlugin,
             GamePlugin,
         ))
         .add_systems(Update, fps_title_system);
