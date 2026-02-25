@@ -187,8 +187,9 @@ pub struct GamePlugin;
 impl Plugin for GamePlugin {
     fn build(&self, app: &mut App) {
         // Game-domain resources
-        // C++ default: water = 0x8000 (32768 raw u16). World units = 32768 / HEIGHT_SCALE = 2048.
-        app.insert_resource(WaterLevel(32768.0 / crate::asset_loader::constants::HEIGHT_SCALE as f32));
+        // C++ default: water = 55 (raw u16 height units). World units = 55 / HEIGHT_SCALE.
+        // Source: game_app.cpp:2061, game_web.cpp:911, mainmenu.cpp "ak.setWater(55)"
+        app.insert_resource(WaterLevel(55.0 / crate::asset_loader::constants::HEIGHT_SCALE as f32));
         // GameState deferred to Phase 7 Plan 02
 
         // PreUpdate: sync water + mount to physics (after character input)
