@@ -96,8 +96,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Game Systems
 
-- [ ] **GAME-01**: Game state machine (Loading -> Playing -> Paused)
-- [ ] **GAME-02**: Main menu with basic navigation
+- [x] **GAME-01**: Game state machine (Loading -> Playing -> Paused)
+- [x] **GAME-02**: Main menu with basic navigation
 - [ ] **GAME-03**: Weather effects (rain, snow particle systems)
 
 ### Audit Remediation
@@ -211,8 +211,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUD-02 | Phase 7 | Complete |
 | NET-01 | Phase 7 | Pending |
 | NET-02 | Phase 7 | Pending |
-| GAME-01 | Phase 7 | Pending |
-| GAME-02 | Phase 7 | Pending |
+| GAME-01 | Phase 7 | Complete |
+| GAME-02 | Phase 7 | Complete |
 | GAME-03 | Phase 7 | Pending |
 | VIS-01 | Phase 7 | Pending |
 | VIS-03 | Phase 7 | Pending |
