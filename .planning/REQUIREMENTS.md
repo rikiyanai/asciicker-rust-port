@@ -91,8 +91,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Networking
 
-- [ ] **NET-01**: Basic client-server multiplayer (entity replication, position sync)
-- [ ] **NET-02**: Binary protocol compatible with or inspired by C++ WebSocket protocol
+- [x] **NET-01**: Basic client-server multiplayer (entity replication, position sync)
+- [x] **NET-02**: Binary protocol compatible with or inspired by C++ WebSocket protocol
 
 ### Game Systems
 
@@ -209,8 +209,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FX-02 | Phase 6 | Complete |
 | AUD-01 | Phase 7 | Complete |
 | AUD-02 | Phase 7 | Complete |
-| NET-01 | Phase 7 | Pending |
-| NET-02 | Phase 7 | Pending |
+| NET-01 | Phase 7 | Complete |
+| NET-02 | Phase 7 | Complete |
 | GAME-01 | Phase 7 | Complete |
 | GAME-02 | Phase 7 | Complete |
 | GAME-03 | Phase 7 | Pending |
