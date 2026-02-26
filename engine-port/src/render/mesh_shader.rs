@@ -203,6 +203,15 @@ pub fn render_mesh(
     }
 }
 
+/// Public test accessor for compute_face_diffuse.
+#[cfg(test)]
+pub fn compute_face_diffuse_public(
+    v0: [f64; 3], v1: [f64; 3], v2: [f64; 3],
+    instance_tm: &[f64; 16], light_dir: [f32; 3], light_ambient: f32,
+) -> u8 {
+    compute_face_diffuse(v0, v1, v2, instance_tm, light_dir, light_ambient)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
