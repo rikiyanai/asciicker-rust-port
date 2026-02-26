@@ -19,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: CPU Rasterizer Core** - SampleBuffer, triangle/line rasterization, materials, color quantization, and RESOLVE stage
 - [x] **Phase 5: Pipeline Integration** - Full 6-stage rendering pipeline producing real scene output from .a3d world files
 - [x] **Phase 6: Physics and Character** - Sphere collision, character state machine, player input, water, and effects
-- [ ] **Phase 7: Game Systems** - Audio, networking, weather, menus, and visual quality polish
+- [x] **Phase 7: Game Systems** - Audio, networking, weather, menus, and visual quality polish
 - [ ] **Phase 7.1: Physics & Character Polish** - Critical fixes for camera sync, rotation, and actions (INSERTED)
 - [ ] **Phase 8: NPC AI and Combat** - Enemy spawning, target selection, stuck detection, and melee combat
 - [ ] **Phase 9: Inventory and Items** - Item catalog, grid-based inventory UI, pickup/drop interaction, and equipment lifecycle
@@ -173,7 +173,7 @@ Plans:
 - [x] 07-02-PLAN.md -- Game state machine (Loading/Playing/Paused) and main menu (wave 1)
 - [x] 07-03-PLAN.md -- Networking: bevy_replicon 0.38, binary protocol, server/client (wave 2)
 - [x] 07-04-PLAN.md -- Visual quality: Alex Harri 6D shape-vector + Font1 3 skins (TDD, wave 3)
-- [ ] 07-05-PLAN.md -- Weather: ring-buffer particle pool, Perlin wind, snow/rain (TDD, wave 4)
+- [x] 07-05-PLAN.md -- Weather: ring-buffer particle pool, Perlin wind, snow/rain (TDD, wave 4)
 
 ### Phase 7.1: Physics & Character Polish
 **Goal**: Fix critical integration gaps from Phase 6 identified during audit: camera sync, rotation, and Block action
@@ -265,7 +265,7 @@ Note: Phases 3 and 4 are independent (both depend only on Phase 1) and can execu
 | 4. CPU Rasterizer Core | 4/4 | Complete | 2026-02-20 |
 | 5. Pipeline Integration | 8/8 | Complete | 2026-02-22 |
 | 6. Physics and Character | 3/3 | Complete | 2026-02-24 |
-| 7. Game Systems | 2/5 | In Progress | - |
+| 7. Game Systems | 5/5 | Complete | 2026-02-26 |
 | 7.1 Physics & Character Polish | 0/1 | Planned | - |
 | 8. NPC AI and Combat | 0/4 | Planned | - |
 | 9. Inventory and Items | 0/4 | Planned | - |

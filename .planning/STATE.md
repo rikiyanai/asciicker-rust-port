@@ -10,13 +10,13 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 ## Current Position
 
 Phase: 7 of 15 (Game Systems)
-Plan: 4 of 5 in current phase (07-04 complete)
-Status: Phase 7 in progress. Plans 07-01, 07-02, 07-03, 07-04 complete. 1 plan remaining (07-05).
-Last activity: 2026-02-26 -- Completed 07-04: Shape-vector glyph matching with kiddo k-d tree, Font1 with 3 skins, pipeline wiring
+Plan: 5 of 5 in current phase (07-05 complete)
+Status: Phase 7 COMPLETE. All 5 plans (07-01 through 07-05) executed successfully.
+Last activity: 2026-02-26 -- Completed 07-05: Weather particle effects with ring-buffer pool, Perlin wind, composite after resolve
 
-Progress: [#########=] 92%
+Progress: [##########] 100%
 
-**Note:** 07-04 complete. 430 lib tests passing (29 new shape-vector + font tests). ShapeVectorGlyphSelector wired into pipeline, Font1 ready for HUD text.
+**Note:** Phase 7 complete. 446 lib tests passing (16 new weather tests). Weather particles composite to AsciiCellGrid after render pipeline. All game systems implemented.
 
 ## Performance Metrics
 
@@ -37,7 +37,7 @@ Progress: [#########=] 92%
 | 5 - Pipeline Integration | 8 | 93 min | ~12 min |
 
 **Recent Trend:**
-- Last 5 plans: 06-03, 07-01, 07-02, 07-03, 07-04
+- Last 5 plans: 07-01, 07-02, 07-03, 07-04, 07-05
 - Trend: Consistent ~6-25 min per plan
 
 *Updated after each plan completion*
@@ -53,6 +53,7 @@ Progress: [#########=] 92%
 | Phase 07 P01 | 16min | 2 tasks | 6 files |
 | Phase 07 P02 | 18min | 2 tasks | 5 files |
 | Phase 07 P04 | 12min | 2 tasks | 8 files |
+| Phase 07 P05 | 14min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -157,6 +158,10 @@ Recent decisions affecting current work:
 - 07-04: Font1 default_fg = [170,170,170] matching C++ VGA terminal silver/grey
 - 07-04: distance_threshold = 0.05 (squared Euclidean) for auto_mat fallback in uniform regions
 - 07-04: Font1 is Resource-only (no systems) -- calling systems enforce ordering after render_pipeline_system
+- 07-05: Depth testing for weather particles deferred (C++ also lacks it)
+- 07-05: fg=255 (white) for all weather particles matching C++ behavior
+- 07-05: Rain glyphs are extension over C++ (which only has snow)
+- 07-05: No automatic weather state trigger -- public API only (debug key deferred)
 
 ### Pending Todos
 
@@ -173,5 +178,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Completed 07-04-PLAN.md (shape-vector glyph matching, Font1 with 3 skins, pipeline wiring). 430 lib tests passing.
+Stopped at: Completed 07-05-PLAN.md (weather particle effects). Phase 7 complete. 446 lib tests passing.
 Resume file: None
