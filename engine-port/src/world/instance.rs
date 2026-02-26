@@ -297,7 +297,7 @@ mod tests {
             flags: 0,
             story_id: -1,
         };
-        RuntimeInstance::from_world_instance(&wi);
+        RuntimeInstance::from_world_instance(&wi, None);
     }
 
     #[test]

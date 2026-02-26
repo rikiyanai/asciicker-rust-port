@@ -1,6 +1,5 @@
 use bevy::prelude::*;
-use bevy::utils::{EntityHashMap, HashMap};
-use smallvec::SmallVec;
+use std::collections::HashMap;
 
 /// Size of each spatial grid cell in world units.
 /// Matching VISUAL_CELLS from C++ (8.0).
@@ -13,9 +12,9 @@ pub const CELL_SIZE: f32 = 8.0;
 #[derive(Resource, Default)]
 pub struct SpatialGrid {
     /// Cell index to list of entities.
-    pub cells: HashMap<(i32, i32, i32), SmallVec<[Entity; 8]>>,
+    pub cells: HashMap<(i32, i32, i32), Vec<Entity>>,
     /// Entity to cell index reverse mapping for efficient removal.
-    pub entity_cells: EntityHashMap<Entity, (i32, i32, i32)>,
+    pub entity_cells: HashMap<Entity, (i32, i32, i32)>,
 }
 
 impl SpatialGrid {
@@ -141,26 +140,41 @@ impl SpatialGrid {
         let step_y = if dir.y > 0.0 { 1 } else { -1 };
         let step_z = if dir.z > 0.0 { 1 } else { -1 };
 
-        let delta_x = (CELL_SIZE / dir.x.abs()).abs();
-        let delta_y = (CELL_SIZE / dir.y.abs()).abs();
-        let delta_z = (CELL_SIZE / dir.z.abs()).abs();
+        // Guard against axis-aligned rays: if a component is near zero,
+        // set delta to f32::MAX so that axis is never the min and we
+        // never step along it (avoids NaN / infinite loop).
+        let delta_x = if dir.x.abs() > 1e-10 { CELL_SIZE / dir.x.abs() } else { f32::MAX };
+        let delta_y = if dir.y.abs() > 1e-10 { CELL_SIZE / dir.y.abs() } else { f32::MAX };
+        let delta_z = if dir.z.abs() > 1e-10 { CELL_SIZE / dir.z.abs() } else { f32::MAX };
 
-        let mut max_x = if dir.x > 0.0 {
-            (((gx + 1) as f32 * CELL_SIZE) - origin.x) / dir.x
+        let mut max_x = if dir.x.abs() > 1e-10 {
+            if dir.x > 0.0 {
+                (((gx + 1) as f32 * CELL_SIZE) - origin.x) / dir.x
+            } else {
+                ((gx as f32 * CELL_SIZE) - origin.x) / dir.x
+            }
         } else {
-            ((gx as f32 * CELL_SIZE) - origin.x) / dir.x
+            f32::MAX
         };
 
-        let mut max_y = if dir.y > 0.0 {
-            (((gy + 1) as f32 * CELL_SIZE) - origin.y) / dir.y
+        let mut max_y = if dir.y.abs() > 1e-10 {
+            if dir.y > 0.0 {
+                (((gy + 1) as f32 * CELL_SIZE) - origin.y) / dir.y
+            } else {
+                ((gy as f32 * CELL_SIZE) - origin.y) / dir.y
+            }
         } else {
-            ((gy as f32 * CELL_SIZE) - origin.y) / dir.y
+            f32::MAX
         };
 
-        let mut max_z = if dir.z > 0.0 {
-            (((gz + 1) as f32 * CELL_SIZE) - origin.z) / dir.z
+        let mut max_z = if dir.z.abs() > 1e-10 {
+            if dir.z > 0.0 {
+                (((gz + 1) as f32 * CELL_SIZE) - origin.z) / dir.z
+            } else {
+                ((gz as f32 * CELL_SIZE) - origin.z) / dir.z
+            }
         } else {
-            ((gz as f32 * CELL_SIZE) - origin.z) / dir.z
+            f32::MAX
         };
 
         let mut current_dist = 0.0;
@@ -219,6 +233,10 @@ impl SpatialGrid {
             }
         }
 
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -237,7 +255,7 @@ mod tests {
     #[test]
     fn test_spatial_grid_add_remove() {
         let mut grid = SpatialGrid::default();
-        let e1 = Entity::from_raw(1);
+        let e1 = Entity::from_raw_u32(1).unwrap();
         let cell = (1, 2, 3);
 
         grid.add(cell, e1);
@@ -252,8 +270,8 @@ mod tests {
     #[test]
     fn test_nearby_entities() {
         let mut grid = SpatialGrid::default();
-        let e1 = Entity::from_raw(1);
-        let e2 = Entity::from_raw(2);
+        let e1 = Entity::from_raw_u32(1).unwrap();
+        let e2 = Entity::from_raw_u32(2).unwrap();
 
         grid.add((0, 0, 0), e1);
         grid.add((1, 1, 1), e2);
@@ -262,7 +280,7 @@ mod tests {
         assert!(nearby.contains(&e1));
         assert!(nearby.contains(&e2));
 
-        let e3 = Entity::from_raw(3);
+        let e3 = Entity::from_raw_u32(3).unwrap();
         grid.add((2, 0, 0), e3); // Too far for (0,0,0) center if it only checks 3x3x3
         let nearby2: Vec<Entity> = grid.nearby_entities(Vec3::ZERO).collect();
         assert!(!nearby2.contains(&e3));

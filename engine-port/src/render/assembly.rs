@@ -88,7 +88,7 @@ pub fn a3d_assembly_system(
     mut runtime_world: ResMut<RuntimeWorld>,
     asset_server: Res<AssetServer>,
     _akm_assets: Res<Assets<AkmMesh>>,
-    mut mesh_registry: ResMut<MeshRegistry>,
+    mesh_registry: ResMut<MeshRegistry>,
 ) {
     // Guard 1: already assembled
     if assembly.assembled {

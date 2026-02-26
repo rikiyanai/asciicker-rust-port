@@ -158,13 +158,13 @@ impl RuntimePatch {
                 let v11 = [x1, y1, h11];
 
                 // Triangle orientation from diag bitfield (1 bit per quad)
-                let bit = 1 << (y * HEIGHT_CELLS + x);
-                let (tri1, tri2) = if self.diag & bit != 0 {
+                let bit = 1u16 << (y * HEIGHT_CELLS + x);
+                let [tri1, tri2] = if self.diag & bit != 0 {
                     // Split /
-                    ([[v00, v10, v11], [v00, v11, v01]])
+                    [[v00, v10, v11], [v00, v11, v01]]
                 } else {
                     // Split \
-                    ([[v00, v10, v01], [v10, v11, v01]])
+                    [[v00, v10, v01], [v10, v11, v01]]
                 };
 
                 if let Some(toi) = ray_triangle_intersection(&origin, &dir, &tri1, current_max) {
