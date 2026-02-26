@@ -12,3 +12,6 @@ target/
 # Build
 *.o
 *.d
+
+# Worktrees
+.worktrees/
