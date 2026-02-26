@@ -143,83 +143,19 @@ pub fn render_water_reflections(
     }
 }
 
-/// Extract frustum planes from a given view matrix.
+/// Extract frustum planes for reflected rendering.
 ///
-/// Computes 4 frustum planes (left, right, top, bottom) from the provided
-/// view transform matrix using the same focus_node + screen corner approach
-/// as GameCamera::extract_frustum_planes, but with an arbitrary TM.
+/// Uses the original camera's frustum planes. The planes define which
+/// world-space positions are visible on screen — this doesn't change when
+/// Z is flipped for reflection. The reflected terrain occupies the same
+/// X/Y world positions, just viewed from a mirrored angle.
 fn extract_frustum_planes_from_tm(
-    tm: &[f64; 16],
+    _tm: &[f64; 16],
     camera: &GameCamera,
-    dw: f64,
-    dh: f64,
+    _dw: f64,
+    _dh: f64,
 ) -> Vec<[f64; 4]> {
-    use crate::asset_loader::constants::{HEIGHT_CELLS, HEIGHT_SCALE};
-    use crate::render::camera::{invert_4x4, mat4_mul_vec4, plane_from_points};
-
-    let hc = HEIGHT_CELLS as f64;
-    let a = (camera.yaw as f64) * std::f64::consts::PI / 180.0;
-    let sinyaw = a.sin();
-    let cosyaw = a.cos();
-
-    // Focus node (same as camera — the focal point doesn't change for reflection)
-    let focus_node = [
-        camera.pos[0] as f64 + sinyaw * camera.focal as f64 / hc,
-        camera.pos[1] as f64 - cosyaw * camera.focal as f64 / hc,
-        camera.pos[2] as f64 + 0.5 * camera.focal as f64 / hc * HEIGHT_SCALE as f64,
-    ];
-
-    // Neutral plane (camera horizontal through pos)
-    let neutral_plane = [
-        -sinyaw,
-        cosyaw,
-        0.0,
-        sinyaw * camera.pos[0] as f64 - cosyaw * camera.pos[1] as f64,
-    ];
-
-    let screen_corners_0 = [
-        [0.0, 0.0, 0.0, 1.0],
-        [dw, 0.0, 0.0, 1.0],
-        [0.0, dh, 0.0, 1.0],
-        [dw, dh, 0.0, 1.0],
-    ];
-    let screen_corners_1 = [
-        [0.0, 0.0, 10.0, 1.0],
-        [dw, 0.0, 10.0, 1.0],
-        [0.0, dh, 10.0, 1.0],
-        [dw, dh, 10.0, 1.0],
-    ];
-
-    // Invert the provided TM (not camera.view_tm)
-    let clip_tm = invert_4x4(tm);
-
-    let mut world_corners = [[0.0f64; 3]; 4];
-    for c in 0..4 {
-        let mut w0 = mat4_mul_vec4(&clip_tm, &screen_corners_0[c]);
-        let mut w1 = mat4_mul_vec4(&clip_tm, &screen_corners_1[c]);
-
-        w0[0] /= hc;
-        w0[1] /= hc;
-        w1[0] /= hc;
-        w1[1] /= hc;
-
-        let dir = [w1[0] - w0[0], w1[1] - w0[1], w1[2] - w0[2]];
-        let dot_origin = neutral_plane[0] * w0[0] + neutral_plane[1] * w0[1]
-            + neutral_plane[2] * w0[2] + neutral_plane[3];
-        let dot_dir = neutral_plane[0] * dir[0] + neutral_plane[1] * dir[1]
-            + neutral_plane[2] * dir[2];
-        let t = if dot_dir.abs() > 1e-12 { -dot_origin / dot_dir } else { 0.0 };
-        world_corners[c] = [w0[0] + t * dir[0], w0[1] + t * dir[1], w0[2] + t * dir[2]];
-    }
-
-    let (ll, lr, ul, ur) = (world_corners[0], world_corners[1], world_corners[2], world_corners[3]);
-
-    vec![
-        plane_from_points(&focus_node, &ll, &ul),
-        plane_from_points(&focus_node, &ur, &lr),
-        plane_from_points(&focus_node, &ul, &ur),
-        plane_from_points(&focus_node, &lr, &ll),
-    ]
+    camera.frustum_planes.clone()
 }
 
 /// Apply Perlin noise ripple color shifts to reflected water cells.
