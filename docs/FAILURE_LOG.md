@@ -2,7 +2,7 @@
 
 ## Issues, Blockers, and Problems
 
-**Last Updated:** 2026-02-24
+**Last Updated:** 2026-02-26
 
 ---
 
@@ -46,12 +46,12 @@
 |----|-------|----------|--------|------------|
 | F234 | No perspective division in project_world_to_screen() — always uses isometric view_tm, sprites never get perspective foreshortening. C++ render.cpp:1804-1846 applies per-vertex 1/distance scaling. | Critical | RESOLVED | Added perspective branch to project_world_to_screen() matching transform_vertex_perspective() logic. |
 | F235 | Elevation uses height-diff fallback instead of bit 15 — resolve.rs compute_elevation() falls back to height-difference heuristic when no bit-15 flags set. C++ render.cpp:3456 uses visual>>15. game_map_y8.a3d has ZERO bit-15 flags (4 unique visuals: 0,1,5,15), so pure bit-15 logic produces elevation=3 for all cells → real material table has empty glyphs at elv=3 → blank screen. Height-diff fallback is REQUIRED until bit-15 data is present. | Critical | DEFERRED | Reverted. Height-diff fallback retained. Pure bit-15 fix causes blank glyphs. Needs investigation of C++ terrain data flow. |
-| F236 | Diffuse hardcoded 0xFF in mesh_shader — render_mesh() writes diffuse=0xFF for all faces instead of computing Lambertian n·l from face normals. C++ render.cpp:1680 computes Diffuse(dzdx, dzdy) per triangle. | High | OPEN | Needs face normal computation and dot product with LIGHT_DIR. |
+| F236 | Diffuse hardcoded 0xFF in mesh_shader — render_mesh() writes diffuse=0xFF for all faces instead of computing Lambertian n·l from face normals. C++ render.cpp:1680 computes Diffuse(dzdx, dzdy) per triangle. | High | RESOLVED | Fixed: light_ambient 1.0→0.3, light_dir to match terrain LIGHT_DIR [0.3,-0.3,1.0] normalized. Commit `8245a38`. |
 | F237 | Golden output tests missing — VIS-02 permanently #[ignore], no C++ reference data in repo. Phase 5 Plan 06 infrastructure exists but no real baselines. | High | OPEN | Requires C++ engine dump utility to generate reference frames. See F153. |
 | F238 | Terrain shader missing HEIGHT_SCALE boost — C++ render.cpp:1602 adds HEIGHT_SCALE to height when bit 15 set, creating visual elevation steps. Rust TerrainShader.blend() already implements this correctly. | High | RESOLVED | Already implemented at terrain_shader.rs:58-62. Verified against C++. |
-| F239 | Frustum AABB 8x too large — terrain AABB is in visual-cell units but frustum planes are in camera-pos-space. Factor of HEIGHT_CELLS=4 per axis = 16x area mismatch. Culling is nearly useless. | High | OPEN | Fix: convert AABB to pos-space (divide XY by HEIGHT_CELLS) or convert frustum to visual-cell units. |
+| F239 | Frustum AABB 8x too large — terrain AABB is in visual-cell units but frustum planes are in camera-pos-space. Factor of HEIGHT_CELLS=4 per axis = 16x area mismatch. Culling is nearly useless. | High | RESOLVED | Fixed: AABB x1/y1 expanded by `size - 1.0 + VISUAL_CELLS` to match render extent in pos-space. Commit `a30b150`. |
 | F240 | WASD movement world-space not yaw-relative — camera_input_system rotates by yaw already (camera.rs:397-403). C++ physics.cpp:1429 applies same rotation. | Medium | RESOLVED | Already implemented correctly at camera.rs:397-404. Verified against C++. |
-| F241 | Stages 4-5 stubbed — Shadow projection and water reflection stages are empty stubs. Deferred to Phase 6 per plan. | Medium | OPEN | Planned for Phase 6 (06-03-PLAN.md). Not a bug, expected sequencing. |
+| F241 | Stages 4-5 stubbed — Shadow projection and water reflection stages are empty stubs. Deferred to Phase 6 per plan. | Medium | PARTIAL | Stage 4 (player blob shadow) implemented: `render_player_shadow()` in pipeline.rs, attenuates diffuse within 2.0 unit radius of player via inv_tm screen→world projection. Commit `e28ce13`. Stage 5 (water reflection) still stubbed — see F244. |
 | F242 | Vertex formula verified — terrain vertex computation matches C++ render.cpp:1723 formula: vx = patch_x * HEIGHT_CELLS + hx * VISUAL_CELLS. | OK | RESOLVED | Confirmed correct at terrain_shader.rs:115-116. |
 
 ### Round 13 Audit Findings (2026-02-21)
@@ -326,6 +326,7 @@
 | F240 | Phase 6 runtime: character sprite invisible — Transform.z in world units but project_world_to_screen expects raw u16 height units | High | RESOLVED | query_character_sprites converts pos.z * HEIGHT_SCALE before calling project_world_to_screen. |
 | F241 | Phase 6 runtime: water level 0x8000 (32768 raw) far above terrain [0,817], reflection pass overwrites entire frame producing black screen | Critical | RESOLVED | C++ game uses water=55 (raw u16), not 0x8000 (format constant). sync_water_to_render converts world units * HEIGHT_SCALE. |
 | F243 | Water areas render as black. Root cause is compound: (A) Terrain fill is only 25% of sample buffer (23679/94944). Camera at z=800, terrain heights 0-817 — all terrain is far below camera, projects small. Black is not just "water" but all empty screen space (sky + water + map edge). (B) Sky/clear color is black (visual=0 at CLEAR_HEIGHT) instead of C++ sky blue (RGB555 0xC,0xC,0x1B). (C) Underwater terrain vertex clamping (h→max(h,water_z)) gives only ~5% perspective coverage change (distance 780→745 from z=800 camera). Three fix attempts all FAILED: (1) Height clamp in water.rs Stage 5 marking — no effect on CLEAR_HEIGHT cells. (2) Per-pixel Z clamp in blend() — changes depth not coverage; broke reflection marking (1806→24). (3) Vertex-level clamp in render_patch() — negligible coverage increase due to camera altitude. Needs: investigate why camera is at z=800 (94 raw * HEIGHT_SCALE?), why C++ terrain fills viewport, and whether sky color is a separate issue from water. | Critical | OPEN | All three clamping approaches failed. Problem is camera altitude and/or missing sky color, not just water shader. |
+| F244 | Water ripple fix attempt FAILED — 3 sub-fixes applied and fully reverted. (A) Changed `perspective=false` to `perspective=true` with recomputed mul/add/view_pos for flipped camera — reflected geometry rendered at wrong screen positions. (B) Replaced `extract_frustum_planes_from_tm` stub with real extraction from flipped TM — culled ALL reflected terrain (reflection_us dropped from 31ms to 0.2ms, underwater_samples=0). Reverted to `camera.frustum_planes.clone()`. (C) Fixed `apply_water_ripple_pass` to check all 4 samples in 2x2 block. After reverting (B), reflected terrain bled INTO above-water terrain — gray/white reflected geometry overwrote normal terrain. Root cause: the perspective projection path (view_pos/view_dir/mul/add) for the flipped reflection camera produces wrong depth values, causing reflected samples to win depth tests against above-water terrain. The affine path (`perspective=false`, using view_tm directly) is correct for reflection because the flipped view_tm already encodes the full transformation. All 3 sub-fixes reverted in commit `0f3c44c`. | Critical | OPEN | Water reflection requires careful study of C++ render.cpp reflection pass — the flipped camera must use the affine (view_tm) path, not the perspective (mul/add) path. The ripple fix (C) is safe to re-apply independently once reflection rendering is correct. |
 
 ---
 
@@ -406,4 +407,4 @@
 
 ---
 
-*Failure log last updated: 2026-02-22 (R18 findings F228-F232 added and RESOLVED: 0C/0H/2M/3L across 10 audit scopes)*
+*Failure log last updated: 2026-02-26 (F236 RESOLVED, F239 RESOLVED, F241 PARTIAL, F244 OPEN — water ripple fix attempt failed and fully reverted)*
