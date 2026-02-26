@@ -288,15 +288,19 @@ pub fn query_terrain_frustum<F>(
 ) where
     F: FnMut(&RuntimePatch),
 {
-    // Compute AABB in camera-pos-space (same as frustum planes).
-    // Frustum planes are in pos-space: inv(view_tm) divided by HEIGHT_CELLS.
-    // Patch coordinate bx maps directly to pos-space x (since world vertex
-    // x = bx * HEIGHT_CELLS, divided by HEIGHT_CELLS = bx).
+    // F239 FIX: Expand AABB to account for vertex render extent.
+    // Each patch renders geometry from bx to bx + VISUAL_CELLS in pos-space
+    // (C++ render.cpp:1723: vx = x * HEIGHT_CELLS + dx * VISUAL_CELLS).
+    // At level L, the region covers 2^L patches. The last patch extends
+    // VISUAL_CELLS beyond its coordinate. Previous: size=2^L (1 unit per patch).
+    // Fixed: x1 = x0 + size - 1 + VISUAL_CELLS (last patch starts at x0+size-1,
+    // renders to x0+size-1+VISUAL_CELLS).
+    use crate::asset_loader::constants::VISUAL_CELLS;
     let size = (1i32 << level) as f64;
     let x0 = bx as f64;
     let y0 = by as f64;
-    let x1 = x0 + size;
-    let y1 = y0 + size;
+    let x1 = x0 + size - 1.0 + VISUAL_CELLS as f64;
+    let y1 = y0 + size - 1.0 + VISUAL_CELLS as f64;
 
     let (lo, hi) = node.height_bounds();
     // Z in raw height units (same space as frustum planes, which are derived
@@ -718,6 +722,64 @@ mod tests {
 
         assert_eq!(visible.len(), 1, "Exactly 1 patch should be visible");
         assert_eq!(visible[0], (0, 0), "Only top-left patch should be visible");
+    }
+
+    // --- F239 Tests ---
+
+    /// Build a minimal 1-patch leaf node for AABB testing.
+    fn make_single_leaf(x: i32, y: i32) -> QuadNode {
+        QuadNode::Leaf(RuntimePatch {
+            x,
+            y,
+            height: [[100u16; HEIGHT_CELLS_PLUS_ONE]; HEIGHT_CELLS_PLUS_ONE],
+            visual: [[1u16; VISUAL_CELLS]; VISUAL_CELLS],
+            diag: 0,
+            dark: 0,
+            lo: 100,
+            hi: 100,
+        })
+    }
+
+    #[test]
+    fn frustum_aabb_accounts_for_render_extent() {
+        // F239: A patch at bx=5 renders geometry spanning [5, 5+VISUAL_CELLS]
+        // in pos-space. A frustum plane at x=10 (inside the render extent)
+        // should NOT cull this patch.
+        let node = make_single_leaf(5, 5);
+
+        // LEFT plane at x=10: x >= 10 → [1, 0, 0, -10]
+        // Patch at bx=5 renders to x=5..13 (5 + VISUAL_CELLS=8).
+        // The plane x>=10 should intersect this extent (Partial), not reject it.
+        let planes: Vec<[f64; 4]> = vec![[1.0, 0.0, 0.0, -10.0]];
+
+        let mut visible = Vec::new();
+        query_terrain_frustum(&node, 0, 5, 5, &planes, &mut |patch: &RuntimePatch| {
+            visible.push((patch.x, patch.y));
+        });
+
+        assert!(
+            !visible.is_empty(),
+            "Patch at (5,5) renders to x=[5,13] and should be visible when frustum plane is at x=10"
+        );
+    }
+
+    #[test]
+    fn frustum_aabb_still_culls_distant_patches() {
+        // F239: A patch at bx=0 renders to [0, VISUAL_CELLS=8].
+        // A plane requiring x>=20 should cull it.
+        let node = make_single_leaf(0, 0);
+
+        let planes: Vec<[f64; 4]> = vec![[1.0, 0.0, 0.0, -20.0]];
+
+        let mut visible = Vec::new();
+        query_terrain_frustum(&node, 0, 0, 0, &planes, &mut |patch: &RuntimePatch| {
+            visible.push((patch.x, patch.y));
+        });
+
+        assert!(
+            visible.is_empty(),
+            "Patch at (0,0) renders to x=[0,8] and should be culled when plane requires x>=20"
+        );
     }
 
     // Helper: count leaf nodes
