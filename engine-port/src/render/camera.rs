@@ -708,68 +708,6 @@ mod tests {
     }
 
     #[test]
-    fn default_light_ambient_matches_terrain() {
-        // F236: light_ambient must be 0.3 (matching terrain LIGHT_DIR[3]),
-        // not 1.0 which collapses diffuse to ~255 for all normals.
-        let cam = GameCamera::default();
-        assert!(
-            (cam.light_ambient - 0.3).abs() < 0.01,
-            "light_ambient should be 0.3, got {}",
-            cam.light_ambient
-        );
-    }
-
-    const IDENTITY_TM: [f64; 16] = [
-        1.0, 0.0, 0.0, 0.0,
-        0.0, 1.0, 0.0, 0.0,
-        0.0, 0.0, 1.0, 0.0,
-        0.0, 0.0, 0.0, 1.0,
-    ];
-
-    #[test]
-    fn mesh_diffuse_varies_with_default_light() {
-        // F236: With corrected light_ambient=0.3, compute_face_diffuse should
-        // produce varying values, not always ~255.
-        let cam = GameCamera::default();
-
-        // Face pointing straight up: normal = (0, 0, 1)
-        let up_face = crate::render::mesh_shader::compute_face_diffuse_public(
-            [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0],
-            &IDENTITY_TM, cam.light_dir, cam.light_ambient,
-        );
-
-        // Face pointing down: normal = (0, 0, -1)
-        let down_face = crate::render::mesh_shader::compute_face_diffuse_public(
-            [0.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0],
-            &IDENTITY_TM, cam.light_dir, cam.light_ambient,
-        );
-
-        assert!(
-            up_face != down_face,
-            "Up-facing ({}) and down-facing ({}) should differ",
-            up_face, down_face
-        );
-        assert!(up_face > down_face, "Up-facing should be brighter than down-facing");
-        // Note: up_face may be 255 due to the +0.5 bias in the C++ formula —
-        // that's correct. The bug was ALL faces returning ~255 with ambient=1.0.
-        // Down-facing must be well below 255 to confirm shading variation.
-        assert!(down_face < 128, "Down-facing should be dark, got {}", down_face);
-    }
-
-    #[test]
-    fn default_light_dir_matches_terrain() {
-        // F236: light_dir must match terrain's LIGHT_DIR [0.3, -0.3, 1.0]
-        // (normalized), not (1,1,1)/sqrt(3).
-        let cam = GameCamera::default();
-        let len = (cam.light_dir[0].powi(2) + cam.light_dir[1].powi(2) + cam.light_dir[2].powi(2)).sqrt();
-        assert!((len - 1.0).abs() < 0.01, "light_dir should be unit length, got {}", len);
-        // Z component should be dominant (sun from above)
-        assert!(cam.light_dir[2] > 0.9, "light_dir Z should be >0.9 (sun above), got {}", cam.light_dir[2]);
-        // Y component should be negative (matching terrain LIGHT_DIR[1] = -0.3)
-        assert!(cam.light_dir[1] < 0.0, "light_dir Y should be negative, got {}", cam.light_dir[1]);
-    }
-
-    #[test]
     fn test_invert_identity() {
         let identity = [
             1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,

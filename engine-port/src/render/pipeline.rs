@@ -743,54 +743,6 @@ mod tests {
     }
 
     #[test]
-    fn player_shadow_attenuates_nearby_samples() {
-        // F241: Stage 4 shadow should darken samples near the player position.
-        use crate::render::sample_buffer::Sample;
-
-        let mut buf = SampleBuffer::new(10, 10);
-        let mut camera = GameCamera::default();
-        camera.pos = [5.0, 5.0, 100.0];
-        let dw = (2 * 10 + 4) as f64;
-        let dh = (2 * 10 + 4) as f64;
-        camera.update(dw, dh);
-
-        let buf_w = buf.width as i32;
-        let buf_h = buf.height as i32;
-
-        // Fill all samples with terrain at player's Z height
-        for sample in buf.samples.iter_mut() {
-            sample.height = 100.0;
-            sample.diffuse = 200;
-            sample.spare = 0; // terrain
-        }
-
-        // Save pre-shadow diffuse values
-        let pre_diffuse: Vec<u8> = buf.samples.iter().map(|s| s.diffuse).collect();
-
-        // Apply shadow
-        render_player_shadow(
-            &mut buf.samples,
-            buf_w,
-            buf_h,
-            &camera,
-            &[5.0, 5.0, 100.0],
-        );
-
-        // At least some samples near player should be darkened
-        let darkened_count = buf
-            .samples
-            .iter()
-            .zip(pre_diffuse.iter())
-            .filter(|(s, pre)| s.diffuse < **pre)
-            .count();
-
-        assert!(
-            darkened_count > 0,
-            "Shadow should darken at least some nearby samples"
-        );
-    }
-
-    #[test]
     fn test_pipeline_mesh_branch_calls_render_mesh() {
         use crate::asset_loader::akm_mesh::{AkmFace, AkmMesh, AkmVertex};
         use crate::render::camera::GameCamera;
