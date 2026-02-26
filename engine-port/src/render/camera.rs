@@ -381,7 +381,7 @@ pub fn camera_update_system(mut camera: ResMut<GameCamera>, config: Res<RenderCo
 
 /// Invert a 4x4 column-major matrix. Returns the inverse.
 /// Uses the adjugate/cofactor method.
-fn invert_4x4(m: &[f64; 16]) -> [f64; 16] {
+pub(crate) fn invert_4x4(m: &[f64; 16]) -> [f64; 16] {
     // Compute cofactors for a general 4x4 matrix
     let s0 = m[0] * m[5] - m[4] * m[1];
     let s1 = m[0] * m[6] - m[4] * m[2];
@@ -428,7 +428,7 @@ fn invert_4x4(m: &[f64; 16]) -> [f64; 16] {
 }
 
 /// Multiply a 4x4 column-major matrix by a 4-vector.
-fn mat4_mul_vec4(m: &[f64; 16], v: &[f64; 4]) -> [f64; 4] {
+pub(crate) fn mat4_mul_vec4(m: &[f64; 16], v: &[f64; 4]) -> [f64; 4] {
     [
         m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12] * v[3],
         m[1] * v[0] + m[5] * v[1] + m[9] * v[2] + m[13] * v[3],
@@ -440,7 +440,7 @@ fn mat4_mul_vec4(m: &[f64; 16], v: &[f64; 4]) -> [f64; 4] {
 /// Compute a plane `[a, b, c, d]` from three points using cross product.
 /// The plane normal is `(p1 - p0) x (p2 - p0)`, normalized.
 /// `d = -dot(normal, p0)`.
-fn plane_from_points(p0: &[f64; 3], p1: &[f64; 3], p2: &[f64; 3]) -> [f64; 4] {
+pub(crate) fn plane_from_points(p0: &[f64; 3], p1: &[f64; 3], p2: &[f64; 3]) -> [f64; 4] {
     let u = [p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]];
     let v = [p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2]];
 

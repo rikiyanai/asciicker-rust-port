@@ -82,14 +82,28 @@ pub fn render_water_reflections(
         let pre_spares: Vec<u8> = sample_buffer.samples.iter().map(|s| s.spare).collect();
 
         // Build a flipped camera for the terrain shader.
-        // F242 FIX: Set perspective=false so render_patch uses the flipped view_tm
-        // via transform_vertex(). In perspective mode, render_patch ignores view_tm
-        // and uses view_pos/view_dir/mul/add/view_ofs (which are NOT flipped),
-        // making the reflection render a complete no-op.
+        // Water-fix: Keep perspective=true (was false). The affine path doesn't
+        // match the perspective-built flipped view matrix. Instead, recompute
+        // mul/add/view_pos for the flipped camera so the perspective path works.
         let mut flipped_camera = camera.clone();
         flipped_camera.view_tm = flipped_tm;
         flipped_camera.frustum_planes = flipped_planes.clone();
-        flipped_camera.perspective = false;
+        // perspective stays true (inherited from camera.clone())
+
+        // Recompute mul/add for the flipped matrix (perspective path reads these)
+        flipped_camera.mul[0] = flipped_tm[0];
+        flipped_camera.mul[1] = flipped_tm[1];
+        flipped_camera.mul[2] = flipped_tm[4];
+        flipped_camera.mul[3] = flipped_tm[5];
+        flipped_camera.mul[4] = 0.0;
+        flipped_camera.mul[5] = flipped_tm[9];
+
+        flipped_camera.add[0] = flipped_tm[12];
+        flipped_camera.add[1] = flipped_tm[13] + 0.5;
+        flipped_camera.add[2] = flipped_tm[14];
+
+        // Reflected view_pos Z
+        flipped_camera.view_pos[2] = (2.0 * water_z - camera.view_pos[2] as f32) as f32;
 
         terrain.query_visible(&flipped_planes, |patch| {
             crate::render::terrain_shader::render_patch(
@@ -131,19 +145,81 @@ pub fn render_water_reflections(
 
 /// Extract frustum planes from a given view matrix.
 ///
-/// Simplified version that re-derives planes using the same approach as
-/// GameCamera::extract_frustum_planes but with an arbitrary transform.
+/// Computes 4 frustum planes (left, right, top, bottom) from the provided
+/// view transform matrix using the same focus_node + screen corner approach
+/// as GameCamera::extract_frustum_planes, but with an arbitrary TM.
 fn extract_frustum_planes_from_tm(
-    _tm: &[f64; 16],
+    tm: &[f64; 16],
     camera: &GameCamera,
-    _dw: f64,
-    _dh: f64,
+    dw: f64,
+    dh: f64,
 ) -> Vec<[f64; 4]> {
-    // For reflected rendering, we use the original camera's frustum planes
-    // expanded slightly to catch geometry that might be visible in reflection.
-    // The reflected geometry is at mirrored positions so the original frustum
-    // planes (which define the visible screen area) are still valid for culling.
-    camera.frustum_planes.clone()
+    use crate::asset_loader::constants::{HEIGHT_CELLS, HEIGHT_SCALE};
+    use crate::render::camera::{invert_4x4, mat4_mul_vec4, plane_from_points};
+
+    let hc = HEIGHT_CELLS as f64;
+    let a = (camera.yaw as f64) * std::f64::consts::PI / 180.0;
+    let sinyaw = a.sin();
+    let cosyaw = a.cos();
+
+    // Focus node (same as camera — the focal point doesn't change for reflection)
+    let focus_node = [
+        camera.pos[0] as f64 + sinyaw * camera.focal as f64 / hc,
+        camera.pos[1] as f64 - cosyaw * camera.focal as f64 / hc,
+        camera.pos[2] as f64 + 0.5 * camera.focal as f64 / hc * HEIGHT_SCALE as f64,
+    ];
+
+    // Neutral plane (camera horizontal through pos)
+    let neutral_plane = [
+        -sinyaw,
+        cosyaw,
+        0.0,
+        sinyaw * camera.pos[0] as f64 - cosyaw * camera.pos[1] as f64,
+    ];
+
+    let screen_corners_0 = [
+        [0.0, 0.0, 0.0, 1.0],
+        [dw, 0.0, 0.0, 1.0],
+        [0.0, dh, 0.0, 1.0],
+        [dw, dh, 0.0, 1.0],
+    ];
+    let screen_corners_1 = [
+        [0.0, 0.0, 10.0, 1.0],
+        [dw, 0.0, 10.0, 1.0],
+        [0.0, dh, 10.0, 1.0],
+        [dw, dh, 10.0, 1.0],
+    ];
+
+    // Invert the provided TM (not camera.view_tm)
+    let clip_tm = invert_4x4(tm);
+
+    let mut world_corners = [[0.0f64; 3]; 4];
+    for c in 0..4 {
+        let mut w0 = mat4_mul_vec4(&clip_tm, &screen_corners_0[c]);
+        let mut w1 = mat4_mul_vec4(&clip_tm, &screen_corners_1[c]);
+
+        w0[0] /= hc;
+        w0[1] /= hc;
+        w1[0] /= hc;
+        w1[1] /= hc;
+
+        let dir = [w1[0] - w0[0], w1[1] - w0[1], w1[2] - w0[2]];
+        let dot_origin = neutral_plane[0] * w0[0] + neutral_plane[1] * w0[1]
+            + neutral_plane[2] * w0[2] + neutral_plane[3];
+        let dot_dir = neutral_plane[0] * dir[0] + neutral_plane[1] * dir[1]
+            + neutral_plane[2] * dir[2];
+        let t = if dot_dir.abs() > 1e-12 { -dot_origin / dot_dir } else { 0.0 };
+        world_corners[c] = [w0[0] + t * dir[0], w0[1] + t * dir[1], w0[2] + t * dir[2]];
+    }
+
+    let (ll, lr, ul, ur) = (world_corners[0], world_corners[1], world_corners[2], world_corners[3]);
+
+    vec![
+        plane_from_points(&focus_node, &ll, &ul),
+        plane_from_points(&focus_node, &ur, &lr),
+        plane_from_points(&focus_node, &ul, &ur),
+        plane_from_points(&focus_node, &lr, &ll),
+    ]
 }
 
 /// Apply Perlin noise ripple color shifts to reflected water cells.
@@ -173,19 +249,28 @@ pub fn apply_water_ripple_pass(
         for cx in 0..grid_w {
             let cell_idx = (cy * grid_w + cx) as usize;
 
-            // Check if corresponding sample has REFLECTION spare bits
-            // Sample coordinates: sx = 2 + 2*cx, sy = 2 + 2*cy
+            // Water-fix 4c: Check all 4 samples in 2x2 block (matching resolve's
+            // combined_spare OR logic) instead of only upper-left sample.
             let sx = 2 + 2 * cx;
             let sy = 2 + 2 * cy;
             let sample_w = 2 * grid_w + 4;
-            let sample_idx = (sy * sample_w + sx) as usize;
 
-            if sample_idx >= samples.len() {
+            let i00 = (sy * sample_w + sx) as usize;
+            let i10 = i00 + 1;
+            let i01 = ((sy + 1) * sample_w + sx) as usize;
+            let i11 = i01 + 1;
+
+            if i11 >= samples.len() {
                 continue;
             }
 
-            let sample = &samples[sample_idx];
-            if sample.spare & spare_bits::PARITY_MASK != spare_bits::REFLECTION {
+            // OR all 4 samples' spare bits (same as resolve.rs)
+            let combined_spare = samples[i00].spare | samples[i10].spare
+                | samples[i01].spare | samples[i11].spare;
+
+            if (combined_spare & spare_bits::PARITY_MASK) != spare_bits::REFLECTION
+                || (combined_spare & spare_bits::MESH_FLAG) != 0
+            {
                 continue;
             }
 
