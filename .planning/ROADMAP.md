@@ -166,7 +166,7 @@ Plans:
   3. Weather effects (rain, snow) render as particle systems that are visible in the ASCII output and respond to game state
   4. A main menu loads on startup with navigation to start game, and the game state machine transitions correctly between Loading, Playing, and Paused states
   5. Alex Harri 6D shape-vector glyph matching replaces auto_mat glyph selection at the RESOLVE stage (auto_mat still used for fg/bg color), and all 3 font skins (grey, gold, pink) are available
-**Plans**: 5 plans
+**Plans**: 7 plans
 
 Plans:
 - [x] 07-01-PLAN.md -- Audio: bevy_kira_audio 0.25, 16-track DynamicAudioChannels mixer (wave 1)
@@ -174,6 +174,8 @@ Plans:
 - [x] 07-03-PLAN.md -- Networking: bevy_replicon 0.38, binary protocol, server/client (wave 2)
 - [x] 07-04-PLAN.md -- Visual quality: Alex Harri 6D shape-vector + Font1 3 skins (TDD, wave 3)
 - [x] 07-05-PLAN.md -- Weather: ring-buffer particle pool, Perlin wind, snow/rain (TDD, wave 4)
+- [ ] 07-06-PLAN.md -- GAP CLOSURE: Weather debug keybind (F5 cycles WeatherState) (wave 5)
+- [ ] 07-07-PLAN.md -- GAP CLOSURE: Network integration test (server+client renet transport) (wave 5)
 
 ### Phase 7.1: Physics & Character Polish
 **Goal**: Fix critical integration gaps from Phase 6 identified during audit: camera sync, rotation, and Block action
@@ -265,7 +267,7 @@ Note: Phases 3 and 4 are independent (both depend only on Phase 1) and can execu
 | 4. CPU Rasterizer Core | 4/4 | Complete | 2026-02-20 |
 | 5. Pipeline Integration | 8/8 | Complete | 2026-02-22 |
 | 6. Physics and Character | 3/3 | Complete | 2026-02-24 |
-| 7. Game Systems | 5/5 | Complete | 2026-02-26 |
+| 7. Game Systems | 5/7 | Gap Closure | 2026-02-26 |
 | 7.1 Physics & Character Polish | 0/1 | Planned | - |
 | 8. NPC AI and Combat | 0/4 | Planned | - |
 | 9. Inventory and Items | 0/4 | Planned | - |
