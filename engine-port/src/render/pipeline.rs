@@ -176,6 +176,74 @@ pub fn camera_terrain_init_system(
 }
 
 // ---------------------------------------------------------------------------
+// Stage 4: Player blob shadow
+// ---------------------------------------------------------------------------
+
+/// Stage 4: Player blob shadow projection.
+///
+/// Ports C++ render.cpp:3184-3217. For each sample near the player, transforms
+/// screen coords to world via inv_tm, computes distance to player position,
+/// and attenuates diffuse within a ~2.0 unit radius.
+pub fn render_player_shadow(
+    samples: &mut [crate::render::sample_buffer::Sample],
+    buf_w: i32,
+    buf_h: i32,
+    camera: &GameCamera,
+    player_pos: &[f32; 3],
+) {
+    use crate::asset_loader::constants::HEIGHT_CELLS;
+
+    let inv_tm = &camera.inv_tm;
+    let hc = HEIGHT_CELLS as f64;
+
+    // Shadow radius in world units squared (C++ uses ~2.0)
+    let shadow_radius_sq: f64 = 2.0;
+    // Height tolerance (C++ uses 64 raw height units)
+    let height_tolerance: f32 = 64.0;
+
+    for y in 0..buf_h {
+        for x in 0..buf_w {
+            let idx = (y * buf_w + x) as usize;
+            let sample = &samples[idx];
+
+            // Skip clear samples
+            if sample.height == crate::render::sample_buffer::Sample::CLEAR_HEIGHT {
+                continue;
+            }
+
+            // Height proximity check (C++ render.cpp:3188)
+            if (sample.height - player_pos[2]).abs() > height_tolerance {
+                continue;
+            }
+
+            // Transform screen (x, y, height) to world via inv_tm
+            // C++ render.cpp:3191-3194
+            let sx = x as f64;
+            let sy = y as f64;
+            let sz = sample.height as f64;
+
+            let wx = inv_tm[0] * sx + inv_tm[4] * sy + inv_tm[8] * sz + inv_tm[12];
+            let wy = inv_tm[1] * sx + inv_tm[5] * sy + inv_tm[9] * sz + inv_tm[13];
+
+            // Distance from player (C++ render.cpp:3197-3198)
+            let dx = wx / hc - player_pos[0] as f64;
+            let dy = wy / hc - player_pos[1] as f64;
+            let sq_xy = dx * dx + dy * dy;
+
+            if sq_xy <= shadow_radius_sq {
+                // Shadow attenuation (C++ render.cpp:3204)
+                let dz = (2.0 * (player_pos[2] as f64 - sample.height as f64) + 2.0 * sq_xy) as i32;
+                let attenuation = (dz.max(0).min(255)) as u8;
+
+                // Darken diffuse (subtract attenuation, clamp to 0)
+                let s = &mut samples[idx];
+                s.diffuse = s.diffuse.saturating_sub(attenuation);
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Pipeline system
 // ---------------------------------------------------------------------------
 
@@ -395,8 +463,12 @@ pub fn render_pipeline_system(
         }
         timing.world_us = t2.elapsed().as_micros() as u64;
 
-        // Stage 4: SHADOW (stub -- future)
+        // Stage 4: SHADOW (F241 FIX: real player blob shadow)
         let t3 = Instant::now();
+        // Player position for shadow. Uses camera.pos as fallback (spectator mode).
+        // When Character entities exist (Phase 6), this should come from the
+        // player entity's position. For now, camera.pos is a reasonable proxy.
+        render_player_shadow(buf, buf_w, buf_h, &camera, &camera.pos);
         timing.shadow_us = t3.elapsed().as_micros() as u64;
     } // mutable borrow of sample_buffer.samples ENDS here
 
@@ -668,6 +740,54 @@ mod tests {
             crate::render::sample_buffer::Sample::clear_state().visual
         );
         assert!(clear_us < 1_000_000, "Clear should complete quickly");
+    }
+
+    #[test]
+    fn player_shadow_attenuates_nearby_samples() {
+        // F241: Stage 4 shadow should darken samples near the player position.
+        use crate::render::sample_buffer::Sample;
+
+        let mut buf = SampleBuffer::new(10, 10);
+        let mut camera = GameCamera::default();
+        camera.pos = [5.0, 5.0, 100.0];
+        let dw = (2 * 10 + 4) as f64;
+        let dh = (2 * 10 + 4) as f64;
+        camera.update(dw, dh);
+
+        let buf_w = buf.width as i32;
+        let buf_h = buf.height as i32;
+
+        // Fill all samples with terrain at player's Z height
+        for sample in buf.samples.iter_mut() {
+            sample.height = 100.0;
+            sample.diffuse = 200;
+            sample.spare = 0; // terrain
+        }
+
+        // Save pre-shadow diffuse values
+        let pre_diffuse: Vec<u8> = buf.samples.iter().map(|s| s.diffuse).collect();
+
+        // Apply shadow
+        render_player_shadow(
+            &mut buf.samples,
+            buf_w,
+            buf_h,
+            &camera,
+            &[5.0, 5.0, 100.0],
+        );
+
+        // At least some samples near player should be darkened
+        let darkened_count = buf
+            .samples
+            .iter()
+            .zip(pre_diffuse.iter())
+            .filter(|(s, pre)| s.diffuse < **pre)
+            .count();
+
+        assert!(
+            darkened_count > 0,
+            "Shadow should darken at least some nearby samples"
+        );
     }
 
     #[test]
