@@ -84,6 +84,11 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **FX-01**: Water rendering with reflective surface (reflection stage re-runs terrain+world below water plane)
 - [x] **FX-02**: Perlin Z-perturbation for water ripple effect
 
+### Physics & Character Polish (Phase 7.1)
+
+- [ ] **PHYS-FIX-01**: Camera position sync to player physics output
+- [ ] **CHAR-FIX-01**: Camera-relative movement and Block action wiring
+
 ### Audio
 
 - [x] **AUD-01**: bevy_kira_audio integration with basic sound effect playback
@@ -113,6 +118,52 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **VIS-01**: Alex Harri 6D shape-vector glyph matching integrated at RESOLVE stage (phased: auto_mat first, then 2D, then 6D)
 - [ ] **VIS-02**: Golden-file CI comparison of AnsiCell output against C++ reference (<1% cell difference threshold) -- INFRASTRUCTURE COMPLETE, blocked on C++ reference data capture
 - [ ] **VIS-03**: Font system with CP437 glyphs (3 skins: grey, gold, pink)
+
+### NPC AI and Combat
+
+- [ ] **NPC-01**: SpatialGrid resource for dynamic entity spatial indexing
+- [ ] **NPC-02**: Ray-vs-SpatialGrid and Ray-vs-BSP query API
+- [ ] **NPC-03**: NpcBundle defining character archetype with PhysicsIO as Component
+- [ ] **NPC-04**: EnemyGen spawn system with randomized equipment weights
+- [ ] **NPC-05**: AI behavior including target selection and path chasing
+- [ ] **NPC-06**: Stuck recovery logic (4-phase detection)
+- [ ] **NPC-07**: Animation-driven melee hit detection (frame 21)
+- [ ] **NPC-08**: NPC death lifecycle and respawn timers
+
+### Inventory and Items
+
+- [ ] **ITEM-01**: Item type catalog (ItemProto) loaded from data
+- [ ] **ITEM-02**: Grid-based inventory UI with bitmask collision and directional navigation
+- [ ] **ITEM-03**: Proximity-based pickup and dropping of world items
+- [ ] **ITEM-04**: Equipment lifecycle updating 5D sprite lookup
+
+### HUD and Interaction
+
+- [ ] **HUD-01**: Status bars (HP/MP) rendered at bottom-left
+- [ ] **HUD-02**: TalkBox (Chat UI) with world-space talk bubbles
+- [ ] **HUD-03**: Minimap with height-sampled terrain and NPC dots
+- [ ] **HUD-04**: Mouse-to-world unprojection for targeting and interaction
+
+### Full Menu System
+
+- [ ] **FMENU-01**: Hierarchical menu state machine and stack navigation
+- [ ] **FMENU-02**: Background dithering and fade-in transitions
+- [ ] **FMENU-03**: Level selection screen and settings persistence (JSON)
+- [ ] **FMENU-04**: (Optional) Visual gamepad configuration UI
+
+### Full Networking
+
+- [ ] **FNET-01**: Authoritative entity snapshot replication (bevy_replicon)
+- [ ] **FNET-02**: Server-validated combat protocol (Swing/Damage/Death)
+- [ ] **FNET-03**: Global item ownership and SpatialGrid synchronization
+- [ ] **FNET-04**: Input-based movement with client-side prediction and server reconciliation
+- [ ] **FNET-05**: Lag compensation via ping measurement and remote interpolation
+
+### NPC Scripting
+
+- [ ] **SCRIPT-01**: Embedded Lua 5.4 runtime with sandboxed environment
+- [ ] **SCRIPT-02**: NPC Script API exposing world data and movement commands
+- [ ] **SCRIPT-03**: Script hot-reload system via asset directory watching
 
 ## v2 Requirements
 
@@ -207,6 +258,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CHAR-04 | Phase 6 | Complete |
 | FX-01 | Phase 6 | Complete |
 | FX-02 | Phase 6 | Complete |
+| PHYS-FIX-01 | Phase 7.1 | Pending |
+| CHAR-FIX-01 | Phase 7.1 | Pending |
 | AUD-01 | Phase 7 | Complete |
 | AUD-02 | Phase 7 | Complete |
 | NET-01 | Phase 7 | Complete |
@@ -216,10 +269,38 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GAME-03 | Phase 7 | Pending |
 | VIS-01 | Phase 7 | Pending |
 | VIS-03 | Phase 7 | Pending |
+| NPC-01 | Phase 8 | Pending |
+| NPC-02 | Phase 8 | Pending |
+| NPC-03 | Phase 8 | Pending |
+| NPC-04 | Phase 8 | Pending |
+| NPC-05 | Phase 8 | Pending |
+| NPC-06 | Phase 8 | Pending |
+| NPC-07 | Phase 8 | Pending |
+| NPC-08 | Phase 8 | Pending |
+| ITEM-01 | Phase 9 | Pending |
+| ITEM-02 | Phase 9 | Pending |
+| ITEM-03 | Phase 9 | Pending |
+| ITEM-04 | Phase 9 | Pending |
+| HUD-01 | Phase 10 | Pending |
+| HUD-02 | Phase 10 | Pending |
+| HUD-03 | Phase 10 | Pending |
+| HUD-04 | Phase 10 | Pending |
+| FMENU-01 | Phase 11 | Pending |
+| FMENU-02 | Phase 11 | Pending |
+| FMENU-03 | Phase 11 | Pending |
+| FMENU-04 | Phase 11 | Pending |
+| FNET-01 | Phase 12 | Pending |
+| FNET-02 | Phase 12 | Pending |
+| FNET-03 | Phase 12 | Pending |
+| FNET-04 | Phase 12 | Pending |
+| FNET-05 | Phase 12 | Pending |
+| SCRIPT-01 | Phase 13 | Pending |
+| SCRIPT-02 | Phase 13 | Pending |
+| SCRIPT-03 | Phase 13 | Pending |
 
 **Coverage:**
-- v1 requirements: 57 total
-- Mapped to phases: 57
+- v1 requirements: 87 total
+- Mapped to phases: 87
 - Unmapped: 0
 
 ---

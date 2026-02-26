@@ -320,7 +320,7 @@ mod tests {
                 story_id: -1,
             }],
         };
-        let world = RuntimeWorld::build_from_parsed(&world_data);
+        let world = RuntimeWorld::build_from_parsed(&world_data, None);
 
         let mut soup = Vec::new();
         let center = [5.0, 5.0, 5.0]; // Near the mesh
@@ -371,7 +371,7 @@ mod tests {
                 story_id: -1,
             }],
         };
-        let world = RuntimeWorld::build_from_parsed(&world_data);
+        let world = RuntimeWorld::build_from_parsed(&world_data, None);
 
         let mut soup = Vec::new();
         collect_world_triangles(&world, &[0.0, 0.0, 0.0], 5.0, 1.0, 1.0, &mut soup);

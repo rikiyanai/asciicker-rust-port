@@ -511,7 +511,7 @@ impl AssetLoader for XpLoader {
 
 ### Mage Core 4-Texture Mapping to Bevy
 
-The Mage Core reference implementation (`/Users/r/Projects/ascii research/Mage-core`) uses standalone wgpu. The mapping to Bevy's render world:
+The Mage Core reference implementation (`../reference/Mage-core`) uses standalone wgpu. The mapping to Bevy's render world:
 
 | Mage Core Concept | Bevy Equivalent |
 |-------------------|-----------------|
@@ -614,12 +614,12 @@ Phase 7: Polish & Systems
 - [Render Pipeline Architecture - DeepWiki](https://deepwiki.com/bevyengine/bevy/5.1-render-pipeline-architecture) -- Pipeline specialization, feature keys (LOW confidence, unverified)
 - [Bevy Asset System - DeepWiki](https://deepwiki.com/bevyengine/bevy/4-asset-system) -- AssetLoader trait, async loading, handles (LOW confidence)
 - [Bevy 0.17 to 0.18 Migration Guide](https://bevy.org/learn/migration-guides/0-17-to-0-18/) -- Breaking changes in recent version (LOW confidence, not fully read)
-- Mage Core source: `/Users/r/Projects/ascii research/Mage-core/src/render.rs` -- 4-texture GPU approach with wgpu directly (HIGH confidence, read source code)
-- Mage Core shader: `/Users/r/Projects/ascii research/Mage-core/src/shader.wgsl` -- WGSL fullscreen quad with font atlas compositing (HIGH confidence, read source code)
-- C++ render pipeline: `/Users/r/Downloads/asciicker-Y9-2/docs/RENDER_PIPELINE_DETAILED.md` -- 6-stage CPU pipeline stages (HIGH confidence, project documentation)
-- C++ render pipeline map: `/Users/r/Downloads/asciicker-Y9-2/docs/RENDER_PIPELINE_MAP.md` -- Data structures, fragile invariants (HIGH confidence, project documentation)
-- C++ engine render skill: `/Users/r/Downloads/asciicker-Y9-2/docs/skills/engine-render.md` -- Sample/AnsiCell/Material structs, traps (HIGH confidence, project documentation)
-- C++ world loading skill: `/Users/r/Downloads/asciicker-Y9-2/docs/skills/world-loading.md` -- .a3d format, BSP/quadtree APIs (HIGH confidence, project documentation)
+- Mage Core source: `../reference/Mage-core/src/render.rs` -- 4-texture GPU approach with wgpu directly (HIGH confidence, read source code)
+- Mage Core shader: `../reference/Mage-core/src/shader.wgsl` -- WGSL fullscreen quad with font atlas compositing (HIGH confidence, read source code)
+- C++ render pipeline: `(ORIGINAL GAME)asciicker-Y9-2-main/docs/RENDER_PIPELINE_DETAILED.md` -- 6-stage CPU pipeline stages (HIGH confidence, project documentation)
+- C++ render pipeline map: `(ORIGINAL GAME)asciicker-Y9-2-main/docs/RENDER_PIPELINE_MAP.md` -- Data structures, fragile invariants (HIGH confidence, project documentation)
+- C++ engine render skill: `(ORIGINAL GAME)asciicker-Y9-2-main/docs/skills/engine-render.md` -- Sample/AnsiCell/Material structs, traps (HIGH confidence, project documentation)
+- C++ world loading skill: `(ORIGINAL GAME)asciicker-Y9-2-main/docs/skills/world-loading.md` -- .a3d format, BSP/quadtree APIs (HIGH confidence, project documentation)
 
 ---
 *Architecture research for: Rust/Bevy ASCII game engine port of Asciicker C++ engine*

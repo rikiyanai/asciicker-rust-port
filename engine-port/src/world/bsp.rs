@@ -497,6 +497,151 @@ pub fn query_bsp_sphere(
     }
 }
 
+// --- Ray query ---
+
+/// Test whether a ray intersects an AABB.
+///
+/// Returns Option<toi> if the ray intersects the AABB within [0, max_dist].
+pub fn ray_intersects_bbox(
+    bbox: &Bbox,
+    origin: [f64; 3],
+    inv_dir: [f64; 3],
+    max_dist: f64,
+) -> Option<f64> {
+    let mut tmin = 0.0f64;
+    let mut tmax = max_dist;
+
+    for i in 0..3 {
+        let t1 = (bbox[i * 2] - origin[i]) * inv_dir[i];
+        let t2 = (bbox[i * 2 + 1] - origin[i]) * inv_dir[i];
+
+        tmin = tmin.max(t1.min(t2));
+        tmax = tmax.min(t1.max(t2));
+    }
+
+    if tmax >= tmin && tmin < max_dist {
+        Some(tmin)
+    } else {
+        None
+    }
+}
+
+/// Ray query on the BSP tree.
+///
+/// Traverses the BSP in near-to-far order along the ray.
+/// Prunes branches whose AABB does not intersect the ray.
+/// Callback returns Option<toi> for a hit; traversal stops at the first hit.
+pub fn query_bsp_ray<F>(
+    node: &BspNode,
+    origin: [f64; 3],
+    dir: [f64; 3],
+    inv_dir: [f64; 3],
+    max_dist: f64,
+    callback: &mut F,
+) -> Option<(InstanceId, f64)>
+where
+    F: FnMut(InstanceId, f64) -> Option<f64>,
+{
+    match node {
+        BspNode::Node {
+            children,
+            bbox,
+            split_plane,
+            split_axis,
+        } => {
+            if ray_intersects_bbox(bbox, origin, inv_dir, max_dist).is_none() {
+                return None;
+            }
+
+            let axis = *split_axis as usize;
+            let near = if origin[axis] < *split_plane { 0 } else { 1 };
+            let far = 1 - near;
+
+            // Recurse near child
+            if let Some(child) = &children[near] {
+                if let Some(hit) = query_bsp_ray(child, origin, dir, inv_dir, max_dist, callback) {
+                    return Some(hit);
+                }
+            }
+
+            // Recurse far child
+            if let Some(child) = &children[far] {
+                if let Some(hit) = query_bsp_ray(child, origin, dir, inv_dir, max_dist, callback) {
+                    return Some(hit);
+                }
+            }
+        }
+
+        BspNode::NodeShare {
+            children,
+            bbox,
+            instances,
+        } => {
+            if ray_intersects_bbox(bbox, origin, inv_dir, max_dist).is_none() {
+                return None;
+            }
+
+            let mut best_hit: Option<(InstanceId, f64)> = None;
+
+            // Check straddling instances
+            for &id in instances {
+                if let Some(toi) = callback(id, max_dist) {
+                    if best_hit.is_none() || toi < best_hit.unwrap().1 {
+                        best_hit = Some((id, toi));
+                    }
+                }
+            }
+
+            // If we hit a straddling instance, we can't stop yet because a child
+            // might have a closer hit. But we can limit max_dist.
+            let mut current_max = best_hit.map(|h| h.1).unwrap_or(max_dist);
+
+            if let Some(c) = &children[0] {
+                if let Some((id, toi)) = query_bsp_ray(c, origin, dir, inv_dir, current_max, callback) {
+                    best_hit = Some((id, toi));
+                    current_max = toi;
+                }
+            }
+            if let Some(c) = &children[1] {
+                if let Some((id, toi)) = query_bsp_ray(c, origin, dir, inv_dir, current_max, callback) {
+                    best_hit = Some((id, toi));
+                }
+            }
+
+            return best_hit;
+        }
+
+        BspNode::Leaf {
+            bbox, instances, ..
+        } => {
+            if ray_intersects_bbox(bbox, origin, inv_dir, max_dist).is_none() {
+                return None;
+            }
+
+            let mut best_hit: Option<(InstanceId, f64)> = None;
+            let mut current_max = max_dist;
+
+            for &id in instances {
+                if let Some(toi) = callback(id, current_max) {
+                    best_hit = Some((id, toi));
+                    current_max = toi;
+                }
+            }
+            return best_hit;
+        }
+
+        BspNode::Inst { bbox, instance, .. } => {
+            if ray_intersects_bbox(bbox, origin, inv_dir, max_dist).is_none() {
+                return None;
+            }
+            if let Some(toi) = callback(*instance, max_dist) {
+                return Some((*instance, toi));
+            }
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

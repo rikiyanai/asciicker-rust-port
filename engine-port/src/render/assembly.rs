@@ -88,7 +88,7 @@ pub fn a3d_assembly_system(
     mut runtime_world: ResMut<RuntimeWorld>,
     asset_server: Res<AssetServer>,
     _akm_assets: Res<Assets<AkmMesh>>,
-    mut mesh_registry: ResMut<MeshRegistry>,
+    mesh_registry: ResMut<MeshRegistry>,
 ) {
     // Guard 1: already assembled
     if assembly.assembled {
@@ -131,7 +131,7 @@ pub fn a3d_assembly_system(
     );
 
     // (b) Build RuntimeWorld
-    let built_world = RuntimeWorld::build_from_parsed(world);
+    let built_world = RuntimeWorld::build_from_parsed(world, Some(&asset_server));
     let instance_count = built_world.instances.len();
     *runtime_world = built_world;
 
@@ -140,17 +140,7 @@ pub fn a3d_assembly_system(
     let material_count = materials.len();
     commands.insert_resource(RuntimeMaterials(materials));
 
-    // (d) Queue AKM mesh loads for mesh instances
-    for inst in &runtime_world.instances {
-        if let crate::world::instance::RuntimeInstance::Mesh { mesh_id, .. } = inst {
-            mesh_registry
-                .meshes
-                .entry(mesh_id.clone())
-                .or_insert_with(|| asset_server.load(format!("meshes/{mesh_id}")));
-        }
-    }
-
-    // (e) Mark assembly complete
+    // (d) Mark assembly complete
     assembly.assembled = true;
 
     info!(

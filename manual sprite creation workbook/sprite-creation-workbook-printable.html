@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Manual Sprite Creation Workbook - Printable</title>
+    <style>
+        @page {
+            size: letter;
+            margin: 0.5in;
+        }
+        
+        body {
+            font-family: "Courier New", Courier, monospace;
+            font-size: 10pt;
+            line-height: 1.2;
+            max-width: 8.5in;
+            margin: 0 auto;
+            padding: 0.5in;
+        }
+        
+        h1 {
+            text-align: center;
+            font-size: 18pt;
+            border-bottom: 2px solid black;
+            padding-bottom: 10px;
+        }
+        
+        h2 {
+            font-size: 14pt;
+            border-bottom: 1px solid black;
+            padding-bottom: 5px;
+            margin-top: 20px;
+        }
+        
+        h3 {
+            font-size: 12pt;
+            margin-top: 15px;
+        }
+        
+        pre {
+            font-family: "Courier New", Courier, monospace;
+            font-size: 8pt;
+            background: #f5f5f5;
+            padding: 10px;
+            border: 1px solid #ccc;
+            overflow-x: auto;
+            white-space: pre;
+        }
+        
+        .page-break {
+            page-break-after: always;
+        }
+        
+        .bubble {
+            display: inline-block;
+            width: 15px;
+            height: 15px;
+            border: 2px solid black;
+            border-radius: 50%;
+            margin: 2px;
+        }
+        
+        .bubble-filled {
+            background: black;
+        }
+        
+        .form-field {
+            border-bottom: 1px solid black;
+            min-width: 100px;
+            display: inline-block;
+        }
+        
+        .grid-cell {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 1px solid black;
+            text-align: center;
+            font-size: 8pt;
+        }
+        
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        
+        th, td {
+            border: 1px solid black;
+            padding: 5px;
+            text-align: center;
+        }
+        
+        .checkbox {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 1px solid black;
+            margin-right: 5px;
+        }
+        
+        .checkbox-checked {
+            background: black;
+        }
+        
+        .rgb-field {
+            display: inline-block;
+            width: 30px;
+            border-bottom: 1px solid black;
+            text-align: center;
+        }
+        
+        .registration-mark {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            background: black;
+        }
+        
+        .info-box {
+            border: 2px solid black;
+            padding: 10px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+
+<!-- PAGE 1: Cover + Overview -->
+<div class="page-break">
+    <h1>MANUAL SPRITE CREATION WORKBOOK</h1>
+    <p style="text-align: center;">XP Sprite Templates for Asciicker</p>
+    <p style="text-align: center;">___________________________________</p>
+    
+    <h2>SET 1: REFERENCE - HOW IT WORKS</h2>
+    
+    <h3>1.1 XP File Structure</h3>
+    <p>An .xp file contains 3 layers:</p>
+    <ul>
+        <li><strong>Layer 0:</strong> Color key (transparency) + Atlas metadata</li>
+        <li><strong>Layer 1:</strong> Height encoding (0-35 per cell)</li>
+        <li><strong>Layer 2:</strong> Visual drawing (glyph + fg/bg colors)</li>
+    </ul>
+    
+    <h3>1.2 Layer 0 - Color Key + Metadata</h3>
+    <div class="info-box">
+        <p><strong>Every cell:</strong> background color = transparency key</p>
+        <p><strong>Metadata cells:</strong></p>
+        <ul>
+            <li>[0,0] = angle count (digit '1'-'8')</li>
+            <li>[heightx1, 0] = animation 1 frames</li>
+            <li>[heightx2, 0] = animation 2 frames</li>
+            <li>etc.</li>
+        </ul>
+    </div>
+    
+    <h3>1.3 Layer 1 - Height</h3>
+    <div class="info-box">
+        <p>Each cell's glyph encodes Z-height for depth sorting:</p>
+        <ul>
+            <li>'0'-'9' = heights 0-9</li>
+            <li>'A'-'Z' = heights 10-35</li>
+        </ul>
+    </div>
+    
+    <h3>1.4 Layer 2 - Visual</h3>
+    <div class="info-box">
+        <p>Each cell has: glyph (CP437) + foreground RGB + background RGB</p>
+        <p>Transparency: if fg/bk matches Layer 0's bk color = transparent</p>
+    </div>
+    
+    <h3>1.5 Atlas Layout</h3>
+    <pre>
+    Grid: columns = projs x sum(frames), rows = angles
+    
+    Example: 8 angles, 2 animations x 4 frames, projs=2
+    
+    Columns 0-7 (proj)     Columns 8-15 (refl)
+    +------------------+   +------------------+
+    |F0|F1|F2|F3|F0|F1|   |F0|F1|F2|F3|F0|F1|
+    |F0|F1|F2|F3|F0|F1|   |F0|F1|F2|F3|F0|F1|
+    |F0|F1|F2|F3|F0|F1|   |F0|F1|F2|F3|F0|F1|
+    |F0|F1|F2|F3|F0|F1|   |F0|F1|F2|F3|F0|F1|
+    |F0|F1|F2|F3|F0|F1|   |F0|F1|F2|F3|F0|F1|
+    |F0|F1|F2|F3|F0|F1|   |F0|F1|F2|F3|F0|F1|
+    |F0|F1|F2|F3|F0|F1|   |F0|F1|F2|F3|F0|F1|
+    |F0|F1|F2|F3|F0|F1|   |F0|F1|F2|F3|F0|F1|
+    +------------------+   +------------------+
+    </pre>
+</div>
+
+<!-- PAGE 2: Single Frame Template -->
+<div class="page-break">
+    <h2>SET 2: BASE CHARACTER - SINGLE FRAME</h2>
+    
+    <h3>2.1 Single Frame Template</h3>
+    <p>Frame Size: Width <span class="form-field"></span> x Height <span class="form-field"></span> cells</p>
+    
+    <p><strong>Instructions:</strong> For each cell below, fill in: Glyph #, Foreground Color (RGB), Background Color (RGB)</p>
+    
+    <div style="border: 2px solid black; padding: 10px; margin: 10px 0;">
+        <p><strong>GRID (8x8 example - copy for larger frames):</strong></p>
+        <table style="width: 300px; margin: 0 auto;">
+            <tr>
+                <td></td>
+                <td>0</td><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td>
+            </tr>
+            <tr>
+                <td>0</td>
+                <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+                <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+            </tr>
+            <tr>
+                <td>1</td>
+                <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+                <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+            </tr>
+            <tr>
+                <td>2</td>
+                <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+                <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+            </tr>
+            <tr>
+                <td>3</td>
+                <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+                <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+            </tr>
+            <tr>
+                <td>4</td>
+                <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+                <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+            </tr>
+            <tr>
+                <td>5</td>
+                <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+                <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+            </tr>
+            <tr>
+                <td>6</td>
+                <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+                <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+            </tr>
+            <tr>
+                <td>7</td>
+                <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+                <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+            </tr>
+        </table>
+    </div>
+    
+    <h3>Cell Detail Form (photocopy this section):</h3>
+    <p>Cell [_,_]: Glyph <span class="form-field"></span> FG R<span class="rgb-field"></span>G<span class="rgb-field"></span>B<span class="rgb-field"></span> BG R<span class="rgb-field"></span>G<span class="rgb-field"></span>B<span class="rgb-field"></span></p>
+    <p>Cell [_,_]: Glyph <span class="form-field"></span> FG R<span class="rgb-field"></span>G<span class="rgb-field"></span>B<span class="rgb-field"></span> BG R<span class="rgb-field"></span>G<span class="rgb-field"></span>B<span class="rgb-field"></span></p>
+    <p>Cell [_,_]: Glyph <span class="form-field"></span> FG R<span class="rgb-field"></span>G<span class="rgb-field"></span>B<span class="rgb-field"></span> BG R<span class="rgb-field"></span>G<span class="rgb-field"></span>B<span class="rgb-field"></span></p>
+    <p>Cell [_,_]: Glyph <span class="form-field"></span> FG R<span class="rgb-field"></span>G<span class="rgb-field"></span>B<span class="rgb-field"></span> BG R<span class="rgb-field"></span>G<span class="rgb-field"></span>B<span class="rgb-field"></span></p>
+    <p>Cell [_,_]: Glyph <span class="form-field"></span> FG R<span class="rgb-field"></span>G<span class="rgb-field"></span>B<span class="rgb-field"></span> BG R<span class="rgb-field"></span>G<span class="rgb-field"></span>B<span class="rgb-field"></span></p>
+    <p>Cell [_,_]: Glyph <span class="form-field"></span> FG R<span class="rgb-field"></span>G<span class="rgb-field"></span>B<span class="rgb-field"></span> BG R<span class="rgb-field"></span>G<span class="rgb-field"></span>B<span class="rgb-field"></span></p>
+    <p>Cell [_,_]: Glyph <span class="form-field"></span> FG R<span class="rgb-field"></span>G<span class="rgb-field"></span>B<span class="rgb-field"></span> BG R<span class="rgb-field"></span>G<span class="rgb-field"></span>B<span class="rgb-field"></span></p>
+    <p>Cell [_,_]: Glyph <span class="form-field"></span> FG R<span class="rgb-field"></span>G<span class="rgb-field"></span>B<span class="rgb-field"></span> BG R<span class="rgb-field"></span>G<span class="rgb-field"></span>B<span class="rgb-field"></span></p>
+</div>
+
+<!-- PAGE 3: Complete Sheet + OMR -->
+<div class="page-break">
+    <h3>2.2 Complete Sprite Sheet Template</h3>
+    
+    <p>Frame Size: <span class="form-field"></span> x <span class="form-field"></span> cells</p>
+    <p>Angles: <span class="checkbox"></span>1 <span class="checkbox"></span>8</p>
+    <p>Animations: <span class="form-field"></span> frames: <span class="form-field"></span>, <span class="form-field"></span>, <span class="form-field"></span></p>
+    
+    <h4>Layer 0 (Color Key + Metadata):</h4>
+    <p>Color Key: R<span class="rgb-field"></span>G<span class="rgb-field"></span>B<span class="rgb-field"></span></p>
+    <p>Metadata: [0,0]=<span class="form-field"></span> (angles) [heightx1]=<span class="form-field"></span> (anim1) [heightx2]=<span class="form-field"></span> (anim2)</p>
+    
+    <h4>Layer 1 (Height):</h4>
+    <p>Use height digits (0-9, A-Z) for each cell in sprite grid</p>
+    
+    <h4>Layer 2 (Visual):</h4>
+    <p>Draw actual sprite - use single frame templates for each frame</p>
+</div>
+
+<!-- PAGE 4: OMR Bubble Sheet -->
+<div class="page-break">
+    <h2>SPRITE IDENTIFICATION (OMR BUBBLE SHEET)</h2>
+    
+    <p><strong>Sheet ID:</strong> <span class="checkbox"></span><span class="checkbox"></span><span class="checkbox"></span><span class="checkbox"></span><span class="checkbox"></span><span class="checkbox"></span><span class="checkbox"></span><span class="checkbox"></span></p>
+    
+    <h3>Sprite Info:</h3>
+    <p>Name: <span class="form-field" style="width: 200px;"></span></p>
+    
+    <p>Kind:
+        <span class="checkbox"></span> Human
+        <span class="checkbox"></span> Wolf
+        <span class="checkbox"></span> Bee
+    </p>
+    
+    <p>Frame Size: Width <span class="form-field"></span> x Height <span class="form-field"></span></p>
+    
+    <h3>Angles:</h3>
+    <p><span class="checkbox"></span> 1 (single) <span class="checkbox"></span> 8 (8-way)</p>
+    
+    <h3>Animations:</h3>
+    <p>Count: <span class="form-field"></span></p>
+    <p>Anim 1: <span class="form-field"></span> frames</p>
+    <p>Anim 2: <span class="form-field"></span> frames</p>
+    <p>Anim 3: <span class="form-field"></span> frames</p>
+    <p>Anim 4: <span class="form-field"></span> frames</p>
+    
+    <h3>Layer 0 - Color Key:</h3>
+    <p><span class="checkbox"></span> Magenta (255,0,255)</p>
+    <p>Custom: R<span class="rgb-field"></span>G<span class="rgb-field"></span>B<span class="rgb-field"></span></p>
+    
+    <h3>Registration Marks (mark corners):</h3>
+    <table style="width: 100%; border: none;">
+        <tr>
+            <td style="border: none;"><span class="registration-mark"></span></td>
+            <td style="border: none; text-align: right;"><span class="registration-mark"></span></td>
+        </tr>
+        <tr>
+            <td style="border: none; height: 100px;"></td>
+        </tr>
+        <tr>
+            <td style="border: none;"><span class="registration-mark"></span></td>
+            <td style="border: none; text-align: right;"><span class="registration-mark"></span></td>
+        </tr>
+    </table>
+</div>
+
+<!-- PAGE 5: Equipment -->
+<div class="page-break">
+    <h2>SET 3: EQUIPMENT VARIATIONS</h2>
+    
+    <h3>3.1 Equipment Overlay</h3>
+    
+    <p>Base Sprite: <span class="form-field" style="width: 150px;"></span></p>
+    
+    <p>Equipment to Add:
+        Armor: <span class="checkbox"></span>None <span class="checkbox"></span>Regular
+        Helmet: <span class="checkbox"></span>None <span class="checkbox"></span>Regular
+        Shield: <span class="checkbox"></span>None <span class="checkbox"></span>Regular
+        Weapon: <span class="checkbox"></span>None <span class="checkbox"></span>Sword <span class="checkbox"></span>Crossbow
+    </p>
+    
+    <h4>Overlay Grid (mark changed cells):</h4>
+    <table style="width: 200px; margin: 0 auto;">
+        <tr>
+            <td></td><td>0</td><td>1</td><td>2</td><td>3</td><td>4</td><td>5</td><td>6</td><td>7</td>
+        </tr>
+        <tr>
+            <td>0</td>
+            <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+            <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+        </tr>
+        <tr>
+            <td>1</td>
+            <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+            <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+        </tr>
+        <tr>
+            <td>2</td>
+            <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+            <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+        </tr>
+        <tr>
+            <td>3</td>
+            <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+            <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+        </tr>
+        <tr>
+            <td>4</td>
+            <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+            <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+        </tr>
+        <tr>
+            <td>5</td>
+            <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+            <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+        </tr>
+        <tr>
+            <td>6</td>
+            <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+            <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+        </tr>
+        <tr>
+            <td>7</td>
+            <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+            <td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td><td class="grid-cell"></td>
+        </tr>
+    </table>
+    
+    <h4>Output filename: <span class="form-field" style="width: 150px;"></span>.xp</h4>
+</div>
+
+<!-- PAGE 6: Reference -->
+<div class="page-break">
+    <h2>APPENDIX: REFERENCE CHARTS</h2>
+    
+    <h3>Equipment Combinations</h3>
+    <table>
+        <tr><th>Sprite</th><th>Mount</th><th>Armor</th><th>Helmet</th><th>Weapon</th><th>Filename</th></tr>
+        <tr><td>Human</td><td>0</td><td>0</td><td>0</td><td>0</td><td>player-0000</td></tr>
+        <tr><td>Human</td><td>0</td><td>0</td><td>0</td><td>1</td><td>player-0001</td></tr>
+        <tr><td>Human</td><td>0</td><td>1</td><td>1</td><td>1</td><td>player-0111</td></tr>
+        <tr><td>Human</td><td>1</td><td>1</td><td>1</td><td>1</td><td>player-1111</td></tr>
+        <tr><td>Wolf</td><td>1</td><td>0</td><td>0</td><td>0</td><td>wolfie-1000</td></tr>
+        <tr><td>Wolf</td><td>1</td><td>1</td><td>1</td><td>1</td><td>wolfie-1111</td></tr>
+        <tr><td>Bee</td><td>2</td><td>0</td><td>0</td><td>0</td><td>bigbee-2000</td></tr>
+        <tr><td>Bee</td><td>2</td><td>1</td><td>1</td><td>1</td><td>bigbee-2111</td></tr>
+    </table>
+    
+    <h3>Common CP437 Glyphs</h3>
+    <table>
+        <tr><th>Code</th><th>Char</th><th>Name</th><th>Code</th><th>Char</th><th>Name</th></tr>
+        <tr><td>219</td><td>#</td><td>Full block</td><td>220</td><td>_</td><td>Lower half</td></tr>
+        <tr><td>221</td><td>|</td><td>Left half</td><td>222</td><td>|</td><td>Right half</td></tr>
+        <tr><td>223</td><td>~</td><td>Upper half</td><td>176</td><td>.</td><td>Light shade</td></tr>
+        <tr><td>177</td><td>:</td><td>Med shade</td><td>178</td><td>;</td><td>Dark shade</td></tr>
+        <tr><td>1</td><td>:)</td><td>Smiley</td><td>3</td><td><3</td><td>Heart</td></tr>
+        <tr><td>4</td><td><></td><td>Diamond</td><td>10</td><td>*</td><td>Star</td></tr>
+    </table>
+    
+    <h3>Color Reference</h3>
+    <table>
+        <tr><th>Name</th><th>R</th><th>G</th><th>B</th><th>Name</th><th>R</th><th>G</th><th>B</th></tr>
+        <tr><td>Black</td><td>0</td><td>0</td><td>0</td><td>White</td><td>255</td><td>255</td><td>255</td></tr>
+        <tr><td>Red</td><td>255</td><td>0</td><td>0</td><td>Green</td><td>0</td><td>255</td><td>0</td></tr>
+        <tr><td>Blue</td><td>0</td><td>0</td><td>255</td><td>Yellow</td><td>255</td><td>255</td><td>0</td></tr>
+        <tr><td>Cyan</td><td>0</td><td>255</td><td>255</td><td>Magenta</td><td>255</td><td>0</td><td>255</td></tr>
+    </table>
+    
+    <p style="margin-top: 30px; text-align: center;">--- END OF WORKBOOK ---</p>
+</div>
+
+</body>
+</html>

@@ -576,7 +576,7 @@ For the planner -- how each C++ subsystem maps to Rust:
 - [bevy_kira_audio GitHub README](https://github.com/NiklasEi/bevy_kira_audio) -- Version compatibility: 0.25 = Bevy 0.18
 - [bevy_replicon GitHub](https://github.com/projectharmonia/bevy_replicon) -- Version 0.38 = Bevy 0.18.0; feature list
 - [kiddo docs.rs](https://docs.rs/kiddo) -- Version 5.2.4; f32 support; const-generic dimensions; `nearest_one`
-- Alex Harri TypeScript reference: `KdTree.ts` (104 lines), `CharacterMatcher.ts` (52 lines), `effects.ts` (20 lines), `generateSamplingData.ts` (212 lines) -- local at `/Users/r/Projects/ascii research/alexharri-ascii/website_repo/website-master/src/components/AsciiScene/`
+- Alex Harri TypeScript reference: `KdTree.ts` (104 lines), `CharacterMatcher.ts` (52 lines), `effects.ts` (20 lines), `generateSamplingData.ts` (212 lines) -- local at `../reference/alexharri-ascii/website_repo/website-master/src/components/AsciiScene/`
 - Alphabet JSON files (six-samples.json, default.json) -- local at same path under `alphabets/`
 - C++ architecture docs: `batch_audio.md`, `network_cpp.md`, `mainmenu_cpp.md`, `weather_cpp.md` -- local at `docs/arch/`
 - Alex Harri integration research: `docs/research/alexharri-asciicker-integration.md` -- local research document

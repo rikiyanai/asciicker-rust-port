@@ -2,7 +2,7 @@
 
 ## Overview
 
-This roadmap takes the Asciicker C++ game engine (82K lines, custom CPU software rasterizer rendering 3D worlds as ASCII art) and rebuilds it in Rust/Bevy across 7 phases. The journey moves from a compiling skeleton through isolated subsystems (asset parsers, GPU output, CPU rasterizer) to full pipeline integration, then layers physics, character gameplay, and finally game systems like audio/networking/weather. Phases 3 and 4 are independent and can execute in parallel -- the GPU output plugin uses synthetic test data while the CPU rasterizer is pure algorithm work. Phase 5 is the critical convergence where all prior work connects to render a real Asciicker world file.
+This roadmap takes the Asciicker C++ game engine (82K lines, custom CPU software rasterizer rendering 3D worlds as ASCII art) and rebuilds it in Rust/Bevy across 15 phases. The journey moves from a compiling skeleton through isolated subsystems (asset parsers, GPU output, CPU rasterizer) to full pipeline integration, then layers physics, character gameplay, and finally game systems like audio/networking/weather. Phases 3 and 4 are independent and can execute in parallel -- the GPU output plugin uses synthetic test data while the CPU rasterizer is pure algorithm work. Phase 5 is the critical convergence where all prior work connects to render a real Asciicker world file.
 
 ## Phases
 
@@ -18,8 +18,15 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3.1: Audit Remediation** - Fix Critical/High severity code-level risks from Phases 1-3 audit before Phase 5 integration (INSERTED)
 - [x] **Phase 4: CPU Rasterizer Core** - SampleBuffer, triangle/line rasterization, materials, color quantization, and RESOLVE stage
 - [x] **Phase 5: Pipeline Integration** - Full 6-stage rendering pipeline producing real scene output from .a3d world files
-- [ ] **Phase 6: Physics and Character** - Sphere collision, character state machine, player input, water, and effects
+- [x] **Phase 6: Physics and Character** - Sphere collision, character state machine, player input, water, and effects
 - [ ] **Phase 7: Game Systems** - Audio, networking, weather, menus, and visual quality polish
+- [ ] **Phase 7.1: Physics & Character Polish** - Critical fixes for camera sync, rotation, and actions (INSERTED)
+- [ ] **Phase 8: NPC AI and Combat** - Enemy spawning, target selection, stuck detection, and melee combat
+- [ ] **Phase 9: Inventory and Items** - Item catalog, grid-based inventory UI, pickup/drop interaction, and equipment lifecycle
+- [ ] **Phase 10: UI/HUD and Interaction** - Status bars, chat UI, minimap, and screen-to-world unprojection
+- [ ] **Phase 11: Full Menu System** - Hierarchical menu navigation, dither transitions, level selection, and settings persistence
+- [ ] **Phase 12: Full Networking** - Authoritative entity replication, combat protocol, item sync, movement prediction, and lag compensation
+- [ ] **Phase 13: NPC Scripting** - Embedded Lua runtime, script API, and hot-reloading behavior
 
 ## Phase Details
 
@@ -168,6 +175,81 @@ Plans:
 - [ ] 07-04-PLAN.md -- Visual quality: Alex Harri 6D shape-vector + Font1 3 skins (TDD, wave 3)
 - [ ] 07-05-PLAN.md -- Weather: ring-buffer particle pool, Perlin wind, snow/rain (TDD, wave 4)
 
+### Phase 7.1: Physics & Character Polish
+**Goal**: Fix critical integration gaps from Phase 6 identified during audit: camera sync, rotation, and Block action
+**Depends on**: Phase 6
+**Requirements**: PHYS-FIX-01, CHAR-FIX-01
+**Success Criteria**:
+  1. Camera position is synchronized to player position from physics output
+  2. WASD forces are rotated by camera yaw before physics integration
+  3. Block input key (KeyF) is functional and triggers state transition
+**Plans**: 1 plan
+
+### Phase 8: NPC AI and Combat
+**Goal**: Enemies spawn in the world, have autonomous AI behavior, and the player can engage in melee combat with them
+**Depends on**: Phase 7
+**Requirements**: NPC-01, NPC-02, NPC-03, NPC-04, NPC-05, NPC-06, NPC-07, NPC-08
+**Success Criteria**:
+  1. NPCs spawn automatically at world load from .a3d EnemyGen data with randomized equipment
+  2. The SpatialGrid provides efficient proximity queries for AI and combat targeting
+  3. NPCs autonomously chase players, recover from being stuck, and return to spawn points
+  4. Melee combat hits connect exactly on animation frame 21, applying damage and knockback
+**Plans**: 4 plans
+
+### Phase 9: Inventory and Items
+**Goal**: A complete item system allowing pickup, management, and equipment of various item types
+**Depends on**: Phase 8
+**Requirements**: ITEM-01, ITEM-02, ITEM-03, ITEM-04
+**Success Criteria**:
+  1. An 8x20 grid-based inventory UI supports bitmask collision and directional navigation
+  2. Players can pick up items from the world using the SpatialGrid and drop them back
+  3. Consumables (food, potions) apply gameplay effects and are destroyed on use
+  4. Equipping items modifies the character's 5D sprite lookup and visual appearance
+**Plans**: 4 plans
+
+### Phase 10: UI/HUD and Interaction
+**Goal**: Enhanced player interface with status bars, chat, minimap, and world-space feedback
+**Depends on**: Phase 9
+**Requirements**: HUD-01, HUD-02, HUD-03, HUD-04
+**Success Criteria**:
+  1. HP and MP bars render correctly at the bottom-left using Font1 on the AsciiCellGrid
+  2. A TalkBox system supports scrollable chat history and per-character talk bubbles
+  3. A top-right minimap displays height-sampled terrain and nearby NPC dots
+  4. Mouse clicks correctly target world entities via screen-to-world unprojection
+**Plans**: 4 plans
+
+### Phase 11: Full Menu System
+**Goal**: Complete hierarchical menu hierarchy with settings persistence and dithered transitions
+**Depends on**: Phase 7
+**Requirements**: FMENU-01, FMENU-02, FMENU-03, FMENU-04
+**Success Criteria**:
+  1. A stack-based hierarchical menu allows navigation through Video, Audio, and Control settings
+  2. Background scaling and dither-fade transitions match the C++ engine's aesthetic fidelity
+  3. A Level Selection screen lists and loads available .a3d world files
+  4. User settings are persisted to a JSON config file and applied at startup
+**Plans**: 4 plans (1 optional)
+
+### Phase 12: Full Networking
+**Goal**: Authoritative multiplayer gameplay with entity replication and lag compensation
+**Depends on**: Phase 10
+**Requirements**: FNET-01, FNET-02, FNET-03, FNET-04, FNET-05
+**Success Criteria**:
+  1. Authoritative server replicates character positions, animations, and states to all clients
+  2. Combat actions and item interactions are validated server-side to prevent cheating
+  3. Client-side prediction and server reconciliation provide zero-latency movement feedback
+  4. Remote entity interpolation and ping measurement handle network jitter and delay
+**Plans**: 5 plans
+
+### Phase 13: NPC Scripting
+**Goal**: User-extensible NPC behavior via embedded Lua scripting with hot-reloading
+**Depends on**: Phase 8
+**Requirements**: SCRIPT-01, SCRIPT-02, SCRIPT-03
+**Success Criteria**:
+  1. A sandboxed Lua 5.4 runtime allows loading and executing NPC scripts from assets
+  2. A script API exposes world data, entity stats, and movement/action commands to Lua
+  3. Scripts can be hot-reloaded at runtime without restarting the game engine
+**Plans**: 3 plans
+
 ## Progress
 
 **Execution Order:**
@@ -183,7 +265,14 @@ Note: Phases 3 and 4 are independent (both depend only on Phase 1) and can execu
 | 4. CPU Rasterizer Core | 4/4 | Complete | 2026-02-20 |
 | 5. Pipeline Integration | 8/8 | Complete | 2026-02-22 |
 | 6. Physics and Character | 3/3 | Complete | 2026-02-24 |
-| 7. Game Systems | 1/5 | In Progress | - |
+| 7. Game Systems | 2/5 | In Progress | - |
+| 7.1 Physics & Character Polish | 0/1 | Planned | - |
+| 8. NPC AI and Combat | 0/4 | Planned | - |
+| 9. Inventory and Items | 0/4 | Planned | - |
+| 10. UI/HUD and Interaction | 0/4 | Planned | - |
+| 11. Full Menu System | 0/4 | Planned | - |
+| 12. Full Networking | 0/5 | Planned | - |
+| 13. NPC Scripting | 0/3 | Planned | - |
 
 ## Developer Experience
 

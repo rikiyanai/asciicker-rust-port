@@ -1,0 +1,14 @@
+# OS
+.DS_Store
+
+# Rust
+target/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Build
+*.o
+*.d

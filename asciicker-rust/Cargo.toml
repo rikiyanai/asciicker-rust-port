@@ -1,0 +1,32 @@
+[package]
+name = "asciicker"
+version = "0.1.0"
+edition = "2021"
+authors = ["Asciicker Team"]
+description = "Asciicker game engine port from C++ to Rust using Bevy"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+bevy = "0.18.0"
+bevy_kira_audio = "0.24"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+flate2 = "1.0"
+anyhow = "1.0"
+thiserror = "2.0"
+log = "0.4"
+env_logger = "0.11"
+
+[dev-dependencies]
+proptest = "1.0"
+goldenfile = "1.4"
+insta = "1.39"
+
+[profile.release]
+opt-level = 3
+lto = true
+
+[profile.dev]
+opt-level = 0

@@ -390,7 +390,7 @@ Three approaches exist for updating CPU data textures every frame:
 ## Sources
 
 ### Primary (HIGH confidence)
-- **Mage Core source** (`/Users/r/Projects/ascii research/Mage-core/src/`) - Complete reference implementation of 4-texture ASCII GPU rendering (shader.wgsl, render.rs, image.rs, config.rs, app.rs). ~2000 lines. Directly inspected.
+- **Mage Core source** (`../reference/Mage-core/src/`) - Complete reference implementation of 4-texture ASCII GPU rendering (shader.wgsl, render.rs, image.rs, config.rs, app.rs). ~2000 lines. Directly inspected.
 - **Existing AsciiCellGrid** (`engine-port/src/output/ascii_cell_grid.rs`) - Already implements the 3-array layout (char_indices, fg_colors, bg_colors) matching the 4-texture approach. Directly inspected.
 - **Existing RenderConfig** (`engine-port/src/render/config.rs`) - Default 240x135 ASCII resolution, 2x supersample factor. Directly inspected.
 - **Bevy 0.18 Release Notes** (https://bevy.org/news/bevy-0-18/) - FullscreenMaterial introduction, render pipeline updates.

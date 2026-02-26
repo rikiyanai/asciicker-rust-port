@@ -23,8 +23,11 @@ use crate::render::camera::GameCamera;
 use crate::system_sets::{CharacterSet, RenderSet};
 use crate::terrain::RuntimeTerrain;
 
+pub mod spatial_grid;
+
 use state::GameState;
 use menu::MainMenu;
+use spatial_grid::{SpatialGrid, sync_spatial_grid, cleanup_spatial_grid};
 
 // ---------------------------------------------------------------------------
 // Resources
@@ -267,6 +270,7 @@ impl Plugin for GamePlugin {
         // C++ default: water = 55 (raw u16 height units). World units = 55 / HEIGHT_SCALE.
         // Source: game_app.cpp:2061, game_web.cpp:911, mainmenu.cpp "ak.setWater(55)"
         app.insert_resource(WaterLevel(55.0 / crate::asset_loader::constants::HEIGHT_SCALE as f32));
+        app.init_resource::<SpatialGrid>();
 
         // ---------------------------------------------------------------
         // P7-014 FIX: Gate ALL Phase 6 systems on GameState::Playing.
@@ -311,19 +315,18 @@ impl Plugin for GamePlugin {
         // Gated on Playing state.
         app.add_systems(
             PostUpdate,
-            sync_camera_to_player
-                .before(CharacterSet::SpritePush)
-                .run_if(in_state(GameState::Playing)),
-        );
-        app.add_systems(
-            PostUpdate,
-            sync_physics_to_character
-                .before(CharacterSet::SpritePush)
-                .in_set(CharacterSet::PhysicsSync)
+            (
+                sync_camera_to_player.before(CharacterSet::SpritePush),
+                sync_physics_to_character
+                    .before(CharacterSet::SpritePush)
+                    .in_set(CharacterSet::PhysicsSync),
+                sync_spatial_grid.after(CharacterSet::PhysicsSync),
+                cleanup_spatial_grid,
+            )
                 .run_if(in_state(GameState::Playing)),
         );
 
-        info!("GamePlugin registered (state machine, menu, water sync, torque, camera follow)");
+        info!("GamePlugin registered (state machine, menu, water sync, torque, camera follow, spatial grid)");
     }
 }
 

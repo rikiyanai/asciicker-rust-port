@@ -256,12 +256,12 @@ Features to explicitly skip until after v1 ships.
 
 ## Sources
 
-- C++ source analysis: `/Users/r/Downloads/asciicker-Y9-2/` (~82K lines, 48 files) -- HIGH confidence
+- C++ source analysis: `(ORIGINAL GAME)asciicker-Y9-2-main/` (~82K lines, 48 files) -- HIGH confidence
 - Skill packs: engine-render.md, world-loading.md, physics-system/SKILL.md, game-mechanics/SKILL.md, networking/SKILL.md, editor-asciiid.md -- HIGH confidence
 - Architecture audit: HANDOFF_ENGINE_AUDIT.md (file inventory, 34 analysis outputs) -- HIGH confidence
-- Mage Core reference: `/Users/r/Projects/ascii research/Mage-core/` (~2000 lines Rust) -- HIGH confidence (direct code review)
+- Mage Core reference: `../reference/Mage-core/` (~2000 lines Rust) -- HIGH confidence (direct code review)
 - Alex Harri shape vectors: https://alexharri.com/blog/ascii-rendering (Jan 2026) -- HIGH confidence (published technique)
-- Alex Harri implementation: `/Users/r/Projects/ascii research/alexharri-ascii/` (TypeScript) -- HIGH confidence (direct code review)
+- Alex Harri implementation: `../reference/alexharri-ascii/` (TypeScript) -- HIGH confidence (direct code review)
 - bevy_ascii_terminal: https://github.com/sarkahn/bevy_ascii_terminal (v0.18.2, Feb 2026) -- MEDIUM confidence (web search, not code review)
 - Mage Core crate: https://github.com/baad-c0de/mage-core -- MEDIUM confidence (web search + code review)
 - PROJECT.md decisions: D001 (Bevy), D003 (CPU rasterizer), D004-D005 (perspective), D010 (auto_mat first), D012 (shape-match in RESOLVE), D040/D041 (pending) -- HIGH confidence
