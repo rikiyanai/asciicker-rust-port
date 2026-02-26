@@ -5,25 +5,25 @@
 See: .planning/PROJECT.md (updated 2026-02-20)
 
 **Core value:** The CPU rasterizer must produce visually identical output to the C++ engine -- same glyphs, same colors, same depth ordering -- so that existing Asciicker worlds render correctly in the Rust port.
-**Current focus:** Phase 7 in progress: Game Systems.
+**Current focus:** Phase 7 gap closure plans executing. Next gap closure: 07-07.
 
 ## Current Position
 
 Phase: 7 of 15 (Game Systems)
-Plan: 5 of 5 in current phase (07-05 complete)
-Status: Phase 7 COMPLETE. All 5 plans (07-01 through 07-05) executed successfully.
-Last activity: 2026-02-26 -- Completed 07-05: Weather particle effects with ring-buffer pool, Perlin wind, composite after resolve
+Plan: 6 of 7 in current phase (07-06 complete)
+Status: Executing Phase 7 gap closure plans. 07-06 done (weather debug keybind).
+Last activity: 2026-02-26 -- Completed 07-06: F5 debug keybind to cycle weather states at runtime
 
-Progress: [##########] 100%
+Progress: [########--] 86%
 
-**Note:** Phase 7 complete. 446 lib tests passing (16 new weather tests). Weather particles composite to AsciiCellGrid after render pipeline. All game systems implemented.
+**Note:** Phase 7 gap closure in progress. 07-06 complete (F5 weather debug keybind). 447 lib tests passing (17 weather tests). 07-07 remaining.
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 22
+- Total plans completed: 23
 - Average duration: ~7 min
-- Total execution time: ~2.6 hours
+- Total execution time: ~2.7 hours
 
 **By Phase:**
 
@@ -37,8 +37,8 @@ Progress: [##########] 100%
 | 5 - Pipeline Integration | 8 | 93 min | ~12 min |
 
 **Recent Trend:**
-- Last 5 plans: 07-01, 07-02, 07-03, 07-04, 07-05
-- Trend: Consistent ~6-25 min per plan
+- Last 5 plans: 07-02, 07-03, 07-04, 07-05, 07-06
+- Trend: Consistent ~4-25 min per plan
 
 *Updated after each plan completion*
 | Phase 05 P01 | 17min | 2 tasks | 5 files |
@@ -54,6 +54,7 @@ Progress: [##########] 100%
 | Phase 07 P02 | 18min | 2 tasks | 5 files |
 | Phase 07 P04 | 12min | 2 tasks | 8 files |
 | Phase 07 P05 | 14min | 2 tasks | 2 files |
+| Phase 07 P06 | 4min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -162,6 +163,7 @@ Recent decisions affecting current work:
 - 07-05: fg=255 (white) for all weather particles matching C++ behavior
 - 07-05: Rain glyphs are extension over C++ (which only has snow)
 - 07-05: No automatic weather state trigger -- public API only (debug key deferred)
+- 07-06: cycle_weather_debug_system chained before weather_update_system so state change takes effect same frame
 
 ### Pending Todos
 
@@ -178,5 +180,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: Completed 07-05-PLAN.md (weather particle effects). Phase 7 complete. 446 lib tests passing.
+Stopped at: Completed 07-06-PLAN.md (F5 weather debug keybind). 07-07 remaining.
 Resume file: None
