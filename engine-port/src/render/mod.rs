@@ -10,6 +10,7 @@ pub mod rasterizer;
 pub mod resolve;
 pub mod resolve_bridge;
 pub mod sample_buffer;
+pub mod shape_vector;
 pub mod sprite_blit;
 pub mod terrain_shader;
 pub mod types;
@@ -22,6 +23,7 @@ use camera::{GameCamera, camera_input_system, camera_update_system, has_characte
 use config::RenderConfig;
 use pipeline::{PipelineTiming, camera_terrain_init_system, render_pipeline_system};
 use sample_buffer::SampleBuffer;
+use shape_vector::ShapeVectorMatcher;
 use sprite_blit::SpriteQueue;
 
 use crate::system_sets::RenderSet;
@@ -81,7 +83,8 @@ impl Plugin for CpuRasterizerPlugin {
             .insert_resource(WaterConfig {
                 water_z: f32::NEG_INFINITY,
                 ripple_time: 0.0,
-            });
+            })
+            .insert_resource(ShapeVectorMatcher::new_default());
 
         app.add_systems(Startup, (load_a3d_scene, verify_plugin_prerequisites));
 

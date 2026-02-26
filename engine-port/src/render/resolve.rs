@@ -15,6 +15,7 @@ use super::quantize::{rgb2pal, rgb8_to_rgb5, rgb555_to_rgb888};
 use super::sample_buffer::{Sample, spare_bits};
 use super::types::AnsiCell;
 
+
 /// Resolve the 2x-supersampled SampleBuffer into an AnsiCell grid.
 ///
 /// Reads 2x2 sample blocks, determines terrain vs mesh path, applies
@@ -42,6 +43,10 @@ pub fn resolve(
     debug_assert!(dw >= 2 * ascii_w + 4);
     debug_assert!(dh >= 2 * ascii_h + 4);
 
+    // Precompute sky palette index (C++ render.cpp:2884 clear color)
+    // Sky blue: RGB555(12,12,27) → RGB888(100,100,220)
+    let sky_pal = rgb2pal([100, 100, 220]);
+
     for cy in 0..ascii_h {
         for cx in 0..ascii_w {
             let out_idx = (cy * ascii_w + cx) as usize;
@@ -60,11 +65,11 @@ pub fn resolve(
             let s01 = &samples[i01];
             let s11 = &samples[i11];
 
-            // Check if all 4 samples are clear
+            // Check if all 4 samples are clear — sky color
             if is_clear(s00) && is_clear(s10) && is_clear(s01) && is_clear(s11) {
                 output[out_idx] = AnsiCell {
-                    fg: 0,
-                    bk: 0,
+                    fg: sky_pal,
+                    bk: sky_pal,
                     gl: b' ',
                     spare: 0,
                 };
@@ -105,7 +110,7 @@ pub fn resolve(
                     sy,
                     materials,
                 };
-                resolve_material(dominant.visual, diffuse_sum, &ctx)
+                resolve_material(dominant.visual, diffuse_sum, &ctx, is_reflection)
             };
 
             // Apply grid/wireframe overlay
@@ -213,7 +218,14 @@ struct MaterialResolveCtx<'a> {
 /// table, and converts MatCell colors to xterm-256 palette indices.
 ///
 /// `diffuse_sum` is the raw sum of all 4 samples' diffuse values (0-1020).
-fn resolve_material(visual: u16, diffuse_sum: u32, ctx: &MaterialResolveCtx<'_>) -> ResolvedCell {
+/// When `is_reflection` is true, applies water tinting (darker, blue-shifted)
+/// matching C++ render.cpp reflection behaviour for terrain.
+fn resolve_material(
+    visual: u16,
+    diffuse_sum: u32,
+    ctx: &MaterialResolveCtx<'_>,
+    is_reflection: bool,
+) -> ResolvedCell {
     // C++ render.cpp:3448: mat[i] = src[i].visual & 0x00FF (8-bit material index).
     // Upper bits may be used for visual shade / animation in future.
     let mat_idx = (visual & 0x00FF) as usize;
@@ -227,12 +239,32 @@ fn resolve_material(visual: u16, diffuse_sum: u32, ctx: &MaterialResolveCtx<'_>)
 
     if mat_idx < ctx.materials.len() {
         let mat_cell = &ctx.materials[mat_idx].shade[elevation as usize][shade_idx];
-        let fg_pal = rgb2pal(mat_cell.fg);
-        let bg_pal = rgb2pal(mat_cell.bg);
-        ResolvedCell {
-            fg: fg_pal,
-            bk: bg_pal,
-            gl: mat_cell.gl,
+
+        if is_reflection {
+            // C++ render.cpp:3622-3627: uniform brightness dimming for reflected
+            // terrain cells — multiply each channel by 255/400 (~64%).
+            // NO blue tint — the C++ engine dims all channels equally.
+            let dim = |rgb: [u8; 3]| -> [u8; 3] {
+                [
+                    ((rgb[0] as u32) * 255 / 400).min(255) as u8,
+                    ((rgb[1] as u32) * 255 / 400).min(255) as u8,
+                    ((rgb[2] as u32) * 255 / 400).min(255) as u8,
+                ]
+            };
+
+            ResolvedCell {
+                fg: rgb2pal(dim(mat_cell.fg)),
+                bk: rgb2pal(dim(mat_cell.bg)),
+                gl: mat_cell.gl,
+            }
+        } else {
+            let fg_pal = rgb2pal(mat_cell.fg);
+            let bg_pal = rgb2pal(mat_cell.bg);
+            ResolvedCell {
+                fg: fg_pal,
+                bk: bg_pal,
+                gl: mat_cell.gl,
+            }
         }
     } else {
         // Fallback for invalid material index
@@ -349,10 +381,12 @@ mod tests {
 
         resolve(&samples, dw, dh, ascii_w, ascii_h, &materials, &mut output);
 
+        // C++ sky blue: RGB888(100,100,220) → xterm palette index
+        let sky_pal = rgb2pal([100, 100, 220]);
         for cell in &output {
             assert_eq!(cell.gl, b' ', "Clear buffer should produce space glyphs");
-            assert_eq!(cell.fg, 0);
-            assert_eq!(cell.bk, 0);
+            assert_eq!(cell.fg, sky_pal, "Clear fg should be sky blue");
+            assert_eq!(cell.bk, sky_pal, "Clear bk should be sky blue");
             assert_eq!(cell.spare, 0);
         }
     }

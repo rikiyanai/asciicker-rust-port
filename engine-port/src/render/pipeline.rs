@@ -479,10 +479,9 @@ pub fn render_pipeline_system(
         }
 
         // Step 3: Glyph selection + RGBA conversion to cell_grid
-        // F242: For REFLECTION cells, apply blue water tint to make water
-        // visually distinct from normal terrain.
+        // Dimming for reflected cells is already applied in resolve_material() (255/400).
+        // Perlin ripple (Step 2) provides water animation.
         let mut glyph_sel = AutoMatGlyphSelector;
-        let sample_w = sample_buffer.width as usize;
         for cy in 0..ascii_h {
             for cx in 0..ascii_w {
                 let i = cy * ascii_w + cx;
@@ -491,36 +490,8 @@ pub fn render_pipeline_system(
                     Some(glyph) => glyph,
                     None => cell.gl,
                 };
-                let mut fg_rgb = XTERM_256_PALETTE[cell.fg as usize];
-                let mut bk_rgb = XTERM_256_PALETTE[cell.bk as usize];
-
-                // Check if this cell corresponds to a reflected (water) sample
-                let sx = 2 + 2 * cx;
-                let sy = 2 + 2 * cy;
-                let sample_idx = sy * sample_w + sx;
-                if sample_idx < sample_buffer.samples.len() {
-                    let sample = &sample_buffer.samples[sample_idx];
-                    if sample.spare & crate::render::sample_buffer::spare_bits::PARITY_MASK
-                        == crate::render::sample_buffer::spare_bits::REFLECTION
-                    {
-                        // Water tint: blend toward dark blue (0, 30, 80)
-                        // 40% original + 60% water tint for bg (dominant water color)
-                        // 60% original + 40% water tint for fg (keep reflected detail)
-                        const WATER_R: u8 = 0;
-                        const WATER_G: u8 = 30;
-                        const WATER_B: u8 = 80;
-                        bk_rgb = [
-                            ((bk_rgb[0] as u16 * 40 + WATER_R as u16 * 60) / 100) as u8,
-                            ((bk_rgb[1] as u16 * 40 + WATER_G as u16 * 60) / 100) as u8,
-                            ((bk_rgb[2] as u16 * 40 + WATER_B as u16 * 60) / 100) as u8,
-                        ];
-                        fg_rgb = [
-                            ((fg_rgb[0] as u16 * 60 + WATER_R as u16 * 40) / 100) as u8,
-                            ((fg_rgb[1] as u16 * 60 + WATER_G as u16 * 40) / 100) as u8,
-                            ((fg_rgb[2] as u16 * 60 + WATER_B as u16 * 40) / 100) as u8,
-                        ];
-                    }
-                }
+                let fg_rgb = XTERM_256_PALETTE[cell.fg as usize];
+                let bk_rgb = XTERM_256_PALETTE[cell.bk as usize];
 
                 cell_grid.char_indices[i] = gl as u16;
                 cell_grid.fg_colors[i] = [fg_rgb[0], fg_rgb[1], fg_rgb[2], 255];

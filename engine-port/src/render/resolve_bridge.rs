@@ -268,7 +268,7 @@ mod tests {
 
     #[test]
     fn test_resolve_to_grid_clear_cells() {
-        // R16-F189 FIX: Clear buffer produces space/black cells
+        // R16-F189 FIX: Clear buffer produces space + sky blue cells
         let buf = SampleBuffer::new(4, 4);
         let materials = test_materials();
         let mut grid = AsciiCellGrid::new(4, 4);
@@ -277,21 +277,23 @@ mod tests {
 
         resolve_to_grid(&buf, &materials, &mut grid, &mut selector, &mut resolve_buf);
 
+        // Sky blue: palette 104 → RGB via bridge pal_to_rgb table
         for i in 0..grid.cells_count() {
             assert_eq!(
                 grid.char_indices[i], 32,
                 "Clear cell should have space glyph (32), got {}",
                 grid.char_indices[i]
             );
-            assert_eq!(
-                grid.fg_colors[i],
-                [0, 0, 0, 255],
-                "Clear cell fg should be black"
-            );
-            assert_eq!(
+            // Sky color should be non-black (blue-ish)
+            assert_ne!(
                 grid.bg_colors[i],
                 [0, 0, 0, 255],
-                "Clear cell bg should be black"
+                "Clear cell bg should NOT be black (should be sky blue)"
+            );
+            assert!(
+                grid.bg_colors[i][2] > grid.bg_colors[i][0],
+                "Sky blue should have B > R, got {:?}",
+                grid.bg_colors[i]
             );
         }
     }

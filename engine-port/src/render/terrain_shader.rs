@@ -43,6 +43,11 @@ pub struct TerrainShader {
     pub material_index: u16,
     /// Base diffuse lighting value, modulated by shadow state.
     pub diffuse_base: u8,
+    /// Water surface height (raw u16 units). When set, per-pixel heights
+    /// below this are clamped UP to water_z. C++ render.cpp:1584.
+    /// This is PER-PIXEL clamping (not vertex-level) so screen position
+    /// is preserved while the z-buffer fills at water level.
+    pub water_z: Option<f32>,
 }
 
 impl RasterShader for TerrainShader {
@@ -59,6 +64,14 @@ impl RasterShader for TerrainShader {
                 sample.height = z + HEIGHT_SCALE as f32;
             } else {
                 sample.height = z;
+            }
+            // C++ render.cpp:1584: clamp underwater terrain height to water level.
+            // Per-pixel clamping preserves screen coverage (triangles stay in place)
+            // while making underwater terrain visible as a flat z-buffer surface.
+            if let Some(wz) = self.water_z {
+                if sample.height < wz {
+                    sample.height = wz;
+                }
             }
         }
     }
@@ -105,20 +118,15 @@ pub fn render_patch(
             let h01_raw = patch.height[hy + 1][hx] as f64;
             let h11_raw = patch.height[hy + 1][hx + 1] as f64;
 
-            // Compute per-quad Lambertian diffuse from RAW heights (before water clamp)
+            // Compute per-quad Lambertian diffuse from actual heights
             let dzdx = (h10_raw - h00_raw) as i32;
             let dzdy = (h01_raw - h00_raw) as i32;
             let diffuse_base = compute_diffuse(dzdx, dzdy);
 
-            // Clamp vertex heights to water_z for projection. This makes underwater
-            // terrain project as a flat surface at water level, filling screen space
-            // that would otherwise be black. C++ render.cpp:1584 equivalent.
-            let (h00, h10, h01, h11) = if let Some(wz) = water_z {
-                let wz = wz as f64;
-                (h00_raw.max(wz), h10_raw.max(wz), h01_raw.max(wz), h11_raw.max(wz))
-            } else {
-                (h00_raw, h10_raw, h01_raw, h11_raw)
-            };
+            // Use raw heights for vertex positions. Water clamping is per-pixel
+            // in blend() — preserves screen coverage while filling z-buffer at
+            // water level. Vertex-level clamping was wrong (shifted triangles).
+            let (h00, h10, h01, h11) = (h00_raw, h10_raw, h01_raw, h11_raw);
 
             // Compute world-space vertex positions.
             // C++ formula: vx = x * HEIGHT_CELLS + dx * VISUAL_CELLS (render.cpp:1723)
@@ -154,6 +162,7 @@ pub fn render_patch(
                     let shader = TerrainShader {
                         material_index: mat_idx,
                         diffuse_base: diffuse,
+                        water_z,
                     };
 
                     // Compute sub-quad vertices by interpolating the height quad corners
@@ -323,6 +332,7 @@ mod tests {
         let shader = TerrainShader {
             material_index: 42,
             diffuse_base: 200,
+            water_z: None,
         };
         shader.blend(&mut sample, 100.0, [0.33, 0.33, 0.34]);
 
@@ -339,6 +349,7 @@ mod tests {
         let shader_low = TerrainShader {
             material_index: 10,
             diffuse_base: 200,
+            water_z: None,
         };
         shader_low.blend(&mut sample, 50.0, [0.33, 0.33, 0.34]);
         assert_eq!(sample.visual, 10);
@@ -347,6 +358,7 @@ mod tests {
         let shader_high = TerrainShader {
             material_index: 20,
             diffuse_base: 100,
+            water_z: None,
         };
         shader_high.blend(&mut sample, 200.0, [0.33, 0.33, 0.34]);
         assert_eq!(
@@ -358,6 +370,7 @@ mod tests {
         let shader_below = TerrainShader {
             material_index: 30,
             diffuse_base: 255,
+            water_z: None,
         };
         shader_below.blend(&mut sample, 25.0, [0.33, 0.33, 0.34]);
         assert_eq!(
