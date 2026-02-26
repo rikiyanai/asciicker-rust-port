@@ -115,9 +115,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Visual Quality
 
-- [ ] **VIS-01**: Alex Harri 6D shape-vector glyph matching integrated at RESOLVE stage (phased: auto_mat first, then 2D, then 6D)
+- [x] **VIS-01**: Alex Harri 6D shape-vector glyph matching integrated at RESOLVE stage (phased: auto_mat first, then 2D, then 6D)
 - [ ] **VIS-02**: Golden-file CI comparison of AnsiCell output against C++ reference (<1% cell difference threshold) -- INFRASTRUCTURE COMPLETE, blocked on C++ reference data capture
-- [ ] **VIS-03**: Font system with CP437 glyphs (3 skins: grey, gold, pink)
+- [x] **VIS-03**: Font system with CP437 glyphs (3 skins: grey, gold, pink)
 
 ### NPC AI and Combat
 
@@ -267,8 +267,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | GAME-01 | Phase 7 | Complete |
 | GAME-02 | Phase 7 | Complete |
 | GAME-03 | Phase 7 | Pending |
-| VIS-01 | Phase 7 | Pending |
-| VIS-03 | Phase 7 | Pending |
+| VIS-01 | Phase 7 | Complete |
+| VIS-03 | Phase 7 | Complete |
 | NPC-01 | Phase 8 | Pending |
 | NPC-02 | Phase 8 | Pending |
 | NPC-03 | Phase 8 | Pending |

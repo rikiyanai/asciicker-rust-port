@@ -10,13 +10,13 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 ## Current Position
 
 Phase: 7 of 15 (Game Systems)
-Plan: 2 of 5 in current phase (07-02 complete)
-Status: Phase 7 in progress. Plans 07-01, 07-02 complete. 3 plans remaining (07-03, 07-04, 07-05).
-Last activity: 2026-02-25 -- Completed 07-02: GameState FSM (MainMenu/Loading/Playing/Paused), main menu, state-gated gameplay systems
+Plan: 4 of 5 in current phase (07-04 complete)
+Status: Phase 7 in progress. Plans 07-01, 07-02, 07-03, 07-04 complete. 1 plan remaining (07-05).
+Last activity: 2026-02-26 -- Completed 07-04: Shape-vector glyph matching with kiddo k-d tree, Font1 with 3 skins, pipeline wiring
 
-Progress: [#########=] 88%
+Progress: [#########=] 92%
 
-**Note:** 07-02 complete. 379 lib tests passing (14 new state/menu tests). GameState controls all system execution flow.
+**Note:** 07-04 complete. 430 lib tests passing (29 new shape-vector + font tests). ShapeVectorGlyphSelector wired into pipeline, Font1 ready for HUD text.
 
 ## Performance Metrics
 
@@ -37,7 +37,7 @@ Progress: [#########=] 88%
 | 5 - Pipeline Integration | 8 | 93 min | ~12 min |
 
 **Recent Trend:**
-- Last 5 plans: 06-01, 06-02, 06-03, 07-01, 07-02
+- Last 5 plans: 06-03, 07-01, 07-02, 07-03, 07-04
 - Trend: Consistent ~6-25 min per plan
 
 *Updated after each plan completion*
@@ -52,6 +52,7 @@ Progress: [#########=] 88%
 | Phase 06 P03 | 25min | 2 tasks | 32 files |
 | Phase 07 P01 | 16min | 2 tasks | 6 files |
 | Phase 07 P02 | 18min | 2 tasks | 5 files |
+| Phase 07 P04 | 12min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -152,6 +153,10 @@ Recent decisions affecting current work:
 - 07-02: RenderSet::WaterTime set added for cross-plugin gating of advance_water_time_system
 - 07-02: Escape from any non-Playing/Paused state returns to MainMenu (R19-005 stuck-state fallback)
 - 07-02: advance_loading_progress checks BOTH AssemblyState.assembled AND terrain.root.is_some()
+- 07-04: Used macro_rules for resolve loop to avoid code duplication between ShapeVectorGlyphSelector and AutoMatGlyphSelector paths
+- 07-04: Font1 default_fg = [170,170,170] matching C++ VGA terminal silver/grey
+- 07-04: distance_threshold = 0.05 (squared Euclidean) for auto_mat fallback in uniform regions
+- 07-04: Font1 is Resource-only (no systems) -- calling systems enforce ordering after render_pipeline_system
 
 ### Pending Todos
 
@@ -167,6 +172,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-02-25
-Stopped at: Completed 07-02-PLAN.md (GameState FSM, main menu, state-gated gameplay systems). 379 lib tests passing.
+Last session: 2026-02-26
+Stopped at: Completed 07-04-PLAN.md (shape-vector glyph matching, Font1 with 3 skins, pipeline wiring). 430 lib tests passing.
 Resume file: None
