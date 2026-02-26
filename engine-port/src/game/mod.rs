@@ -312,9 +312,15 @@ impl Plugin for GamePlugin {
         // Weather systems (Phase 7 Plan 05)
         // ---------------------------------------------------------------
         // weather_update_system: spawns/updates particles in Update (before PostUpdate render)
+        // cycle_weather_debug_system: F5 cycles weather states for testing (gap closure 07-06)
         app.add_systems(
             Update,
-            weather::weather_update_system.run_if(in_state(GameState::Playing)),
+            (
+                weather::cycle_weather_debug_system,
+                weather::weather_update_system,
+            )
+                .chain()
+                .run_if(in_state(GameState::Playing)),
         );
 
         // AUTHORITATIVE SCHEDULE DECISION (M6-AUDIT-FIX):

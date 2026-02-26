@@ -228,6 +228,27 @@ pub fn set_weather_state(weather: &mut Weather, state: WeatherState) {
 // Systems
 // ---------------------------------------------------------------------------
 
+/// Debug keybind -- not a gameplay feature. Remove or gate behind cfg(debug_assertions) for release.
+///
+/// Cycles WeatherState on F5 press: Clear -> LightSnow -> HeavySnow -> Blizzard -> Clear.
+/// Calls set_weather_state to update target_intensity accordingly.
+pub fn cycle_weather_debug_system(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut weather: ResMut<Weather>,
+) {
+    if keys.just_pressed(KeyCode::F5) {
+        let old = weather.state;
+        let next = match old {
+            WeatherState::Clear => WeatherState::LightSnow,
+            WeatherState::LightSnow => WeatherState::HeavySnow,
+            WeatherState::HeavySnow => WeatherState::Blizzard,
+            WeatherState::Blizzard => WeatherState::Clear,
+        };
+        set_weather_state(&mut weather, next);
+        info!("Weather debug: {:?} -> {:?}", old, next);
+    }
+}
+
 /// Update weather: lerp intensity, compute wind, spawn and update particles.
 ///
 /// R19-003 FIX: Wind uses C++ exact parameters (frequency 0.7, amplitude 2.0 * intensity).
@@ -629,5 +650,56 @@ mod tests {
         assert_eq!(RAIN_GLYPHS[0], 0x7C); // |
         assert_eq!(RAIN_GLYPHS[1], 0x2F); // /
         assert_eq!(RAIN_GLYPHS[2], 0x3A); // :
+    }
+
+    #[test]
+    fn test_cycle_weather_cycles_all_states() {
+        // Verify F5 cycle: Clear -> LightSnow -> HeavySnow -> Blizzard -> Clear
+        let mut weather = Weather::default();
+        assert_eq!(weather.state, WeatherState::Clear);
+
+        // Clear -> LightSnow
+        let next = match weather.state {
+            WeatherState::Clear => WeatherState::LightSnow,
+            WeatherState::LightSnow => WeatherState::HeavySnow,
+            WeatherState::HeavySnow => WeatherState::Blizzard,
+            WeatherState::Blizzard => WeatherState::Clear,
+        };
+        set_weather_state(&mut weather, next);
+        assert_eq!(weather.state, WeatherState::LightSnow);
+        assert_eq!(weather.target_intensity, 0.3);
+
+        // LightSnow -> HeavySnow
+        let next = match weather.state {
+            WeatherState::Clear => WeatherState::LightSnow,
+            WeatherState::LightSnow => WeatherState::HeavySnow,
+            WeatherState::HeavySnow => WeatherState::Blizzard,
+            WeatherState::Blizzard => WeatherState::Clear,
+        };
+        set_weather_state(&mut weather, next);
+        assert_eq!(weather.state, WeatherState::HeavySnow);
+        assert_eq!(weather.target_intensity, 0.7);
+
+        // HeavySnow -> Blizzard
+        let next = match weather.state {
+            WeatherState::Clear => WeatherState::LightSnow,
+            WeatherState::LightSnow => WeatherState::HeavySnow,
+            WeatherState::HeavySnow => WeatherState::Blizzard,
+            WeatherState::Blizzard => WeatherState::Clear,
+        };
+        set_weather_state(&mut weather, next);
+        assert_eq!(weather.state, WeatherState::Blizzard);
+        assert_eq!(weather.target_intensity, 1.0);
+
+        // Blizzard -> Clear (wrap)
+        let next = match weather.state {
+            WeatherState::Clear => WeatherState::LightSnow,
+            WeatherState::LightSnow => WeatherState::HeavySnow,
+            WeatherState::HeavySnow => WeatherState::Blizzard,
+            WeatherState::Blizzard => WeatherState::Clear,
+        };
+        set_weather_state(&mut weather, next);
+        assert_eq!(weather.state, WeatherState::Clear);
+        assert_eq!(weather.target_intensity, 0.0);
     }
 }
