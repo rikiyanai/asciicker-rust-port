@@ -20,6 +20,7 @@ use crate::render::mesh_shader::render_mesh;
 use crate::render::resolve::resolve;
 use crate::render::resolve_bridge::{AutoMatGlyphSelector, GlyphSelector, XTERM_256_PALETTE};
 use crate::render::sample_buffer::SampleBuffer;
+use crate::render::shape_vector::{ShapeVectorGlyphSelector, ShapeVectorMatcher};
 use crate::render::sprite_blit::{SpriteQueue, blit_sprite};
 use crate::render::types::AnsiCell;
 use crate::render::water;
@@ -208,6 +209,7 @@ pub fn render_pipeline_system(
     mut sprite_queue: ResMut<SpriteQueue>,
     mut timing: ResMut<PipelineTiming>,
     water_config: Res<WaterConfig>,
+    shape_vec_matcher: Option<ResMut<ShapeVectorMatcher>>,
 ) {
     let frame_start = Instant::now();
 
@@ -479,24 +481,47 @@ pub fn render_pipeline_system(
         }
 
         // Step 3: Glyph selection + RGBA conversion to cell_grid
-        // Dimming for reflected cells is already applied in resolve_material() (255/400).
-        // Perlin ripple (Step 2) provides water animation.
-        let mut glyph_sel = AutoMatGlyphSelector;
-        for cy in 0..ascii_h {
-            for cx in 0..ascii_w {
-                let i = cy * ascii_w + cx;
-                let cell = &resolve_buf[i];
-                let gl = match glyph_sel.select_glyph(&sample_buffer, cx, cy) {
-                    Some(glyph) => glyph,
-                    None => cell.gl,
-                };
-                let fg_rgb = XTERM_256_PALETTE[cell.fg as usize];
-                let bk_rgb = XTERM_256_PALETTE[cell.bk as usize];
+        // R7-CRIT-001 FIX: Use ShapeVectorGlyphSelector when matcher is available,
+        // otherwise fall back to AutoMatGlyphSelector.
+        // R8-XP-001 FIX: Water ripple (Step 2) is PRESERVED above — ordering correct.
+        // R7-XP-005 FIX: &mut sample_buffer.samples borrow DROPPED before this block.
+        // R20-F01: This is the inlined 3-step loop, NOT resolve_to_grid.
 
-                cell_grid.char_indices[i] = gl as u16;
-                cell_grid.fg_colors[i] = [fg_rgb[0], fg_rgb[1], fg_rgb[2], 255];
-                cell_grid.bg_colors[i] = [bk_rgb[0], bk_rgb[1], bk_rgb[2], 255];
-            }
+        // Helper closure for the per-cell loop (shared by both paths)
+        macro_rules! resolve_loop {
+            ($glyph_sel:expr) => {
+                for cy in 0..ascii_h {
+                    for cx in 0..ascii_w {
+                        let i = cy * ascii_w + cx;
+                        let cell = &resolve_buf[i];
+                        let gl = match $glyph_sel.select_glyph(&sample_buffer, cx, cy) {
+                            Some(glyph) => glyph,
+                            None => cell.gl,
+                        };
+                        let fg_rgb = XTERM_256_PALETTE[cell.fg as usize];
+                        let bk_rgb = XTERM_256_PALETTE[cell.bk as usize];
+
+                        cell_grid.char_indices[i] = gl as u16;
+                        cell_grid.fg_colors[i] = [fg_rgb[0], fg_rgb[1], fg_rgb[2], 255];
+                        cell_grid.bg_colors[i] = [bk_rgb[0], bk_rgb[1], bk_rgb[2], 255];
+                    }
+                }
+            };
+        }
+
+        if let Some(mut matcher) = shape_vec_matcher {
+            // R6-XP-008 FIX: Construct selector inside the if-let branch
+            // where both materials and matcher are available.
+            let mut shape_sel = ShapeVectorGlyphSelector {
+                matcher: &mut matcher,
+                materials: &mats.0,
+                water_z: water_config.water_z,
+                distance_threshold: 0.05, // R20-F05: squared Euclidean threshold
+            };
+            resolve_loop!(shape_sel);
+        } else {
+            let mut auto_sel = AutoMatGlyphSelector;
+            resolve_loop!(auto_sel);
         }
     }
     timing.resolve_us = t5.elapsed().as_micros() as u64;

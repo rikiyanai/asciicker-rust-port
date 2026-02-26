@@ -1,6 +1,7 @@
 pub mod assembly;
 pub mod camera;
 pub mod config;
+pub mod font;
 pub mod material;
 pub mod math;
 pub mod mesh_shader;
