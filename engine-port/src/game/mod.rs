@@ -12,6 +12,7 @@
 
 pub mod menu;
 pub mod state;
+pub mod weather;
 
 use bevy::prelude::*;
 
@@ -20,6 +21,7 @@ use crate::character::state_machine::Character;
 use crate::physics::{PhysicsIO, PhysicsState};
 use crate::render::WaterConfig;
 use crate::render::camera::GameCamera;
+use crate::render::pipeline::render_pipeline_system;
 use crate::system_sets::{CharacterSet, RenderSet};
 use crate::terrain::RuntimeTerrain;
 
@@ -271,6 +273,7 @@ impl Plugin for GamePlugin {
         // Source: game_app.cpp:2061, game_web.cpp:911, mainmenu.cpp "ak.setWater(55)"
         app.insert_resource(WaterLevel(55.0 / crate::asset_loader::constants::HEIGHT_SCALE as f32));
         app.init_resource::<SpatialGrid>();
+        app.init_resource::<weather::Weather>();
 
         // ---------------------------------------------------------------
         // P7-014 FIX: Gate ALL Phase 6 systems on GameState::Playing.
@@ -305,6 +308,27 @@ impl Plugin for GamePlugin {
                 .run_if(in_state(GameState::Playing)),
         );
 
+        // ---------------------------------------------------------------
+        // Weather systems (Phase 7 Plan 05)
+        // ---------------------------------------------------------------
+        // weather_update_system: spawns/updates particles in Update (before PostUpdate render)
+        app.add_systems(
+            Update,
+            weather::weather_update_system.run_if(in_state(GameState::Playing)),
+        );
+
+        // AUTHORITATIVE SCHEDULE DECISION (M6-AUDIT-FIX):
+        // render_pipeline_system is in PostUpdate (confirmed by Phase 6).
+        // weather_composite_system MUST also be in PostUpdate, AFTER render_pipeline_system.
+        // P7-009 FIX: explicit .after(render_pipeline_system) ordering.
+        // Research Pitfall 4: composite AFTER resolve to avoid overwrite.
+        app.add_systems(
+            PostUpdate,
+            weather::weather_composite_system
+                .after(render_pipeline_system)
+                .run_if(in_state(GameState::Playing)),
+        );
+
         // PostUpdate: cross-plugin ordering for render pipeline
         app.configure_sets(
             PostUpdate,
@@ -326,7 +350,9 @@ impl Plugin for GamePlugin {
                 .run_if(in_state(GameState::Playing)),
         );
 
-        info!("GamePlugin registered (state machine, menu, water sync, torque, camera follow, spatial grid)");
+        info!(
+            "GamePlugin registered (state machine, menu, water sync, torque, camera follow, spatial grid, weather)"
+        );
     }
 }
 
