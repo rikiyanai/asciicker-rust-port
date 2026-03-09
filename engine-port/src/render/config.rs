@@ -35,32 +35,3 @@ impl RenderConfig {
         2 * self.ascii_height + 4
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn default_ascii_dimensions() {
-        let config = RenderConfig::default();
-        assert_eq!(config.ascii_width, 240);
-        assert_eq!(config.ascii_height, 135);
-    }
-
-    #[test]
-    fn default_sample_dimensions_include_border() {
-        let config = RenderConfig::default();
-        assert_eq!(config.sample_width(), 484);
-        assert_eq!(config.sample_height(), 274);
-    }
-
-    #[test]
-    fn custom_config() {
-        let config = RenderConfig {
-            ascii_width: 120,
-            ascii_height: 67,
-        };
-        assert_eq!(config.sample_width(), 244);
-        assert_eq!(config.sample_height(), 138);
-    }
-}

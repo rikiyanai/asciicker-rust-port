@@ -1,0 +1,17 @@
+{
+  "name": "asciicker-engine-browser-testing",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Claude-oriented browser testing scaffold with screenshot-first visual trails.",
+  "scripts": {
+    "test:smoke": "node scripts/testing/smoke.mjs",
+    "test:e2e": "node scripts/testing/e2e.mjs --feature full",
+    "test:parallel": "node scripts/testing/parallel.mjs --suite core",
+    "test:debug": "node scripts/testing/smoke.mjs --debug 1",
+    "test:serve-fixture": "node scripts/testing/serve_fixture.mjs --port 4173"
+  },
+  "devDependencies": {
+    "playwright": "^1.58.0"
+  }
+}

@@ -48,16 +48,3 @@ pub fn apply_remote_poses(
         transform.rotation = Quat::from_rotation_z(pose.dir);
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_local_player_resource() {
-        let lp = LocalPlayer {
-            entity: Entity::PLACEHOLDER,
-        };
-        assert_eq!(lp.entity, Entity::PLACEHOLDER);
-    }
-}

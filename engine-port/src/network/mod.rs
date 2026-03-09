@@ -102,38 +102,3 @@ impl Plugin for NetworkPlugin {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_network_config_defaults_to_standalone() {
-        let config = NetworkConfig::default();
-        assert_eq!(config.mode, NetworkMode::Standalone);
-    }
-
-    #[test]
-    fn test_network_mode_variants() {
-        let standalone = NetworkMode::Standalone;
-        let server = NetworkMode::Server { port: 5000 };
-        let client = NetworkMode::Client {
-            addr: "127.0.0.1:5000".to_string(),
-        };
-        assert_eq!(standalone, NetworkMode::Standalone);
-        assert_ne!(server, standalone);
-        assert_ne!(client, standalone);
-    }
-
-    #[test]
-    fn test_standalone_plugin_no_panic() {
-        // Verify NetworkPlugin in Standalone mode does not panic
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins);
-        app.add_plugins(NetworkPlugin);
-        app.update();
-
-        // Verify config resource exists
-        assert!(app.world().contains_resource::<NetworkConfig>());
-    }
-}

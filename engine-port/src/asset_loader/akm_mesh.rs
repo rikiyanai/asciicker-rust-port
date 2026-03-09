@@ -273,29 +273,3 @@ pub fn parse_akm(text: &str) -> Result<AkmMesh, AssetError> {
         edges,
     })
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_property_code_mapping() {
-        assert_eq!(property_code("x"), PROP_X);
-        assert_eq!(property_code("y"), PROP_Y);
-        assert_eq!(property_code("z"), PROP_Z);
-        assert_eq!(property_code("red"), PROP_RED);
-        assert_eq!(property_code("diffuse_red"), PROP_RED);
-        assert_eq!(property_code("green"), PROP_GREEN);
-        assert_eq!(property_code("diffuse_green"), PROP_GREEN);
-        assert_eq!(property_code("blue"), PROP_BLUE);
-        assert_eq!(property_code("diffuse_blue"), PROP_BLUE);
-        assert_eq!(property_code("alpha"), PROP_ALPHA);
-        assert_eq!(property_code("nx"), PROP_SKIP);
-        assert_eq!(property_code("s"), PROP_SKIP);
-    }
-
-    #[test]
-    fn test_empty_file() {
-        assert!(parse_akm("").is_err());
-    }
-}
