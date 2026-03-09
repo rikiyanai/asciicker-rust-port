@@ -5,18 +5,24 @@
 See: .planning/PROJECT.md (updated 2026-02-20)
 
 **Core value:** The CPU rasterizer must produce visually identical output to the C++ engine -- same glyphs, same colors, same depth ordering -- so that existing Asciicker worlds render correctly in the Rust port.
-**Current focus:** Phase 7 COMPLETE (all 7 plans including gap closures). Next: Phase 8.
+**Current focus:** Re-verify and close late Phase 5-7 gaps before Phase 8.
 
 ## Current Position
 
-Phase: 7 of 15 (Game Systems)
-Plan: 7 of 7 in current phase (07-07 complete)
-Status: Phase 7 COMPLETE. All 7 plans (07-01 through 07-07) executed successfully including gap closures.
-Last activity: 2026-02-26 -- Completed 07-07: Network integration test with memory_transport verifying PoseUpdate replication
+Phase: 5-7 reverification and gap closure
+Plan: Gap audit completed; execution sequence reset from roadmap authority
+Status: Phase 5 PARTIAL, Phase 6 PARTIAL, Phase 7 PARTIAL. Later-phase completion claims were ahead of runtime and doc evidence.
+Last activity: 2026-03-09 -- Wrote phase gap audit, corrected roadmap status, reproduced open water/render parity bug
 
-Progress: [##########] 100%
+Progress: [######----] re-baselining
 
-**Note:** Phase 7 complete with all gap closures. 447 lib tests passing + 2 network integration tests (1 ignored). All game systems implemented.
+**Note:** `.planning/ROADMAP.md` is the status authority. As of 2026-03-09, the key open evidence-backed gaps are:
+- renderer still has placeholder/stub paths: shadow stage, sprite blit, world-frustum culling, world reflections
+- water remains visually incorrect; current diagnostics show the bug is upstream of ripple animation
+- physics still uses bbox collision proxies instead of real mesh triangles
+- shape-vector integration is partial and explicitly not final; `Font1` is not wired into real systems
+- Mage Core reuse is only partial: the GPU output pattern is present, but the full Mage Core engine/runtime logic was not copied
+- planning/docs are inconsistent (`ROADMAP.md` vs `STATE.md`, missing conductor script from `AGENTS.md`)
 
 ## Performance Metrics
 
@@ -173,6 +179,17 @@ Recent decisions affecting current work:
 - [ ] Commit uncommitted Msaa::Off fix on Camera2d in `engine-port/src/output/mod.rs` (F005 resolution)
 - [ ] Phase 4 REND-10: Release-mode performance benchmark not yet executed (human-verification item from 04-VERIFICATION.md)
 - [ ] Commit STATE.md and config.json uncommitted changes
+- [ ] Restore or replace `scripts/conductor_tools.py` referenced by `AGENTS.md`
+- [ ] Port original mixed reflection/non-reflection `auto_mat` resolve branch into `engine-port/src/render/resolve.rs`
+- [ ] Verify water in release mode after resolve/composite port
+- [ ] Implement real shadow work in `engine-port/src/render/pipeline.rs`
+- [ ] Replace placeholder sprite blit in `engine-port/src/render/sprite_blit.rs` with real XP frame compositing
+- [ ] Restore WORLD-stage BSP frustum culling in render units
+- [ ] Add world mesh/sprite reflections in `engine-port/src/render/water.rs`
+- [ ] Replace bbox collision proxy in `engine-port/src/physics/geometry.rs` with actual AKM triangles
+- [ ] Implement dead-state respawn/menu-return flow
+- [ ] Complete the full shape-vector port beyond the current six-samples bridge and wire `Font1` into real UI systems
+- [ ] Audit/document Mage Core reuse boundaries and any remaining output-path parity gaps
 
 ### Blockers/Concerns
 
@@ -181,6 +198,25 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-02-26
-Stopped at: Completed 07-07-PLAN.md (network integration test). Phase 7 fully complete with all gap closures.
-Resume file: None
+Last session: 2026-03-09
+Stopped at: Gap audit and roadmap correction completed; release build still compiling; next implementation target is mixed-cell water/reflection resolve path.
+Resume file: `docs/plans/2026-03-09-phase-1-7-gap-audit.md`
+
+## Next Sequence
+
+1. Wait for `cargo run --release` to finish and visually re-check the water/reflection overlay symptom at full speed.
+2. Port the original mixed reflection/non-reflection resolve branch from C++ `render.cpp` into `engine-port/src/render/resolve.rs`.
+3. Re-test water in release mode and update `docs/FAILURE_LOG.md` with outcome.
+4. Replace remaining renderer placeholders in priority order:
+   - shadow stage
+   - sprite blit
+   - world frustum culling
+   - world reflections
+5. Close Phase 6 approximation paths:
+   - real mesh collision triangles
+   - dead-state flow
+6. Re-scope Phase 7 visual quality:
+   - complete the full shape-vector port beyond the current six-samples bridge
+   - wire `Font1` into actual HUD/chat/menu code
+   - audit Mage Core output-pattern parity vs the current Bevy implementation
+7. Reconcile roadmap/state/project docs again after each real closure, not before evidence.

@@ -17,9 +17,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: GPU Output** - Bevy render plugin displaying ASCII glyphs via Mage Core 4-texture WGSL shader
 - [x] **Phase 3.1: Audit Remediation** - Fix Critical/High severity code-level risks from Phases 1-3 audit before Phase 5 integration (INSERTED)
 - [x] **Phase 4: CPU Rasterizer Core** - SampleBuffer, triangle/line rasterization, materials, color quantization, and RESOLVE stage
-- [x] **Phase 5: Pipeline Integration** - Full 6-stage rendering pipeline producing real scene output from .a3d world files
-- [x] **Phase 6: Physics and Character** - Sphere collision, character state machine, player input, water, and effects
-- [x] **Phase 7: Game Systems** - Audio, networking, weather, menus, and visual quality polish
+- [ ] **Phase 5: Pipeline Integration** - Partial: real scene pipeline exists, but shadow/world-frustum/sprite/reflection parity gaps remain
+- [ ] **Phase 6: Physics and Character** - Partial: playable core exists, but collision/water/render parity gaps remain
+- [ ] **Phase 7: Game Systems** - Partial: subsystems exist, but the current six-samples matcher is not final, Font1 is not integrated, weather/network evidence is incomplete, and planning-state drift remains
 - [ ] **Phase 7.1: Physics & Character Polish** - Critical fixes for camera sync, rotation, and actions (INSERTED)
 - [ ] **Phase 8: NPC AI and Combat** - Enemy spawning, target selection, stuck detection, and melee combat
 - [ ] **Phase 9: Inventory and Items** - Item catalog, grid-based inventory UI, pickup/drop interaction, and equipment lifecycle
@@ -127,6 +127,7 @@ Plans:
   3. Terrain quadtree with HEIGHT_CELLS=4 and VISUAL_CELLS=8 renders with frustum culling, and terrain shadows cast correctly via 64-bit bitmask per patch
   4. BSP tree traversal renders world geometry with frustum culling, all 4 node types functional (NODE, NODE_SHARE, LEAF, INST), and instance flags respected
   5. Golden-file CI comparison of full-scene AnsiCell output against C++ reference shows <1% cell difference
+**Status Note**: PARTIAL. Core pipeline shipped, but authoritative completion is blocked by unresolved gaps documented on 2026-03-09: Stage 4 shadow is still stubbed, WORLD-stage BSP frustum culling is disabled, deferred sprite blit is still placeholder `'S'`, world reflections are not re-queried in the water pass, and VIS-02 remains partial pending real C++ capture data.
 **Plans**: 8 plans
 
 Plans:
@@ -149,6 +150,7 @@ Plans:
   3. The character renders with the correct equipment sprite (5D lookup: action x weapon x shield x helmet x armor x mount) and frame animation timing
   4. Water surfaces render with reflections (reflection stage re-runs terrain+world below water plane) and Perlin Z-perturbation ripple effect
   5. Physics runs at 15ms fixed timestep via Bevy FixedUpdate with max 10 substeps, maintaining 60fps with character + full scene
+**Status Note**: PARTIAL. The player loop is usable, but physics/render parity is incomplete: world collision still uses bbox proxies instead of real AKM triangles, dead-state flow remains deferred, and water rendering is still visually incorrect despite the Phase 6 water path existing.
 **Plans**: 3 plans
 
 Plans:
@@ -166,6 +168,7 @@ Plans:
   3. Weather effects (rain, snow) render as particle systems that are visible in the ASCII output and respond to game state
   4. A main menu loads on startup with navigation to start game, and the game state machine transitions correctly between Loading, Playing, and Paused states
   5. Alex Harri 6D shape-vector glyph matching replaces auto_mat glyph selection at the RESOLVE stage (auto_mat still used for fg/bg color), and all 3 font skins (grey, gold, pink) are available
+**Status Note**: PARTIAL. Audio/menu/weather/network/shape-vector systems exist, but completion claims are ahead of evidence: ROADMAP and STATE disagree on 07-06/07-07, the current six-samples matcher is an intermediate bridge and not the final shape-vector port, `Font1` is resource-only and not wired into HUD/chat/menu systems, and weather/network completion evidence needs re-verification. Separately, the repo only ports the Mage Core GPU output pattern, not the full Mage Core engine/runtime logic.
 **Plans**: 7 plans
 
 Plans:
@@ -257,6 +260,29 @@ Plans:
 **Execution Order:**
 Phases execute in numeric order: 1 -> 2 -> 3 (parallel with 4) -> 4 (parallel with 3) -> 5 -> 6 -> 7
 Note: Phases 3 and 4 are independent (both depend only on Phase 1) and can execute in parallel.
+
+## Immediate Next Steps
+
+1. Reconcile planning/doc state:
+   - fix `.planning/STATE.md` to stop claiming full Phase 7 completion
+   - restore or replace the missing `scripts/conductor_tools.py` entrypoint referenced by `AGENTS.md`
+2. Finish the water/reflection resolve path:
+   - port the original mixed reflection/non-reflection `auto_mat` branch from C++ `render.cpp`
+   - verify release-mode behavior against the current blank-water / reflection-overlay bug
+3. Replace remaining render placeholders:
+   - implement Stage 4 shadow work in `render/pipeline.rs`
+   - restore proper world/BSP frustum culling
+   - replace placeholder sprite blit with real XP frame compositing
+   - add world reflections to `render/water.rs`
+4. Close Phase 6 approximations:
+   - replace bbox collision proxies with actual transformed AKM triangle soup
+   - implement dead-state respawn/menu-return flow
+5. Re-baseline the Phase 7 visual path:
+   - complete the full shape-vector port beyond the current six-samples bridge
+   - wire `Font1` into real menu/HUD/chat usage and align matcher data with the runtime font atlas
+   - document and audit Mage Core reuse boundaries (GPU output pattern vs full engine logic)
+6. Re-run evidence-based verification before Phase 8:
+   - update ROADMAP/STATE only from commit + test + runtime evidence
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|

@@ -147,6 +147,7 @@
 - [Plan: Ancestor Cleanup](plan-ancestor-cleanup.md)
 - [Plan: SampleBuffer Bridge](plan-SampleBuffer-bridge.md)
 - [Plan: Terrain Fix](implementation-plan-terrain-fix.md)
+- [Plan: Phase 1-7 Gap Audit (2026-03-09)](plans/2026-03-09-phase-1-7-gap-audit.md)
 
 ### Audit Documents
 - [Audit: Assumptions Verified](audit-assumptions-verified.md)

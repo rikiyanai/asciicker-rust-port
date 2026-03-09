@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A Rust/Bevy reimplementation of the Asciicker C++ game engine (~82K lines across 48 files). Asciicker is a multiplayer ASCII-art game featuring a custom CPU software rasterizer that renders 3D worlds using CP437 glyphs with per-cell foreground/background colors. The port preserves the original's unique aesthetic while modernizing the architecture with Bevy ECS, GPU-accelerated ASCII output via Mage Core's 4-texture approach, and Alex Harri's 6D shape-vector glyph matching at the RESOLVE stage.
+A Rust/Bevy reimplementation of the Asciicker C++ game engine (~82K lines across 48 files). Asciicker is a multiplayer ASCII-art game featuring a custom CPU software rasterizer that renders 3D worlds using CP437 glyphs with per-cell foreground/background colors. The port preserves the original's unique aesthetic while modernizing the architecture with Bevy ECS, a Mage Core-inspired 4-texture GPU output path, and a still-incomplete Alex Harri shape-vector integration at the RESOLVE stage.
 
 ## Core Value
 
@@ -35,8 +35,8 @@ The CPU rasterizer must produce visually identical output to the C++ engine — 
 - [ ] Port character state machine (idle, walk, run, attack, block, etc.)
 - [ ] Port 5D equipment sprite lookup
 - [ ] Implement deferred sprite blit (after RESOLVE stage)
-- [ ] Implement GPU-accelerated ASCII output as Bevy render plugin (Mage Core 4-texture approach: char index, fg, bg, font atlas)
-- [ ] Integrate Alex Harri 6D shape-vector k-d tree matching at RESOLVE stage (replaces auto_mat glyph selection; auto_mat still used for fg/bg color)
+- [ ] Implement GPU-accelerated ASCII output as Bevy render plugin (Mage Core-inspired 4-texture approach: char index, fg, bg, font atlas; full Mage Core engine/runtime is not being copied wholesale)
+- [ ] Complete the full Alex Harri shape-vector port at RESOLVE stage (current six-samples matcher is an intermediate bridge, not the final implementation; auto_mat still used for fg/bg color until parity is proven)
 - [ ] Perspective camera with Q/E rotation toggle (D004-D005: perspective REQUIRED)
 - [ ] Basic multiplayer networking (client-server model)
 - [ ] Audio system via bevy_kira_audio (16-track mixer)
@@ -56,7 +56,8 @@ The CPU rasterizer must produce visually identical output to the C++ engine — 
 - Mobile/web platform targets — desktop-first (Windows/Linux/macOS)
 - Custom engine from scratch — Bevy provides ECS, input, audio, windowing (Decision D001)
 - GPU rasterization — CPU rasterizer matches C++ fidelity (Decision D003); GPU only for final ASCII output
-- Full Alex Harri 6D vectors from day one — start with auto_mat, upgrade to 6D after performance validation (Decision D010)
+- Full Mage Core engine/runtime parity — out of scope; only the GPU output architecture is being reused
+- Treating the current six-samples matcher as final — out of scope; it is an intermediate bridge until the full shape-vector path is implemented and validated
 
 ## Context
 
@@ -67,13 +68,13 @@ The CPU rasterizer must produce visually identical output to the C++ engine — 
 
 ### Technology Stack
 - **Engine**: Bevy 0.18+ (ECS, input, audio, windowing) — Decision D001 (2026-02-19)
-- **ASCII Rendering**: Mage Core 4-texture GPU approach as Bevy render plugin (char index + fg + bg + font atlas via WGPU/WGSL)
-- **Glyph Selection**: Alex Harri 6D shape-vector k-d tree matching (phased: 2D first per D010, upgrade to 6D after validation)
+- **ASCII Rendering**: Mage Core-inspired 4-texture GPU approach as a Bevy render plugin (char index + fg + bg + font atlas via WGPU/WGSL)
+- **Glyph Selection**: Alex Harri shape-vector matching (current repo has an intermediate six-samples bridge; full intended port remains to be completed and validated)
 - **CPU Rasterizer**: Custom (port of C++ render.cpp) outputs to SampleBuffer
 - **Audio**: bevy_kira_audio for 16-track mixer
 
 ### Reference Implementations
-- **Mage Core**: `../reference/Mage-core` (~2000 lines Rust, v0.2.0, GPU-accelerated ASCII rendering)
+- **Mage Core**: `../reference/Mage-core` (~2000 lines Rust, v0.2.0, GPU-accelerated ASCII rendering) used as an output-architecture reference, not as a full engine/runtime to be copied verbatim
 - **Alex Harri**: `../reference/alexharri-ascii` (TypeScript/WebGL2, 6D shape-vector matching with k-d tree)
 
 ### Existing Skeleton
@@ -125,4 +126,4 @@ The CPU rasterizer must produce visually identical output to the C++ engine — 
 | D041: Ancestor cleanup | Pending — needs research on C++ behavior | Pending |
 
 ---
-*Last updated: 2026-02-20 after initialization*
+*Last updated: 2026-03-09 after Phase 5-7 gap audit correction*
