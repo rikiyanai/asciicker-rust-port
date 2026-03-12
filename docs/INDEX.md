@@ -4,6 +4,7 @@
 - [AGENTS.md](../AGENTS.md) - Agent entry point and repo guidelines
 - [CLAUDE.md](../CLAUDE.md) - Claude-specific memory and instructions
 - [Agent Protocol](AGENT_PROTOCOL.md) - Agent startup and evidence rules
+- [Control Reference](CONTROL_REFERENCE.md) - Master list of gameplay, debug, tuning, and capture controls
 
 ## Planning
 - [Roadmap](../.planning/ROADMAP.md) - Canonical status ledger (planned - GSD-managed)
@@ -147,7 +148,14 @@
 - [Plan: Ancestor Cleanup](plan-ancestor-cleanup.md)
 - [Plan: SampleBuffer Bridge](plan-SampleBuffer-bridge.md)
 - [Plan: Terrain Fix](implementation-plan-terrain-fix.md)
-- [Plan: Phase 1-7 Gap Audit (2026-03-09)](plans/2026-03-09-phase-1-7-gap-audit.md)
+- [Plan: 2026-03-09 Water Regression Investigation Log](plans/2026-03-09-water-regression-investigation-log.md)
+- [Plan: 2026-03-09 Water Next-Step Architecture Audit](plans/2026-03-09-water-next-step-architecture-audit.md)
+- [Plan: 2026-03-10 Architecture Alignment Handoff](plans/2026-03-10-architecture-alignment-handoff.md)
+- [Spec: 2026-03-10 Gap-to-100% Requirements](plans/2026-03-10-gap-100pct-spec.md)
+- [Plan: 2026-03-11 Shape-Vector Occupancy Tuning](plans/2026-03-11-shape-vector-occupancy-tuning.md)
+- [Plan: 2026-03-11 Alex Harri vs Original Architecture Audit](plans/2026-03-11-alexharri-vs-original-architecture-audit.md)
+- [Audit: 2026-03-11 Render/Glyph/Lighting Deep-Dive vs C++](plans/2026-03-11-render-glyph-lighting-audit.md)
+- [Spec: 2026-03-11 Three-Mode Render Spec (Original/Harri/Combined)](plans/2026-03-11-three-mode-render-spec.md)
 
 ### Audit Documents
 - [Audit: Assumptions Verified](audit-assumptions-verified.md)

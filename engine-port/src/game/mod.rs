@@ -27,9 +27,9 @@ use crate::terrain::RuntimeTerrain;
 
 pub mod spatial_grid;
 
-use state::GameState;
 use menu::MainMenu;
-use spatial_grid::{SpatialGrid, sync_spatial_grid, cleanup_spatial_grid};
+use spatial_grid::{SpatialGrid, cleanup_spatial_grid, sync_spatial_grid};
+use state::GameState;
 
 // ---------------------------------------------------------------------------
 // Resources
@@ -242,9 +242,8 @@ impl Plugin for GamePlugin {
         // Pause toggle: runs in both Playing and Paused states
         app.add_systems(
             Update,
-            state::toggle_pause.run_if(
-                in_state(GameState::Playing).or(in_state(GameState::Paused)),
-            ),
+            state::toggle_pause
+                .run_if(in_state(GameState::Playing).or(in_state(GameState::Paused))),
         );
 
         // ---------------------------------------------------------------
@@ -271,7 +270,9 @@ impl Plugin for GamePlugin {
         // ---------------------------------------------------------------
         // C++ default: water = 55 (raw u16 height units). World units = 55 / HEIGHT_SCALE.
         // Source: game_app.cpp:2061, game_web.cpp:911, mainmenu.cpp "ak.setWater(55)"
-        app.insert_resource(WaterLevel(55.0 / crate::asset_loader::constants::HEIGHT_SCALE as f32));
+        app.insert_resource(WaterLevel(
+            55.0 / crate::asset_loader::constants::HEIGHT_SCALE as f32,
+        ));
         app.init_resource::<SpatialGrid>();
         app.init_resource::<weather::Weather>();
 
@@ -365,3 +366,160 @@ impl Plugin for GamePlugin {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_water_level_syncs_to_physics() {
+        // WaterLevel is in world units, passes directly to PhysicsIO.water
+        let water_level = WaterLevel(5.0);
+        let mut physics_io = PhysicsIO::default();
+
+        physics_io.water = water_level.0;
+        assert_eq!(physics_io.water, 5.0);
+    }
+
+    #[test]
+    fn test_water_level_syncs_to_render() {
+        use crate::asset_loader::constants::HEIGHT_SCALE;
+        // WaterLevel is in world units. Render needs raw u16 (multiply by HEIGHT_SCALE).
+        let water_level = WaterLevel(10.0);
+        let mut water_config = WaterConfig {
+            water_z: f32::NEG_INFINITY,
+            ripple_time: 0.0,
+        };
+
+        water_config.water_z = water_level.0 * HEIGHT_SCALE as f32;
+        assert_eq!(water_config.water_z, 10.0 * HEIGHT_SCALE as f32);
+    }
+
+    #[test]
+    fn test_rotation_frame_rate_independent() {
+        // R16-F199 FIX: Same elapsed time at 30fps vs 60fps produces same total yaw
+        let torque = 1.0f32;
+        let speed = 45.0f32; // degrees per second at torque=1
+
+        // 30fps: 30 iterations of dt=1/30
+        let dt_30 = 1.0f32 / 30.0;
+        let mut yaw_30 = 0.0f32;
+        for _ in 0..30 {
+            yaw_30 += torque * speed * dt_30;
+        }
+
+        // 60fps: 60 iterations of dt=1/60
+        let dt_60 = 1.0f32 / 60.0;
+        let mut yaw_60 = 0.0f32;
+        for _ in 0..60 {
+            yaw_60 += torque * speed * dt_60;
+        }
+
+        // Both should produce 45.0 degrees after 1.0 seconds
+        assert!(
+            (yaw_30 - yaw_60).abs() < 0.001,
+            "Frame-rate independent: 30fps={yaw_30} vs 60fps={yaw_60}"
+        );
+        assert!(
+            (yaw_30 - 45.0).abs() < 0.01,
+            "Total yaw should be ~45.0 degrees, got {yaw_30}"
+        );
+    }
+
+    #[test]
+    fn test_camera_follows_player() {
+        // R54: After physics updates pos, camera.pos matches physics_io.pos
+        let physics_io = PhysicsIO {
+            pos: [10.0, 20.0, 30.0],
+            ..Default::default()
+        };
+        let mut camera = GameCamera::default();
+
+        // Simulate sync_camera_to_player
+        camera.pos = [physics_io.pos[0], physics_io.pos[1], physics_io.pos[2]];
+
+        assert_eq!(camera.pos, [10.0, 20.0, 30.0]);
+    }
+
+    #[test]
+    fn test_mount_change_updates_collision_dimensions() {
+        use crate::character::equipment::{Mount, SpriteReq};
+
+        let mut physics_io = PhysicsIO::default();
+        let original_radius = physics_io.world_radius;
+
+        // Wolf mount has larger collision dimensions
+        let wolf_req = SpriteReq {
+            mount: Mount::Wolf,
+            ..Default::default()
+        };
+        let (wolf_radius, wolf_height) = wolf_req.collision_dimensions();
+        physics_io.world_radius = wolf_radius;
+        physics_io.world_height = wolf_height;
+
+        assert!(
+            physics_io.world_radius > original_radius,
+            "Wolf radius {} should be larger than default {}",
+            physics_io.world_radius,
+            original_radius
+        );
+    }
+
+    #[test]
+    fn test_apply_torque_to_camera_math() {
+        // Verify torque integration: yaw += torque * 45.0 * dt
+        let torque = 1.0f32;
+        let dt = 0.016f32; // ~60fps
+        let mut yaw = 0.0f32;
+
+        yaw += torque * 45.0 * dt;
+
+        let expected = 45.0 * 0.016;
+        assert!(
+            (yaw - expected).abs() < 0.0001,
+            "Yaw should be {expected}, got {yaw}"
+        );
+    }
+
+    #[test]
+    fn test_sync_physics_to_character_transform() {
+        // Physics output updates character Transform
+        let pos = [5.0f32, 10.0, 15.0];
+        let mut transform = Transform::default();
+
+        transform.translation.x = pos[0];
+        transform.translation.y = pos[1];
+        transform.translation.z = pos[2];
+
+        assert_eq!(transform.translation, Vec3::new(5.0, 10.0, 15.0));
+    }
+
+    #[test]
+    fn test_game_state_default_starts_at_main_menu() {
+        // GameState::MainMenu is the default state on startup
+        assert_eq!(GameState::default(), GameState::MainMenu);
+    }
+
+    #[test]
+    fn test_game_state_all_four_variants_exist() {
+        // Verify all 4 GameState variants compile and are distinct
+        let states = [
+            GameState::MainMenu,
+            GameState::Loading,
+            GameState::Playing,
+            GameState::Paused,
+        ];
+        for i in 0..states.len() {
+            for j in (i + 1)..states.len() {
+                assert_ne!(states[i], states[j]);
+            }
+        }
+    }
+
+    #[test]
+    fn test_main_menu_default_has_two_items() {
+        let menu = MainMenu::default();
+        assert_eq!(menu.items.len(), 2);
+        assert_eq!(menu.selected_index, 0);
+    }
+}

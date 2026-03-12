@@ -147,3 +147,189 @@ impl SampleBuffer {
         &mut self.samples[idx]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sample_is_8_bytes() {
+        assert_eq!(std::mem::size_of::<Sample>(), 8);
+    }
+
+    #[test]
+    fn clear_state_has_correct_fields() {
+        let s = Sample::clear_state();
+        // Sky-blue: r5=0x0C, g5=0x0C, b5=0x1B => packed = 0x6D8C
+        assert_eq!(s.visual, 0x0C | (0x0C << 5) | (0x1B << 10));
+        assert_eq!(s.diffuse, 0xFF);
+        assert_eq!(s.spare, spare_bits::MESH_FLAG);
+        assert_eq!(s.height, Sample::CLEAR_HEIGHT);
+    }
+
+    #[test]
+    fn depth_test_ro_passes_when_behind() {
+        let s = Sample {
+            height: 10.0,
+            ..Sample::clear_state()
+        };
+        // z = 10.0: height(10) <= 10 + 8 = true
+        assert!(s.depth_test_ro(10.0));
+        // z = 20.0: height(10) <= 20 + 8 = true
+        assert!(s.depth_test_ro(20.0));
+    }
+
+    #[test]
+    fn depth_test_ro_fails_when_in_front() {
+        let s = Sample {
+            height: 30.0,
+            ..Sample::clear_state()
+        };
+        // z = 10.0: height(30) <= 10 + 8 = 18 => false
+        assert!(!s.depth_test_ro(10.0));
+    }
+
+    #[test]
+    fn depth_test_ro_boundary() {
+        let s = Sample {
+            height: 18.0,
+            ..Sample::clear_state()
+        };
+        // z = 10.0: height(18) <= 10 + 8 = 18 => true (equal)
+        assert!(s.depth_test_ro(10.0));
+
+        let s2 = Sample {
+            height: 18.01,
+            ..Sample::clear_state()
+        };
+        // z = 10.0: height(18.01) <= 18 => false
+        assert!(!s2.depth_test_ro(10.0));
+    }
+
+    #[test]
+    fn is_mesh_flag() {
+        let with_mesh = Sample::clear_state(); // clear_state sets MESH_FLAG
+        assert!(with_mesh.is_mesh());
+
+        let without_mesh = Sample {
+            spare: 0,
+            ..Sample::clear_state()
+        };
+        assert!(!without_mesh.is_mesh());
+    }
+
+    #[test]
+    fn buffer_default_dimensions() {
+        let buf = SampleBuffer::new(240, 135);
+        assert_eq!(buf.width, 484);
+        assert_eq!(buf.height, 274);
+        assert_eq!(buf.samples.len(), 484 * 274);
+    }
+
+    #[test]
+    fn buffer_clear_restores_all_samples() {
+        let mut buf = SampleBuffer::new(240, 135);
+        // Mutate a sample
+        buf.sample_at_mut(10, 20).visual = 0xBEEF;
+        buf.sample_at_mut(10, 20).height = 999.0;
+        assert_eq!(buf.sample_at(10, 20).visual, 0xBEEF);
+
+        // Clear should restore
+        buf.clear();
+        let s = buf.sample_at(10, 20);
+        assert_eq!(s.visual, Sample::clear_state().visual);
+        assert_eq!(s.height, Sample::CLEAR_HEIGHT);
+    }
+
+    #[test]
+    fn buffer_clear_uses_copy_from_slice_semantics() {
+        // Verify the double-allocation pattern works:
+        // mutate -> clear -> verify restored
+        let mut buf = SampleBuffer::new(4, 4);
+        let original_visual = buf.sample_at(0, 0).visual;
+
+        buf.sample_at_mut(0, 0).visual = 0x1234;
+        buf.sample_at_mut(3, 3).height = 42.0;
+        assert_ne!(buf.sample_at(0, 0).visual, original_visual);
+
+        buf.clear();
+        assert_eq!(buf.sample_at(0, 0).visual, original_visual);
+        assert_eq!(buf.sample_at(3, 3).height, Sample::CLEAR_HEIGHT);
+    }
+
+    #[test]
+    fn corner_access_does_not_panic() {
+        let buf = SampleBuffer::new(240, 135);
+        let _ = buf.sample_at(0, 0);
+        let _ = buf.sample_at(483, 273);
+    }
+
+    #[test]
+    fn sample_at_indexing() {
+        let mut buf = SampleBuffer::new(240, 135);
+        buf.sample_at_mut(10, 20).height = 42.0;
+        assert_eq!(buf.sample_at(10, 20).height, 42.0);
+        // Adjacent samples are unaffected (still clear_state)
+        assert_eq!(buf.sample_at(11, 20).height, Sample::CLEAR_HEIGHT);
+    }
+
+    #[test]
+    fn flat_index_matches_row_major() {
+        let buf = SampleBuffer::new(240, 135);
+        assert_eq!(buf.flat_index(0, 0), 0);
+        assert_eq!(buf.flat_index(1, 0), 1);
+        assert_eq!(buf.flat_index(0, 1), 484);
+        assert_eq!(buf.flat_index(483, 273), (273 * 484 + 483) as usize);
+    }
+
+    // --- GAP-10 (R43): Boundary tests ---
+
+    #[test]
+    fn test_sample_buffer_zero_size() {
+        // SampleBuffer::new(0, 0) produces dimensions (4, 4) due to
+        // the 2*ascii+4 formula. Verify it doesn't panic.
+        let buf = SampleBuffer::new(0, 0);
+        assert_eq!(buf.width, 4);
+        assert_eq!(buf.height, 4);
+        assert_eq!(buf.samples.len(), 16);
+        // Can access the last valid index
+        let _ = buf.sample_at(3, 3);
+    }
+
+    #[test]
+    fn test_sample_buffer_border_pixels() {
+        // Border is +2 on each side of the 2x-supersampled area.
+        // For ascii 4x4: w=2*4+4=12, h=2*4+4=12
+        let buf = SampleBuffer::new(4, 4);
+        assert_eq!(buf.width, 12);
+        assert_eq!(buf.height, 12);
+
+        // Border pixel (0,0) should be accessible and cleared
+        let s = buf.sample_at(0, 0);
+        assert_eq!(s.height, Sample::CLEAR_HEIGHT);
+
+        // Border pixel (1,0), (0,1) should also be clear
+        assert_eq!(buf.sample_at(1, 0).height, Sample::CLEAR_HEIGHT);
+        assert_eq!(buf.sample_at(0, 1).height, Sample::CLEAR_HEIGHT);
+
+        // Last border pixel (11,11)
+        assert_eq!(buf.sample_at(11, 11).height, Sample::CLEAR_HEIGHT);
+    }
+
+    #[test]
+    fn test_sample_buffer_last_valid_index() {
+        // For ascii 4x4: w=12, h=12. Last valid index is (11, 11).
+        let mut buf = SampleBuffer::new(4, 4);
+        let last_x = buf.width - 1; // 11
+        let last_y = buf.height - 1; // 11
+
+        // Write to last valid sample
+        buf.sample_at_mut(last_x, last_y).visual = 0xABCD;
+        buf.sample_at_mut(last_x, last_y).height = 42.0;
+
+        // Read back
+        let s = buf.sample_at(last_x, last_y);
+        assert_eq!(s.visual, 0xABCD);
+        assert_eq!(s.height, 42.0);
+    }
+}

@@ -76,3 +76,93 @@ pub fn game_to_bevy(v: GameVec3) -> Vec3 {
 pub fn bevy_to_game(v: Vec3) -> GameVec3 {
     GameVec3::from_bevy(v)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn up_is_z() {
+        assert_eq!(UP, Vec3::Z);
+    }
+
+    #[test]
+    fn forward_is_y() {
+        assert_eq!(FORWARD, Vec3::Y);
+    }
+
+    #[test]
+    fn right_is_x() {
+        assert_eq!(RIGHT, Vec3::X);
+    }
+
+    #[test]
+    fn game_up_maps_to_bevy_up() {
+        let result = game_to_bevy(GameVec3(UP));
+        assert_eq!(result, Vec3::Y);
+    }
+
+    #[test]
+    fn game_forward_maps_to_bevy_negative_z() {
+        let result = game_to_bevy(GameVec3(FORWARD));
+        assert_eq!(result, Vec3::new(0.0, 0.0, -1.0));
+    }
+
+    #[test]
+    fn roundtrip_identity() {
+        let vectors = [
+            Vec3::new(1.0, 2.0, 3.0),
+            Vec3::new(-5.0, 0.0, 10.0),
+            Vec3::ZERO,
+            Vec3::ONE,
+            Vec3::new(0.5, -0.3, 7.7),
+        ];
+        for v in vectors {
+            let game_v = GameVec3(v);
+            let roundtrip = bevy_to_game(game_to_bevy(game_v));
+            assert!(
+                (roundtrip.inner() - v).length() < f32::EPSILON,
+                "Roundtrip failed for {v}: got {:?}",
+                roundtrip.inner()
+            );
+        }
+    }
+
+    #[test]
+    fn inverse_roundtrip_identity() {
+        let vectors = [
+            Vec3::new(1.0, 2.0, 3.0),
+            Vec3::new(-5.0, 0.0, 10.0),
+            Vec3::ZERO,
+        ];
+        for v in vectors {
+            let roundtrip = game_to_bevy(bevy_to_game(v));
+            assert!(
+                (roundtrip - v).length() < f32::EPSILON,
+                "Inverse roundtrip failed for {v}: got {roundtrip}"
+            );
+        }
+    }
+
+    #[test]
+    fn gamevec3_deref_provides_vec3_methods() {
+        let gv = GameVec3::new(3.0, 4.0, 0.0);
+        // Deref allows calling Vec3 methods directly
+        let len = gv.length();
+        assert!((len - 5.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn gamevec3_zero_constant() {
+        assert_eq!(GameVec3::ZERO.inner(), Vec3::ZERO);
+    }
+
+    #[test]
+    fn gamevec3_prevents_implicit_vec3_assignment() {
+        // This is a compile-time guarantee: GameVec3 is not Vec3.
+        // We verify the newtype is distinct by checking size and type identity.
+        let gv = GameVec3::new(1.0, 2.0, 3.0);
+        let v: Vec3 = gv.inner(); // Explicit conversion required
+        assert_eq!(v, Vec3::new(1.0, 2.0, 3.0));
+    }
+}

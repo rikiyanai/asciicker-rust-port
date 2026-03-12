@@ -290,3 +290,458 @@ pub fn bresenham(buf: &mut [Sample], w: i32, h: i32, from: [i32; 3], to: [i32; 3
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::render::sample_buffer::spare_bits;
+
+    /// Create a cleared buffer of given dimensions for testing.
+    fn make_buf(w: i32, h: i32) -> Vec<Sample> {
+        vec![Sample::clear_state(); (w * h) as usize]
+    }
+
+    /// Test shader that writes flat color at depth-tested positions.
+    struct FlatShader {
+        visual: u16,
+        diffuse: u8,
+        spare: u8,
+    }
+
+    impl RasterShader for FlatShader {
+        fn blend(&self, sample: &mut Sample, z: f32, _bc: [f32; 3]) {
+            if sample.height < z || sample.height == Sample::CLEAR_HEIGHT {
+                sample.visual = self.visual;
+                sample.diffuse = self.diffuse;
+                sample.spare = self.spare;
+                sample.height = z;
+            }
+        }
+    }
+
+    // ---- Bresenham tests ----
+
+    #[test]
+    fn bresenham_horizontal_line() {
+        let w = 24;
+        let h = 10;
+        let mut buf = make_buf(w, h);
+
+        bresenham(&mut buf, w, h, [0, 5, 100], [20, 5, 100], spare_bits::GRID);
+
+        // Samples at even x positions along y=5 should have GRID bit set
+        for x in (0..20).step_by(2) {
+            let idx = (w * 5 + x) as usize;
+            assert!(
+                buf[idx].spare & spare_bits::GRID != 0,
+                "Expected GRID bit at x={x}, y=5"
+            );
+        }
+    }
+
+    #[test]
+    fn bresenham_vertical_line() {
+        let w = 10;
+        let h = 24;
+        let mut buf = make_buf(w, h);
+
+        bresenham(&mut buf, w, h, [5, 0, 100], [5, 20, 100], spare_bits::GRID);
+
+        // Samples along x=5 should have GRID bit set
+        for y in 0..20 {
+            let idx = (w * y + 5) as usize;
+            assert!(
+                buf[idx].spare & spare_bits::GRID != 0,
+                "Expected GRID bit at x=5, y={y}"
+            );
+        }
+    }
+
+    #[test]
+    fn bresenham_diagonal_line() {
+        let w = 30;
+        let h = 30;
+        let mut buf = make_buf(w, h);
+
+        bresenham(&mut buf, w, h, [0, 0, 100], [20, 20, 100], spare_bits::GRID);
+
+        // At least some samples along the diagonal should have GRID bit set.
+        // Since ax == ay, it goes horizontal (ax >= ay), stepping by 2.
+        let mut count = 0;
+        for x in (0..20).step_by(2) {
+            for y in 0..20 {
+                let idx = (w * y + x) as usize;
+                if buf[idx].spare & spare_bits::GRID != 0 {
+                    count += 1;
+                }
+            }
+        }
+        assert!(count > 0, "Expected some diagonal samples to be set");
+    }
+
+    #[test]
+    fn bresenham_outside_buffer_no_panic() {
+        let w = 10;
+        let h = 10;
+        let mut buf = make_buf(w, h);
+
+        // Line entirely below (negative y)
+        bresenham(
+            &mut buf,
+            w,
+            h,
+            [0, -10, 100],
+            [10, -5, 100],
+            spare_bits::GRID,
+        );
+
+        // No writes should have occurred
+        for s in &buf {
+            assert_eq!(
+                s.spare,
+                Sample::clear_state().spare,
+                "No writes expected for out-of-bounds line"
+            );
+        }
+    }
+
+    #[test]
+    fn bresenham_depth_behind_existing() {
+        let w = 24;
+        let h = 10;
+        let mut buf = make_buf(w, h);
+
+        // Set existing geometry at high depth (closer to camera = higher z)
+        for x in 0..20 {
+            let idx = (w * 5 + x) as usize;
+            buf[idx].height = 5000.0;
+        }
+
+        // Draw line at z=100, which is behind z=5000 geometry
+        // depth_test_ro: height(5000) <= z(100) + 8 = 108 => false
+        bresenham(&mut buf, w, h, [0, 5, 100], [20, 5, 100], spare_bits::GRID);
+
+        // Spare bits should NOT be set (depth test fails)
+        for x in (0..20).step_by(2) {
+            let idx = (w * 5 + x) as usize;
+            assert_eq!(
+                buf[idx].spare & spare_bits::GRID,
+                0,
+                "GRID bit should NOT be set when depth test fails at x={x}"
+            );
+        }
+    }
+
+    #[test]
+    fn bresenham_zero_length_no_writes() {
+        let w = 10;
+        let h = 10;
+        let mut buf = make_buf(w, h);
+
+        bresenham(&mut buf, w, h, [5, 5, 100], [5, 5, 100], spare_bits::GRID);
+
+        // No writes for zero-length line
+        for s in &buf {
+            assert_eq!(s.spare, Sample::clear_state().spare);
+        }
+    }
+
+    #[test]
+    fn bresenham_step_by_2_horizontal() {
+        let w = 24;
+        let h = 10;
+        let mut buf = make_buf(w, h);
+
+        bresenham(&mut buf, w, h, [0, 5, 100], [20, 5, 100], spare_bits::GRID);
+
+        let clear_spare = Sample::clear_state().spare;
+        for x in (0..20).step_by(2) {
+            let idx = (w * 5 + x) as usize;
+            assert!(
+                buf[idx].spare & spare_bits::GRID != 0,
+                "Even x={x} should have GRID bit"
+            );
+            // x+1 also gets written in horizontal mode
+            assert!(
+                buf[idx + 1].spare & spare_bits::GRID != 0,
+                "x+1={} should have GRID bit",
+                x + 1
+            );
+        }
+        // Past the line endpoint, samples should be clear
+        for x in 20..w {
+            let idx = (w * 5 + x) as usize;
+            assert_eq!(
+                buf[idx].spare, clear_spare,
+                "x={x} past endpoint should be clear"
+            );
+        }
+    }
+
+    // ---- Triangle rasterizer tests ----
+
+    #[test]
+    fn rasterize_small_triangle_fills_interior() {
+        // A small CCW triangle in the upper-left of the buffer.
+        // Vertices: (2,2), (10,2), (6,8) -- a clear triangle shape.
+        let w = 16;
+        let h = 16;
+        let mut buf = make_buf(w, h);
+
+        let shader = FlatShader {
+            visual: 0x1234,
+            diffuse: 200,
+            spare: 0,
+        };
+        let v0: [i32; 4] = [2, 2, 100, 0];
+        let v1: [i32; 4] = [10, 2, 100, 0];
+        let v2: [i32; 4] = [6, 8, 100, 0];
+
+        rasterize(&mut buf, w, h, &shader, [&v0, &v1, &v2], false);
+
+        // Center of triangle (6, 4) should be filled
+        let center = (w * 4 + 6) as usize;
+        assert_eq!(buf[center].visual, 0x1234, "Center pixel should be filled");
+        assert_ne!(
+            buf[center].height,
+            Sample::CLEAR_HEIGHT,
+            "Center depth should be set"
+        );
+    }
+
+    #[test]
+    fn rasterize_outside_pixels_remain_clear() {
+        let w = 16;
+        let h = 16;
+        let mut buf = make_buf(w, h);
+
+        let shader = FlatShader {
+            visual: 0x1234,
+            diffuse: 200,
+            spare: 0,
+        };
+        let v0: [i32; 4] = [2, 2, 100, 0];
+        let v1: [i32; 4] = [10, 2, 100, 0];
+        let v2: [i32; 4] = [6, 8, 100, 0];
+
+        rasterize(&mut buf, w, h, &shader, [&v0, &v1, &v2], false);
+
+        // Pixel far outside triangle (0, 15) should remain at clear state
+        let outside = (w * 15 + 0) as usize;
+        assert_eq!(
+            buf[outside].visual,
+            Sample::clear_state().visual,
+            "Outside pixel should remain clear"
+        );
+        assert_eq!(buf[outside].height, Sample::CLEAR_HEIGHT);
+    }
+
+    #[test]
+    fn rasterize_double_sided_cw_winding() {
+        // CW-wound triangle (vertices in clockwise order).
+        // Without double_sided, nothing should be drawn.
+        // With double_sided, pixels should be filled.
+        let w = 16;
+        let h = 16;
+
+        let shader = FlatShader {
+            visual: 0xABCD,
+            diffuse: 128,
+            spare: 0,
+        };
+        // CW: swap v1 and v2 to reverse winding
+        let v0: [i32; 4] = [2, 2, 100, 0];
+        let v1: [i32; 4] = [6, 8, 100, 0];
+        let v2: [i32; 4] = [10, 2, 100, 0];
+
+        // Single-sided: should NOT draw
+        let mut buf_single = make_buf(w, h);
+        rasterize(&mut buf_single, w, h, &shader, [&v0, &v1, &v2], false);
+        let center_single = (w * 4 + 6) as usize;
+        assert_eq!(
+            buf_single[center_single].visual,
+            Sample::clear_state().visual,
+            "Single-sided CW should NOT draw"
+        );
+
+        // Double-sided: should draw
+        let mut buf_double = make_buf(w, h);
+        rasterize(&mut buf_double, w, h, &shader, [&v0, &v1, &v2], true);
+        let center_double = (w * 4 + 6) as usize;
+        assert_eq!(
+            buf_double[center_double].visual, 0xABCD,
+            "Double-sided CW should draw"
+        );
+    }
+
+    #[test]
+    fn rasterize_single_sided_cw_is_culled() {
+        let w = 16;
+        let h = 16;
+        let mut buf = make_buf(w, h);
+
+        let shader = FlatShader {
+            visual: 0xABCD,
+            diffuse: 128,
+            spare: 0,
+        };
+        // CW winding
+        let v0: [i32; 4] = [2, 2, 100, 0];
+        let v1: [i32; 4] = [6, 8, 100, 0];
+        let v2: [i32; 4] = [10, 2, 100, 0];
+
+        rasterize(&mut buf, w, h, &shader, [&v0, &v1, &v2], false);
+
+        // No pixels should be written
+        for s in &buf {
+            assert_eq!(s.visual, Sample::clear_state().visual);
+        }
+    }
+
+    #[test]
+    fn rasterize_degenerate_collinear_no_draw() {
+        // Three collinear vertices: area = 0, degenerate.
+        let w = 16;
+        let h = 16;
+        let mut buf = make_buf(w, h);
+
+        let shader = FlatShader {
+            visual: 0x1234,
+            diffuse: 200,
+            spare: 0,
+        };
+        let v0: [i32; 4] = [2, 2, 100, 0];
+        let v1: [i32; 4] = [6, 6, 100, 0];
+        let v2: [i32; 4] = [10, 10, 100, 0];
+
+        rasterize(&mut buf, w, h, &shader, [&v0, &v1, &v2], true);
+
+        // No pixels should be written (degenerate)
+        for s in &buf {
+            assert_eq!(s.visual, Sample::clear_state().visual);
+        }
+    }
+
+    #[test]
+    fn rasterize_frustum_culled_all_share_cull_bit() {
+        // All 3 vertices have cull_flags bit 1 set -> frustum culled.
+        let w = 16;
+        let h = 16;
+        let mut buf = make_buf(w, h);
+
+        let shader = FlatShader {
+            visual: 0x1234,
+            diffuse: 200,
+            spare: 0,
+        };
+        let v0: [i32; 4] = [2, 2, 100, 0x01];
+        let v1: [i32; 4] = [10, 2, 100, 0x01];
+        let v2: [i32; 4] = [6, 8, 100, 0x01];
+
+        rasterize(&mut buf, w, h, &shader, [&v0, &v1, &v2], false);
+
+        // No pixels should be written (frustum culled)
+        for s in &buf {
+            assert_eq!(s.visual, Sample::clear_state().visual);
+        }
+    }
+
+    #[test]
+    fn rasterize_depth_test_closer_overwrites() {
+        let w = 16;
+        let h = 16;
+
+        // First: draw a low triangle at z=50
+        let low_shader = FlatShader {
+            visual: 0x1111,
+            diffuse: 100,
+            spare: 0,
+        };
+        let v0: [i32; 4] = [2, 2, 50, 0];
+        let v1: [i32; 4] = [10, 2, 50, 0];
+        let v2: [i32; 4] = [6, 8, 50, 0];
+
+        let mut buf = make_buf(w, h);
+        rasterize(&mut buf, w, h, &low_shader, [&v0, &v1, &v2], false);
+
+        // Then: draw a higher triangle at z=200 (same shape)
+        // In Z-up world, higher z = on top = should overwrite
+        let high_shader = FlatShader {
+            visual: 0x2222,
+            diffuse: 200,
+            spare: 0,
+        };
+        let n0: [i32; 4] = [2, 2, 200, 0];
+        let n1: [i32; 4] = [10, 2, 200, 0];
+        let n2: [i32; 4] = [6, 8, 200, 0];
+
+        rasterize(&mut buf, w, h, &high_shader, [&n0, &n1, &n2], false);
+
+        // Center pixel should show the higher (on-top) triangle
+        let center = (w * 4 + 6) as usize;
+        assert_eq!(
+            buf[center].visual, 0x2222,
+            "Higher z triangle should overwrite lower (on top in Z-up)"
+        );
+    }
+
+    #[test]
+    fn rasterize_adjacent_triangles_no_double_draw() {
+        // Two triangles sharing edge from (5,2) to (5,8).
+        // Tie-breaking should ensure each shared-edge pixel is drawn by exactly
+        // one triangle.
+        let w = 16;
+        let h = 16;
+
+        // Counter to track how many times each pixel is blended.
+        // We'll use visual field as a counter.
+        struct CountShader;
+        impl RasterShader for CountShader {
+            fn blend(&self, sample: &mut Sample, _z: f32, _bc: [f32; 3]) {
+                // Increment visual as a draw counter
+                sample.visual = sample.visual.wrapping_add(1);
+            }
+        }
+
+        let mut buf = make_buf(w, h);
+        // Reset visual to 0 for counting
+        for s in buf.iter_mut() {
+            s.visual = 0;
+        }
+
+        let shader = CountShader;
+
+        // Left triangle (CCW): (1,2), (5,2), (5,8)
+        let l0: [i32; 4] = [1, 2, 100, 0];
+        let l1: [i32; 4] = [5, 2, 100, 0];
+        let l2: [i32; 4] = [5, 8, 100, 0];
+
+        // Right triangle (CCW): (5,2), (9,2), (5,8)
+        let r0: [i32; 4] = [5, 2, 100, 0];
+        let r1: [i32; 4] = [9, 2, 100, 0];
+        let r2: [i32; 4] = [5, 8, 100, 0];
+
+        rasterize(&mut buf, w, h, &shader, [&l0, &l1, &l2], false);
+        rasterize(&mut buf, w, h, &shader, [&r0, &r1, &r2], false);
+
+        // Check shared edge pixels (x=5, y in range): each should be drawn
+        // exactly once (not 0, not 2)
+        let mut any_on_edge_drawn = false;
+        for y in 3..8 {
+            let idx = (w * y + 5) as usize;
+            let count = buf[idx].visual;
+            assert!(
+                count <= 1,
+                "Shared edge pixel at (5,{y}) drawn {count} times (expected 0 or 1)"
+            );
+            if count == 1 {
+                any_on_edge_drawn = true;
+            }
+        }
+        // At least one pixel on/near the shared edge should be drawn by one triangle
+        assert!(
+            any_on_edge_drawn,
+            "Expected at least one pixel near shared edge to be drawn"
+        );
+    }
+}

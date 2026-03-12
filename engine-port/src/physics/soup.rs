@@ -32,3 +32,65 @@ pub fn to_sphere_space(pos: &[f32; 3], center: &[f32; 3], mul_xy: f32, mul_z: f3
         (pos[2] - center[2]) * mul_z,
     ]
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_to_sphere_space_identity() {
+        // Same position as center with 1.0 multipliers -> origin
+        let pos = [10.0, 20.0, 30.0];
+        let center = [10.0, 20.0, 30.0];
+        let result = to_sphere_space(&pos, &center, 1.0, 1.0);
+        assert_eq!(result, [0.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn test_to_sphere_space_offset() {
+        let pos = [12.0, 25.0, 35.0];
+        let center = [10.0, 20.0, 30.0];
+        let result = to_sphere_space(&pos, &center, 1.0, 1.0);
+        assert!((result[0] - 2.0).abs() < 1e-6);
+        assert!((result[1] - 5.0).abs() < 1e-6);
+        assert!((result[2] - 5.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_to_sphere_space_scaling() {
+        // TRAP-P03: XY scaled differently from Z
+        let pos = [12.0, 25.0, 35.0];
+        let center = [10.0, 20.0, 30.0];
+        let mul_xy = 0.5;
+        let mul_z = 0.25;
+        let result = to_sphere_space(&pos, &center, mul_xy, mul_z);
+        assert!((result[0] - 1.0).abs() < 1e-6); // 2.0 * 0.5
+        assert!((result[1] - 2.5).abs() < 1e-6); // 5.0 * 0.5
+        assert!((result[2] - 1.25).abs() < 1e-6); // 5.0 * 0.25
+    }
+
+    #[test]
+    fn test_to_sphere_space_human_entity() {
+        // Realistic: world_radius=1.333, world_height=86.2
+        // mul_xy = 1/1.333 ~= 0.75, mul_z = 2/86.2 ~= 0.0232
+        let pos = [100.0, 200.0, 10.0];
+        let center = [99.0, 200.0, 10.0];
+        let mul_xy = 1.0 / 1.333;
+        let mul_z = 2.0 / 86.2;
+        let result = to_sphere_space(&pos, &center, mul_xy, mul_z);
+        assert!((result[0] - 0.75019).abs() < 0.001);
+        assert!(result[1].abs() < 1e-6);
+        assert!(result[2].abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_soup_item_creation() {
+        let item = SoupItem {
+            tri: [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
+            material: 3,
+            nrm: [0.0, 0.0, 1.0, 0.0],
+        };
+        assert_eq!(item.material, 3);
+        assert_eq!(item.nrm[2], 1.0);
+    }
+}

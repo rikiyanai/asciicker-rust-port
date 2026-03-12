@@ -466,3 +466,257 @@ pub fn point_inside_frustum(planes: &[[f64; 4]], point: &[f64; 3]) -> bool {
         .iter()
         .all(|p| p[0] * point[0] + p[1] * point[1] + p[2] * point[2] + p[3] >= 0.0)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper: create a camera and update it at default config dimensions.
+    fn make_camera(yaw: f32, pos: [f32; 3], perspective: bool) -> GameCamera {
+        let mut cam = GameCamera {
+            yaw,
+            pos,
+            perspective,
+            ..Default::default()
+        };
+        // Default config: 240x135 ASCII -> 484x274 sample
+        cam.update(484.0, 274.0);
+        cam.extract_frustum_planes(484.0, 274.0);
+        cam
+    }
+
+    #[test]
+    fn test_yaw_zero_view_matrix() {
+        let cam = make_camera(0.0, [0.0, 0.0, 0.0], true);
+        // At yaw=0: cosyaw=1, sinyaw=0
+        // zoom=1.0, scale=3.0, ds = 2*3.0/8 = 0.75
+        let ds = 2.0 * 3.0 / 8.0;
+        // tm[0] = cos(0)*ds = ds
+        assert!(
+            (cam.view_tm[0] - ds).abs() < 1e-10,
+            "tm[0] should be ds={ds}"
+        );
+        // tm[1] = -sin(0)*sin30*ds = 0
+        assert!(
+            cam.view_tm[1].abs() < 1e-10,
+            "tm[1] should be 0, got {}",
+            cam.view_tm[1]
+        );
+        // tm[4] = sin(0)*ds = 0
+        assert!(
+            cam.view_tm[4].abs() < 1e-10,
+            "tm[4] should be 0, got {}",
+            cam.view_tm[4]
+        );
+        // tm[5] = cos(0)*sin30*ds = 0.5*ds
+        let expected_5 = SIN30 * ds;
+        assert!(
+            (cam.view_tm[5] - expected_5).abs() < 1e-10,
+            "tm[5] should be {expected_5}, got {}",
+            cam.view_tm[5]
+        );
+    }
+
+    #[test]
+    fn test_scene_shift_doubled() {
+        let mut cam = GameCamera {
+            scene_shift: [5, 3],
+            ..Default::default()
+        };
+        cam.update(484.0, 274.0);
+
+        // view_tm[12] should include scene_shift[0]*2 = 10
+        let mut cam_no_shift = GameCamera::default();
+        cam_no_shift.update(484.0, 274.0);
+
+        let diff_x = cam.view_tm[12] - cam_no_shift.view_tm[12];
+        assert!(
+            (diff_x - 10.0).abs() < 1e-10,
+            "view_tm[12] shift diff should be 10.0, got {diff_x}"
+        );
+
+        let diff_y = cam.view_tm[13] - cam_no_shift.view_tm[13];
+        assert!(
+            (diff_y - 6.0).abs() < 1e-10,
+            "view_tm[13] shift diff should be 6.0, got {diff_y}"
+        );
+
+        // view_ofs should also include scene_shift * 2
+        assert!(
+            (cam.view_ofs[0] - (484.0 / 2.0 + 10.0)).abs() < 1e-5,
+            "view_ofs[0] should be 242+10=252"
+        );
+        assert!(
+            (cam.view_ofs[1] - (274.0 / 2.0 + 6.0)).abs() < 1e-5,
+            "view_ofs[1] should be 137+6=143"
+        );
+    }
+
+    #[test]
+    fn test_perspective_focal_length() {
+        let cam = make_camera(0.0, [0.0, 0.0, 0.0], true);
+        // focal = max(484, 274) * 2 = 968
+        assert!(
+            (cam.focal - 968.0).abs() < 1e-5,
+            "focal should be 968, got {}",
+            cam.focal
+        );
+    }
+
+    #[test]
+    fn test_perspective_view_dir_horizontal() {
+        let cam = make_camera(45.0, [10.0, 20.0, 5.0], true);
+        assert!(
+            cam.view_dir[2].abs() < 1e-10,
+            "view_dir[2] should be 0 (no vertical tilt), got {}",
+            cam.view_dir[2]
+        );
+    }
+
+    #[test]
+    fn test_frustum_planes_count() {
+        let cam = make_camera(0.0, [0.0, 0.0, 0.0], true);
+        assert!(
+            cam.frustum_planes.len() >= 4,
+            "Should have at least 4 frustum planes, got {}",
+            cam.frustum_planes.len()
+        );
+    }
+
+    #[test]
+    fn test_frustum_planes_deterministic() {
+        let cam1 = make_camera(30.0, [5.0, 5.0, 1.0], true);
+        let cam2 = make_camera(30.0, [5.0, 5.0, 1.0], true);
+
+        assert_eq!(
+            cam1.frustum_planes.len(),
+            cam2.frustum_planes.len(),
+            "Plane count should be identical"
+        );
+        for (i, (p1, p2)) in cam1
+            .frustum_planes
+            .iter()
+            .zip(cam2.frustum_planes.iter())
+            .enumerate()
+        {
+            for j in 0..4 {
+                assert!(
+                    (p1[j] - p2[j]).abs() < 1e-15,
+                    "Plane {i} component {j} differs: {} vs {}",
+                    p1[j],
+                    p2[j]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_frustum_planes_axis_aligned_camera() {
+        // R6-007: At yaw=0, pos=[0,0,0], zoom=1.0:
+        // frustum planes should have nonzero normals.
+        let cam = make_camera(0.0, [0.0, 0.0, 0.0], true);
+        assert!(cam.frustum_planes.len() >= 4);
+
+        // All planes should have nonzero normals
+        for (i, plane) in cam.frustum_planes.iter().enumerate() {
+            let normal_len =
+                (plane[0] * plane[0] + plane[1] * plane[1] + plane[2] * plane[2]).sqrt();
+            assert!(
+                normal_len > 0.01,
+                "Frustum plane {i} should have nonzero normal, got len={normal_len}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_frustum_planes_known_point_inside() {
+        // A point at camera origin should be inside all frustum planes
+        let cam = make_camera(0.0, [5.0, 5.0, 0.0], true);
+        let origin = [5.0, 5.0, 0.0];
+        assert!(
+            point_inside_frustum(&cam.frustum_planes, &origin),
+            "Camera origin should be inside all frustum planes"
+        );
+    }
+
+    #[test]
+    fn test_frustum_planes_far_point_outside() {
+        // A point far behind the camera should be outside at least one plane
+        let cam = make_camera(0.0, [0.0, 0.0, 0.0], true);
+        // At yaw=0, view_dir is (0, 1, 0). A point far in -Y should be behind.
+        let behind = [0.0, -10000.0, 0.0];
+        assert!(
+            !point_inside_frustum(&cam.frustum_planes, &behind),
+            "Point far behind camera should be outside frustum"
+        );
+    }
+
+    #[test]
+    fn test_q_decrements_yaw_by_45() {
+        // R16-F187: Verify Q press decrements yaw by 45 degrees
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.init_resource::<GameCamera>();
+        app.init_resource::<ButtonInput<KeyCode>>();
+        app.add_systems(Update, camera_input_system);
+
+        // Simulate Q key press
+        {
+            let mut input = app
+                .world_mut()
+                .get_resource_mut::<ButtonInput<KeyCode>>()
+                .unwrap();
+            input.press(KeyCode::KeyQ);
+        }
+        app.update();
+
+        let camera = app.world().get_resource::<GameCamera>().unwrap();
+        assert!(
+            (camera.yaw - 0.0).abs() < 1e-5,
+            "After Q press from default yaw=45, yaw should be 0, got {}",
+            camera.yaw
+        );
+    }
+
+    #[test]
+    fn test_e_increments_yaw_by_45() {
+        // R16-F187: Verify E press increments yaw by 45 degrees
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.init_resource::<GameCamera>();
+        app.init_resource::<ButtonInput<KeyCode>>();
+        app.add_systems(Update, camera_input_system);
+
+        // Simulate E key press
+        {
+            let mut input = app
+                .world_mut()
+                .get_resource_mut::<ButtonInput<KeyCode>>()
+                .unwrap();
+            input.press(KeyCode::KeyE);
+        }
+        app.update();
+
+        let camera = app.world().get_resource::<GameCamera>().unwrap();
+        assert!(
+            (camera.yaw - 90.0).abs() < 1e-5,
+            "After E press from default yaw=45, yaw should be 90, got {}",
+            camera.yaw
+        );
+    }
+
+    #[test]
+    fn test_invert_identity() {
+        let identity = [
+            1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+        ];
+        let inv = invert_4x4(&identity);
+        for i in 0..16 {
+            assert!(
+                (inv[i] - identity[i]).abs() < 1e-10,
+                "Identity inverse[{i}] should be identity, got {}",
+                inv[i]
+            );
+        }
+    }
+}

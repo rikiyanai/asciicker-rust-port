@@ -13,6 +13,7 @@ pub mod geometry;
 pub mod soup;
 
 use crate::asset_loader::constants::{HEIGHT_CELLS, HEIGHT_SCALE, VISUAL_CELLS};
+use crate::render::assembly::MeshRegistry;
 use crate::terrain::RuntimeTerrain;
 use crate::world::RuntimeWorld;
 use collision::{CollisionResult, check_collision};
@@ -37,6 +38,11 @@ impl PhysicsState {
     /// Public accessor for velocity (used by benchmarks outside crate).
     pub fn vel(&self) -> [f32; 3] {
         self.vel
+    }
+
+    /// Zero out accumulated motion for deterministic replay/capture overrides.
+    pub fn reset_motion(&mut self) {
+        self.vel = [0.0, 0.0, 0.0];
     }
 }
 
@@ -176,6 +182,7 @@ fn collision_sweep_system(
     mut io: ResMut<PhysicsIO>,
     terrain: Res<RuntimeTerrain>,
     world: Res<RuntimeWorld>,
+    mesh_registry: Res<MeshRegistry>,
 ) {
     let dt = io.dt;
     if dt <= 0.0 || io.world_radius <= 0.0 || io.world_height <= 0.0 {
@@ -216,7 +223,15 @@ fn collision_sweep_system(
             collect_terrain_triangles(&terrain, &center, search_radius, mul_xy, mul_z, &mut soup);
         }
         if !world.instances.is_empty() {
-            collect_world_triangles(&world, &center, search_radius, mul_xy, mul_z, &mut soup);
+            collect_world_triangles(
+                &world,
+                &mesh_registry,
+                &center,
+                search_radius,
+                mul_xy,
+                mul_z,
+                &mut soup,
+            );
         }
 
         // Transform velocity to sphere space

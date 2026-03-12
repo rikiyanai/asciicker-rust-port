@@ -1,0 +1,29 @@
+{
+  "story": "smoke",
+  "updatedAt": "2026-03-09T10:20:35.809Z",
+  "summary": {
+    "status": "passed",
+    "stepCount": 4,
+    "detail": {
+      "baseUrl": "http://127.0.0.1:4173"
+    }
+  },
+  "screenshots": [
+    {
+      "action": "open_url",
+      "fileName": "001-open-url.png"
+    },
+    {
+      "action": "capture_app_root_visible",
+      "fileName": "002-capture-app-root-visible.png"
+    },
+    {
+      "action": "click_element",
+      "fileName": "003-click-element.png"
+    },
+    {
+      "action": "capture_details_visible",
+      "fileName": "004-capture-details-visible.png"
+    }
+  ]
+}

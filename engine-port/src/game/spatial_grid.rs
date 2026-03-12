@@ -143,9 +143,21 @@ impl SpatialGrid {
         // Guard against axis-aligned rays: if a component is near zero,
         // set delta to f32::MAX so that axis is never the min and we
         // never step along it (avoids NaN / infinite loop).
-        let delta_x = if dir.x.abs() > 1e-10 { CELL_SIZE / dir.x.abs() } else { f32::MAX };
-        let delta_y = if dir.y.abs() > 1e-10 { CELL_SIZE / dir.y.abs() } else { f32::MAX };
-        let delta_z = if dir.z.abs() > 1e-10 { CELL_SIZE / dir.z.abs() } else { f32::MAX };
+        let delta_x = if dir.x.abs() > 1e-10 {
+            CELL_SIZE / dir.x.abs()
+        } else {
+            f32::MAX
+        };
+        let delta_y = if dir.y.abs() > 1e-10 {
+            CELL_SIZE / dir.y.abs()
+        } else {
+            f32::MAX
+        };
+        let delta_z = if dir.z.abs() > 1e-10 {
+            CELL_SIZE / dir.z.abs()
+        } else {
+            f32::MAX
+        };
 
         let mut max_x = if dir.x.abs() > 1e-10 {
             if dir.x > 0.0 {
@@ -234,5 +246,108 @@ impl SpatialGrid {
         }
 
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_world_to_grid() {
+        // Positive coordinates
+        assert_eq!(
+            SpatialGrid::world_to_grid(Vec3::new(4.0, 12.0, 3.0)),
+            (0, 1, 0)
+        );
+        assert_eq!(
+            SpatialGrid::world_to_grid(Vec3::new(8.0, 0.0, 0.0)),
+            (1, 0, 0)
+        );
+
+        // Negative coordinates (must floor correctly)
+        // -1.0 / 8.0 = -0.125. floor() = -1
+        assert_eq!(
+            SpatialGrid::world_to_grid(Vec3::new(-1.0, -8.1, 0.0)),
+            (-1, -2, 0)
+        );
+    }
+
+    #[test]
+    fn test_spatial_grid_add_remove() {
+        let mut grid = SpatialGrid::default();
+        let e1 = Entity::from_raw_u32(1).unwrap();
+        let cell = (1, 2, 3);
+
+        grid.add(cell, e1);
+        assert!(grid.cells.get(&cell).unwrap().contains(&e1));
+        assert_eq!(grid.entity_cells.get(&e1), Some(&cell));
+
+        grid.remove(e1);
+        assert!(grid.cells.get(&cell).is_none());
+        assert!(grid.entity_cells.get(&e1).is_none());
+    }
+
+    #[test]
+    fn test_nearby_entities() {
+        let mut grid = SpatialGrid::default();
+        let e1 = Entity::from_raw_u32(1).unwrap();
+        let e2 = Entity::from_raw_u32(2).unwrap();
+
+        grid.add((0, 0, 0), e1);
+        grid.add((1, 1, 1), e2);
+
+        let nearby: Vec<Entity> = grid.nearby_entities(Vec3::ZERO).collect();
+        assert!(nearby.contains(&e1));
+        assert!(nearby.contains(&e2));
+
+        let e3 = Entity::from_raw_u32(3).unwrap();
+        grid.add((2, 0, 0), e3); // Too far for (0,0,0) center if it only checks 3x3x3
+        let nearby2: Vec<Entity> = grid.nearby_entities(Vec3::ZERO).collect();
+        assert!(!nearby2.contains(&e3));
+    }
+
+    #[test]
+    fn test_sync_spatial_grid() {
+        let mut app = App::new();
+        app.init_resource::<SpatialGrid>();
+        app.add_systems(Update, (sync_spatial_grid, cleanup_spatial_grid));
+
+        let e1 = app
+            .world_mut()
+            .spawn(GlobalTransform::from_translation(Vec3::new(4.0, 4.0, 4.0)))
+            .id();
+
+        app.update();
+
+        {
+            let grid = app.world().resource::<SpatialGrid>();
+            assert!(grid.entity_cells.contains_key(&e1));
+            let cell = grid.entity_cells.get(&e1).unwrap();
+            assert_eq!(*cell, (0, 0, 0));
+        }
+
+        // Move entity
+        let mut q = app.world_mut().query::<&mut GlobalTransform>();
+        let mut transform = q.get_mut(app.world_mut(), e1).unwrap();
+        *transform = GlobalTransform::from_translation(Vec3::new(12.0, 4.0, 4.0));
+
+        app.update();
+
+        {
+            let grid = app.world().resource::<SpatialGrid>();
+            let cell = grid.entity_cells.get(&e1).unwrap();
+            assert_eq!(*cell, (1, 0, 0));
+        }
+
+        // Despawn
+        app.world_mut().despawn(e1);
+        app.update();
+
+        {
+            let grid = app.world().resource::<SpatialGrid>();
+            assert!(!grid.entity_cells.contains_key(&e1));
+            assert!(grid.cells.is_empty());
+        }
     }
 }

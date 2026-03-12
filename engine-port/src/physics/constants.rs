@@ -15,6 +15,17 @@ pub const MAX_VEL_WATER: f32 = 10.0;
 /// Jump velocity impulse (vertical, world units/s).
 pub const JUMP_VELOCITY: f32 = 10.0;
 
+/// Baseline downward acceleration in air (world units/s^2).
+///
+/// The original buoyancy formula clamps a normalized acceleration in the
+/// range `[-0.78, 0.22]`. Rust previously applied that value directly,
+/// which made jumps float for far too long. We scale the normalized
+/// buoyancy/gravity term so dry-air downward acceleration is about 9.8.
+pub const GRAVITY_ACCEL_AIR: f32 = 9.8;
+
+/// Baseline center-of-mass fraction used by the original buoyancy formula.
+pub const BUOYANCY_CENTER_BASE: f32 = 0.78;
+
 /// Velocity damping factor per second (applied as powf(dt)).
 pub const VEL_DAMPING: f32 = 0.9;
 

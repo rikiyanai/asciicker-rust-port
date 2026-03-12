@@ -5,24 +5,18 @@
 See: .planning/PROJECT.md (updated 2026-02-20)
 
 **Core value:** The CPU rasterizer must produce visually identical output to the C++ engine -- same glyphs, same colors, same depth ordering -- so that existing Asciicker worlds render correctly in the Rust port.
-**Current focus:** Re-verify and close late Phase 5-7 gaps before Phase 8.
+**Current focus:** Renderer occupancy and edge-contrast recovery against the locked baselines. The first semantic gate for shape-vector is now implemented; immediate work is to replay it against the user-approved 2026-03-11 orbit capture and measure whether it reduces chaotic edges without giving back the occupancy gains.
 
 ## Current Position
 
-Phase: 5-7 reverification and gap closure
-Plan: Gap audit completed; execution sequence reset from roadmap authority
-Status: Phase 5 PARTIAL, Phase 6 PARTIAL, Phase 7 PARTIAL. Later-phase completion claims were ahead of runtime and doc evidence.
-Last activity: 2026-03-09 -- Wrote phase gap audit, corrected roadmap status, reproduced open water/render parity bug
+Phase: 5-7 re-verification / gap closure
+Plan: Renderer correctness closure before new feature claims
+Status: PARTIAL. The restored docs overstated completion; Phases 5-7 contain real functionality but are not complete against current visual-fidelity requirements.
+Last activity: 2026-03-11 -- implemented the first semantic gate for shape-vector overrides, then verified it on both a 30-frame smoke replay and a full 120-frame replay (`artifacts/baselines/orbit-2026-03-11-semantic-gated-debug`): occupancy stayed effectively flat while override count dropped by `42.2` cells per frame on average versus the prior best pre-gate replay.
 
-Progress: [######----] re-baselining
+Progress: [######----] 60%
 
-**Note:** `.planning/ROADMAP.md` is the status authority. As of 2026-03-09, the key open evidence-backed gaps are:
-- renderer still has placeholder/stub paths: shadow stage, sprite blit, world-frustum culling, world reflections
-- water remains visually incorrect; current diagnostics show the bug is upstream of ripple animation
-- physics still uses bbox collision proxies instead of real mesh triangles
-- shape-vector integration is partial and explicitly not final; `Font1` is not wired into real systems
-- Mage Core reuse is only partial: the GPU output pattern is present, but the full Mage Core engine/runtime logic was not copied
-- planning/docs are inconsistent (`ROADMAP.md` vs `STATE.md`, missing conductor script from `AGENTS.md`)
+**Note:** The repo has substantial implemented functionality, but the renderer still has open parity regressions (`F244`-`F246`) and the final visual path is not done. Treat `3a621b8` + `artifacts/baselines/backup-3a621b8-run2` as the baseline until manual user sign-off.
 
 ## Performance Metrics
 
@@ -178,45 +172,66 @@ Recent decisions affecting current work:
 - [ ] Phase 3 plan 03-03 Task 2: Human visual verification checkpoint (run `cargo run` from engine-port/, verify checkerboard renders, test window resize)
 - [ ] Commit uncommitted Msaa::Off fix on Camera2d in `engine-port/src/output/mod.rs` (F005 resolution)
 - [ ] Phase 4 REND-10: Release-mode performance benchmark not yet executed (human-verification item from 04-VERIFICATION.md)
-- [ ] Commit STATE.md and config.json uncommitted changes
-- [ ] Restore or replace `scripts/conductor_tools.py` referenced by `AGENTS.md`
-- [ ] Port original mixed reflection/non-reflection `auto_mat` resolve branch into `engine-port/src/render/resolve.rs`
-- [ ] Verify water in release mode after resolve/composite port
-- [ ] Implement real shadow work in `engine-port/src/render/pipeline.rs`
-- [ ] Replace placeholder sprite blit in `engine-port/src/render/sprite_blit.rs` with real XP frame compositing
-- [ ] Restore WORLD-stage BSP frustum culling in render units
-- [ ] Add world mesh/sprite reflections in `engine-port/src/render/water.rs`
-- [ ] Replace bbox collision proxy in `engine-port/src/physics/geometry.rs` with actual AKM triangles
-- [ ] Implement dead-state respawn/menu-return flow
-- [ ] Complete the full shape-vector port beyond the current six-samples bridge and wire `Font1` into real UI systems
-- [ ] Audit/document Mage Core reuse boundaries and any remaining output-path parity gaps
+- [ ] Continue contrast-aware threshold tuning for shape-vector occupancy against `artifacts/baselines/orbit-2026-03-11-current`
+- [ ] Do a manual visual validation pass for the semantic-gated path
+- [ ] Continue porting the remaining original mixed reflection/non-reflection resolve branch in `engine-port/src/render/resolve.rs`
+- [ ] Reconcile `.planning/PROJECT.md` and any remaining older docs that still imply full Phase 7 completion
 
 ### Blockers/Concerns
 
 - ~~bevy_kira_audio must be 0.25 (not 0.24) for Bevy 0.18 compatibility~~ RESOLVED in 07-01
 - bevy_replicon_renet2 must be 0.13 for Bevy 0.18 compatibility (Phase 7, Plan 07-03)
+- The conductor entrypoint required by `AGENTS.md` still does not exist in this repo (`scripts/conductor_tools.py` missing).
+- Current `cargo test` can block briefly on the package-cache lock if another Cargo process is active.
+- Original game capture instrumentation exists, but native original-game builds remain blocked until Homebrew `v8` is actually installed.
 
 ## Session Continuity
 
-Last session: 2026-03-09
-Stopped at: Gap audit and roadmap correction completed; release build still compiling; next implementation target is mixed-cell water/reflection resolve path.
-Resume file: `docs/plans/2026-03-09-phase-1-7-gap-audit.md`
+Last session: 2026-03-10
+Stopped at: planning/doc-health correction plus ongoing resolve-port continuation
+Resume file: `artifacts/baselines/BASELINE_MANIFEST.md`
+
+## Current Reality
+
+- The planning docs restored from `3a621b8` were no longer trustworthy as completion evidence.
+- The canonical renderer regression baseline is:
+  - commit `3a621b818c05689a57835548fcdd3552dd3a6b56`
+  - capture directory `artifacts/baselines/backup-3a621b8-run2`
+- The active working renderer comparison run is:
+  - capture directory `artifacts/baselines/orbit-2026-03-11-current`
+  - best default replay `artifacts/baselines/orbit-2026-03-11-stabilized-debug`
+- Deterministic replay previously showed render-side divergence under matched camera/player/yaw/water state (`F246`).
+- Capture metadata is now provenance-rich enough to label sampled changed cells as reflection, mixed terrain, ripple, silhouette, linecase, and shape-vector fallback/override related.
+- The current sparse-glyph problem is now narrowed to threshold policy on high-contrast cells plus a broader architecture issue: shape-vector was being applied at a stage where it could fight original glyph semantics. The first semantic gate is now implemented, but replay evidence is still pending (`F248`, `F249`).
+- The active pipeline now also fixes Harri color ownership for cells Harri is
+  allowed to control, so glyph swaps no longer blindly reuse resolve-time
+  colors.
+- The latest audit-driven occupancy fixes are now in code too:
+  terrain luma sampling uses material background color, and semantic
+  shape-vector eligibility is encoded directly in `AnsiCell.spare` during
+  resolve.
+- Structural fallback glyph rescue now uses the cell's computed terrain
+  elevation instead of hardcoded elevation `0`, so rescued non-space glyphs are
+  chosen from the correct shade row on raised/lowered terrain.
+- Terrain patch grid-cross writing and mesh water-plane clamp/parity behavior
+  are now ported on the write side, which removes two earlier original-engine
+  parity gaps.
+- Mesh wireframe `0x40` Bresenham writing is now ported too, so both terrain
+  grid and mesh wireframe linecase readers now have active writers behind them.
+- The renderer now has an explicit 3-mode model:
+  `original_only`, `combined`, and `harri_priority`.
+- Replay/capture harness now supports a sequenced variant mode that can replay
+  the same trace across multiple render modes in one stitched run with a
+  capture-only bottom panel showing mode and key settings.
+- Stitched GIF export is now treated as a convenience preview only when it
+  matches the live shader orientation. A divergence was found and fixed: the
+  CPU GIF renderer now flips Y to match `output/shader.wgsl`, and the overlay
+  now includes compact iteration/hash tagging so Desktop exports are
+  identifiable at a glance.
 
 ## Next Sequence
 
-1. Wait for `cargo run --release` to finish and visually re-check the water/reflection overlay symptom at full speed.
-2. Port the original mixed reflection/non-reflection resolve branch from C++ `render.cpp` into `engine-port/src/render/resolve.rs`.
-3. Re-test water in release mode and update `docs/FAILURE_LOG.md` with outcome.
-4. Replace remaining renderer placeholders in priority order:
-   - shadow stage
-   - sprite blit
-   - world frustum culling
-   - world reflections
-5. Close Phase 6 approximation paths:
-   - real mesh collision triangles
-   - dead-state flow
-6. Re-scope Phase 7 visual quality:
-   - complete the full shape-vector port beyond the current six-samples bridge
-   - wire `Font1` into actual HUD/chat/menu code
-   - audit Mage Core output-pattern parity vs the current Bevy implementation
-7. Reconcile roadmap/state/project docs again after each real closure, not before evidence.
+1. Finish and inspect the first stitched three-mode replay artifact.
+2. Continue reducing `threshold_skip_cells` and `colored_space_cells` without reintroducing noisy overrides.
+3. Continue the remaining original mixed-cell resolve/compositing port in `engine-port/src/render/resolve.rs`.
+4. Only after resolve behavior and occupancy are both closer to target, revisit water-specific fixes.

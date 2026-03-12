@@ -89,3 +89,120 @@ pub fn extract_grid_data(grid: &AsciiCellGrid, config: &AsciiRenderConfig) -> Ex
         font_height: config.font_height,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_grid(width: u32, height: u32) -> AsciiCellGrid {
+        let cell_count = (width * height) as usize;
+        AsciiCellGrid {
+            width,
+            height,
+            char_indices: vec![0; cell_count],
+            fg_colors: vec![[0, 0, 0, 255]; cell_count],
+            bg_colors: vec![[0, 0, 0, 255]; cell_count],
+        }
+    }
+
+    fn make_config() -> AsciiRenderConfig {
+        AsciiRenderConfig {
+            font_width: 10,
+            font_height: 16,
+            font_atlas_handle: Handle::default(),
+        }
+    }
+
+    #[test]
+    fn extract_2x2_grid_char_data_encoding() {
+        let mut grid = make_grid(2, 2);
+        grid.char_indices[0] = 65; // 'A'
+        grid.char_indices[1] = 0xDB; // Full block (219)
+        grid.char_indices[2] = 0xB1; // Medium shade (177)
+        grid.char_indices[3] = 32; // Space
+
+        let config = make_config();
+        let extracted = extract_grid_data(&grid, &config);
+
+        // 4 cells * 4 bytes = 16 bytes
+        assert_eq!(extracted.char_data.len(), 16);
+
+        // Cell 0: A (65) -> R=65, G=0, B=0, A=255
+        assert_eq!(extracted.char_data[0], 65);
+        assert_eq!(extracted.char_data[1], 0);
+        assert_eq!(extracted.char_data[2], 0);
+        assert_eq!(extracted.char_data[3], 255);
+
+        // Cell 1: Full block (219) -> R=219, G=0, B=0, A=255
+        assert_eq!(extracted.char_data[4], 219);
+        assert_eq!(extracted.char_data[5], 0);
+        assert_eq!(extracted.char_data[6], 0);
+        assert_eq!(extracted.char_data[7], 255);
+
+        // Cell 2: Medium shade (177) -> R=177, G=0, B=0, A=255
+        assert_eq!(extracted.char_data[8], 177);
+
+        // Cell 3: Space (32) -> R=32
+        assert_eq!(extracted.char_data[12], 32);
+    }
+
+    #[test]
+    fn extract_2x2_grid_fg_bg_flattening() {
+        let mut grid = make_grid(2, 2);
+        grid.fg_colors[0] = [255, 128, 0, 255];
+        grid.fg_colors[1] = [0, 255, 128, 255];
+        grid.bg_colors[0] = [0, 0, 64, 255];
+        grid.bg_colors[1] = [64, 0, 0, 255];
+
+        let config = make_config();
+        let extracted = extract_grid_data(&grid, &config);
+
+        // FG data: 4 cells * 4 bytes = 16 bytes
+        assert_eq!(extracted.fg_data.len(), 16);
+        assert_eq!(&extracted.fg_data[0..4], &[255, 128, 0, 255]);
+        assert_eq!(&extracted.fg_data[4..8], &[0, 255, 128, 255]);
+
+        // BG data
+        assert_eq!(extracted.bg_data.len(), 16);
+        assert_eq!(&extracted.bg_data[0..4], &[0, 0, 64, 255]);
+        assert_eq!(&extracted.bg_data[4..8], &[64, 0, 0, 255]);
+    }
+
+    #[test]
+    fn extract_preserves_dimensions_and_font_sizes() {
+        let grid = make_grid(2, 2);
+        let config = make_config();
+        let extracted = extract_grid_data(&grid, &config);
+
+        assert_eq!(extracted.width, 2);
+        assert_eq!(extracted.height, 2);
+        assert_eq!(extracted.font_width, 10);
+        assert_eq!(extracted.font_height, 16);
+    }
+
+    #[test]
+    fn uniforms_struct_is_16_bytes() {
+        assert_eq!(std::mem::size_of::<AsciiUniforms>(), 16);
+    }
+
+    #[test]
+    fn uniforms_pod_cast() {
+        let uniforms = AsciiUniforms {
+            font_width: 10,
+            font_height: 16,
+            _padding: [0; 2],
+        };
+        let bytes: &[u8] = bytemuck::bytes_of(&uniforms);
+        assert_eq!(bytes.len(), 16);
+        // First 4 bytes: font_width = 10 (little-endian)
+        assert_eq!(bytes[0], 10);
+        assert_eq!(bytes[1], 0);
+        assert_eq!(bytes[2], 0);
+        assert_eq!(bytes[3], 0);
+        // Next 4 bytes: font_height = 16 (little-endian)
+        assert_eq!(bytes[4], 16);
+        assert_eq!(bytes[5], 0);
+        assert_eq!(bytes[6], 0);
+        assert_eq!(bytes[7], 0);
+    }
+}

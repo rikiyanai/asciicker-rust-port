@@ -263,3 +263,80 @@ pub fn parse_world_section(data: &[u8]) -> Result<A3dWorld, AssetError> {
         instances,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_convert_ply_to_akm() {
+        assert_eq!(convert_ply_to_akm("foo.ply".to_string()), "foo.akm");
+        assert_eq!(convert_ply_to_akm("bar.akm".to_string()), "bar.akm");
+        assert_eq!(convert_ply_to_akm("baz".to_string()), "baz");
+    }
+
+    #[test]
+    fn test_read_helpers_eof() {
+        let empty: &[u8] = &[];
+        let mut cursor = 0;
+        assert!(read_i32(empty, &mut cursor).is_err());
+    }
+
+    /// Build a minimal world section binary blob with a single mesh instance.
+    fn build_mesh_instance_blob(tm_values: &[f64; 16]) -> Vec<u8> {
+        let mut data = Vec::new();
+        // format_version: -1 means version=1 (negative encoding)
+        data.extend_from_slice(&(-1i32).to_le_bytes());
+        // instance count = 1
+        data.extend_from_slice(&1i32.to_le_bytes());
+        // mesh_id_len = 3 ("foo")
+        data.extend_from_slice(&3i32.to_le_bytes());
+        data.extend_from_slice(b"foo");
+        // inst_name = "bar" (length-prefixed)
+        data.extend_from_slice(&3i32.to_le_bytes());
+        data.extend_from_slice(b"bar");
+        // 4x4 transform matrix (16 f64 values)
+        for &val in tm_values {
+            data.extend_from_slice(&val.to_le_bytes());
+        }
+        // flags
+        data.extend_from_slice(&0i32.to_le_bytes());
+        // story_id (format_version > 0)
+        data.extend_from_slice(&(-1i32).to_le_bytes());
+        data
+    }
+
+    #[test]
+    fn test_valid_transform_parses_ok() {
+        let tm = [1.0_f64; 16]; // identity-like, all finite
+        let data = build_mesh_instance_blob(&tm);
+        let result = parse_world_section(&data);
+        assert!(result.is_ok(), "Valid transform should parse OK");
+    }
+
+    #[test]
+    fn test_nan_transform_returns_invalid_transform() {
+        let mut tm = [1.0_f64; 16];
+        tm[5] = f64::NAN;
+        let data = build_mesh_instance_blob(&tm);
+        let result = parse_world_section(&data);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AssetError::InvalidTransform(0) => {} // Expected: instance 0
+            other => panic!("Expected InvalidTransform(0), got: {other}"),
+        }
+    }
+
+    #[test]
+    fn test_inf_transform_returns_invalid_transform() {
+        let mut tm = [1.0_f64; 16];
+        tm[10] = f64::INFINITY;
+        let data = build_mesh_instance_blob(&tm);
+        let result = parse_world_section(&data);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AssetError::InvalidTransform(0) => {}
+            other => panic!("Expected InvalidTransform(0), got: {other}"),
+        }
+    }
+}

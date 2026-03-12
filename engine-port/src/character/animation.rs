@@ -115,3 +115,110 @@ impl AnimationState {
         self.elapsed_frames >= STAND_FRAME_COUNT
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_idle_frame_zero() {
+        let mut anim = AnimationState::default();
+        anim.advance(ActionState::None, -1, 16_000);
+        assert_eq!(anim.frame_index, 0);
+    }
+
+    #[test]
+    fn test_walk_frame_from_player_stp() {
+        let mut anim = AnimationState::default();
+        // player_stp=0, STEP_OFFSET=3072, STEP_MASK=8191
+        // (0 + 3072) & 8191 = 3072, 3072 / 1024 = 3
+        anim.advance(ActionState::None, 0, 16_000);
+        assert_eq!(anim.frame_index, 3);
+    }
+
+    #[test]
+    fn test_walk_frame_wraps_with_step_mask() {
+        let mut anim = AnimationState::default();
+        // player_stp=6*1024=6144, (6144+3072) & 8191 = 9216 & 8191 = 1025, 1025/1024 = 1
+        anim.advance(ActionState::None, 6 * 1024, 16_000);
+        assert_eq!(anim.frame_index, 1);
+    }
+
+    #[test]
+    fn test_attack_frame_advance() {
+        let mut anim = AnimationState::default();
+        // 20_000us per frame; feed 60_000us = 3 frames
+        anim.advance(ActionState::Attack, -1, 60_000);
+        assert_eq!(anim.frame_index, 3);
+        assert_eq!(anim.elapsed_frames, 3);
+    }
+
+    #[test]
+    fn test_attack_frame_capped() {
+        let mut anim = AnimationState::default();
+        // Feed enough for 12 frames (240_000us at 20_000/frame)
+        anim.advance(ActionState::Attack, -1, 240_000);
+        assert_eq!(anim.frame_index, ATTACK_FRAME_COUNT);
+    }
+
+    #[test]
+    fn test_block_frame_advance() {
+        let mut anim = AnimationState::default();
+        anim.advance(ActionState::Block, -1, 90_000);
+        assert_eq!(anim.frame_index, 3);
+    }
+
+    #[test]
+    fn test_fall_frame_advance() {
+        let mut anim = AnimationState::default();
+        anim.advance(ActionState::Fall, -1, 90_000);
+        assert_eq!(anim.frame_index, 3);
+    }
+
+    #[test]
+    fn test_stand_frame_advance_capped() {
+        let mut anim = AnimationState::default();
+        // Feed enough for 10 frames = 300_000us, capped at STAND_FRAME_COUNT=5
+        anim.advance(ActionState::Stand, -1, 300_000);
+        assert_eq!(anim.frame_index, STAND_FRAME_COUNT);
+    }
+
+    #[test]
+    fn test_dead_frozen() {
+        let mut anim = AnimationState {
+            frame_index: 3,
+            elapsed_frames: 3,
+        };
+        anim.advance(ActionState::Dead, -1, 1_000_000);
+        assert_eq!(anim.frame_index, 3, "Dead should freeze at last frame");
+    }
+
+    #[test]
+    fn test_is_attack_complete() {
+        let anim = AnimationState {
+            frame_index: 8,
+            elapsed_frames: 8,
+        };
+        assert!(anim.is_attack_complete());
+    }
+
+    #[test]
+    fn test_is_stand_complete() {
+        let anim = AnimationState {
+            frame_index: 5,
+            elapsed_frames: 5,
+        };
+        assert!(anim.is_stand_complete());
+    }
+
+    #[test]
+    fn test_reset() {
+        let mut anim = AnimationState {
+            frame_index: 5,
+            elapsed_frames: 10,
+        };
+        anim.reset();
+        assert_eq!(anim.frame_index, 0);
+        assert_eq!(anim.elapsed_frames, 0);
+    }
+}

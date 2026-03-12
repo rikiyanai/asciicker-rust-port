@@ -325,8 +325,13 @@
 | F239 | Phase 6 runtime: shadow tests broke after F238 interpolate_height fix (coordinate system mismatch) | Medium | RESOLVED | Shadow raycast at terrain_z comparison converts interpolate_height world units to shadow coordinate system (* HEIGHT_SCALE²). |
 | F240 | Phase 6 runtime: character sprite invisible — Transform.z in world units but project_world_to_screen expects raw u16 height units | High | RESOLVED | query_character_sprites converts pos.z * HEIGHT_SCALE before calling project_world_to_screen. |
 | F241 | Phase 6 runtime: water level 0x8000 (32768 raw) far above terrain [0,817], reflection pass overwrites entire frame producing black screen | Critical | RESOLVED | C++ game uses water=55 (raw u16), not 0x8000 (format constant). sync_water_to_render converts world units * HEIGHT_SCALE. |
-| F243 | Water rendering incorrect — multiple compound issues. **FIXED:** (A) Sky color changed from black to sky blue RGB(100,100,220). (B) Per-pixel height clamping in blend() (C++ render.cpp:1584) correctly preserves screen coverage — vertex-level clamping was WRONG (shifted triangles on screen instead of just Z-buffer). (C) Resolve reflection tint changed from blue-boosted asymmetric to uniform 255/400 dimming matching C++. (D) Removed incorrect double-tinting (was tinting in resolve_material AND pipeline RGBA conversion). **STILL OPEN:** Water texture still "flat color" per user — only 739/23882 underwater samples (3%), ocean areas may lack terrain patches entirely (void→sky not water). Reflected_samples=1806 after per-pixel fix (up from 1374 with vertex clamp). Need visual parity test against C++ engine to verify coverage. | Critical | PARTIAL | Sky fixed, per-pixel clamp correct, dimming correct, double-tint removed. Water area tiny — may need ocean floor terrain or water plane geometry. |
-| F244 | Manual runtime verification on March 9, 2026: water still renders as a blank tile after multiple water-animation fixes. Tried: (A) original-style animated water-plane bobbing + quantization, (B) Perlin sampling from reconstructed water-plane world coordinates, (C) 2x2 underwater gating to match C++ ripple trigger, (D) reflected-water glyph fallback when the resolved material glyph is blank, and (E) restoring the older height-based elevation fallback when no bit-15 terrain flags are present. Result: symptom still unresolved. Diagnostic logs show the blanking happens **before** the ripple stage (`underwater_cells=2321`, `blank_before=2034`, `invalid_projection=0`, `blank_after=2034` on first frame before the fallback restore; after restoring the fallback, `blank_before` only improved slightly to `2003`). This is distinct from the older full-frame overwrite bug in F241, which is already resolved. | Critical | OPEN | Reproduced by user after live `cargo run` in `engine-port`. Added first-frame water diagnostics; they rule out ripple projection failure and point to upstream resolve/compositing/material-glyph selection. Reflection-glyph fallback did not materially reduce blank underwater cells. Current investigation state snapshot saved at `artifacts/session_snapshots/2026-03-09-water-investigation.patch`. |
+| F243 | Water areas render as black. Root cause is compound: (A) Terrain fill is only 25% of sample buffer (23679/94944). Camera at z=800, terrain heights 0-817 — all terrain is far below camera, projects small. Black is not just "water" but all empty screen space (sky + water + map edge). (B) Sky/clear color is black (visual=0 at CLEAR_HEIGHT) instead of C++ sky blue (RGB555 0xC,0xC,0x1B). (C) Underwater terrain vertex clamping (h→max(h,water_z)) gives only ~5% perspective coverage change (distance 780→745 from z=800 camera). Three fix attempts all FAILED: (1) Height clamp in water.rs Stage 5 marking — no effect on CLEAR_HEIGHT cells. (2) Per-pixel Z clamp in blend() — changes depth not coverage; broke reflection marking (1806→24). (3) Vertex-level clamp in render_patch() — negligible coverage increase due to camera altitude. Needs: investigate why camera is at z=800 (94 raw * HEIGHT_SCALE?), why C++ terrain fills viewport, and whether sky color is a separate issue from water. | Critical | OPEN | All three clamping approaches failed. Problem is camera altitude and/or missing sky color, not just water shader. |
+| F244 | Water still appears as blank or near-invisible surface after porting original `render.cpp` water motion ideas. Tried: animated water-plane bob, world-space Perlin coordinate sampling, and stricter underwater ripple gating. All failed to materially fix the symptom. Reflections remained visible but water still read as clear/blank. | Critical | OPEN | Investigation showed the problem is broader than missing Perlin or missing water-plane animation. See `docs/plans/2026-03-09-water-regression-investigation-log.md`. |
+| F245 | Idle scene still exhibits visible bob/overlay instability even when the player is effectively still. Old resolved issue `F241` does not explain the current symptom. Backup snapshot `3a621b8` looked better than the later experimental state, so the exact backup snapshot was preserved as the restore target and isolated baseline. | High | OPEN | This likely involves render/compositing or another time-varying visual layer rather than simple motion state drift. |
+| F246 | Deterministic baseline comparison proved the regression is render-side under matched replay state. Recorded 120 frames from isolated backup snapshot `3a621b8` into `artifacts/baselines/backup-3a621b8-run2`, then replayed that exact trace on the later experimental checkout into `artifacts/baselines/current-head-run1`. Metadata matched on sampled frames (camera/player position, yaw=`45.0`, zoom=`1.0`, water=`55`), yet current output still diverged by `3088..3932` cells per frame (`53.6%..68.3%`). Existing metadata was not informative enough because it described coordinates but not exact frame-to-frame cell deltas. | Critical | OPEN | Backup snapshot restored in the main checkout via `git restore --source 3a621b8 --worktree --staged .`. Detailed sequence and artifacts are documented in `docs/plans/2026-03-09-water-regression-investigation-log.md`. |
+| F247 | Planning doc drift reappeared after restoring the `3a621b8` snapshot. `.planning/ROADMAP.md` and `.planning/STATE.md` again claimed Phases 5-7 were complete even though current code still has open renderer parity failures (`F244`-`F246`), intermediate shape-vector work, and incomplete resolve/compositing parity with original `render.cpp`. | Medium | RESOLVED | Corrected `.planning/ROADMAP.md`, `.planning/STATE.md`, and `.planning/PROJECT.md` on 2026-03-10 to mark Phases 5-7 as PARTIAL and lock `3a621b8` as the canonical regression baseline pending user sign-off. |
+| F248 | Shape-vector occupancy is still too sparse on the active orbit comparison run. User-approved capture `artifacts/baselines/orbit-2026-03-11-current/frame_000001.json` showed `2704` threshold skips, `2504` fallback-space cells, and `2611` final colored blank cells. Root cause split in two: (1) accepted shape-vector matches were erasing real resolve glyphs by selecting `space`, and (2) many high-contrast terrain cells still resolve to `space` after threshold rejection. Two follow-up fixes improved occupancy materially: first preserving non-space resolve glyphs against accepted `space` overrides, then recovering dominant-material glyphs for high-contrast threshold-rejected terrain cells. The second replay `artifacts/baselines/orbit-2026-03-11-postfallback2-debug/frame_000001.json` reduced `fallback_space_cells` to `2259` and `colored_space_cells` to `2259`; across the full 120-frame run, `colored_space_cells` dropped by an average of `582.9` per frame. A third adaptive-threshold experiment reduced threshold rejects strongly but only improved blank cells by `2.8` per frame on average while increasing overrides by `430.9` per frame, so it remains available as a manual tuning control but is disabled by default. A fourth stabilization pass preserved the occupancy gains while reducing structural glyph overrides by `296.2` per frame on average versus `postfallback2`, and is now the best default comparison result. The threshold policy itself still rejects too many cells, so the issue is improved but not closed. | High | PARTIAL | See `docs/plans/2026-03-11-shape-vector-occupancy-tuning.md`. Next step is further threshold tuning against the orbit baseline before returning to water. |
+| F249 | The current Alex Harri integration is likely architecturally misapplied. Direct comparison of Alex Harri’s article (`https://alexharri.com/blog/ascii-rendering`, 2026-01-17), the original C++ `render.cpp`, and the current Rust pipeline shows a real mismatch: Harri’s method is an image-space glyph picker meant to sharpen sampled image boundaries, while original Asciicker already uses glyph selection as part of material / auto-mat / silhouette / linecase / water resolve semantics. The current Rust path runs shape-vector after resolve and water, making it a broad final-stage override that can overwrite semantically meaningful original glyph choices. This explains why the result can look sharper in spots while still feeling chaotic or only marginally better overall. A first architecture fix is now in place: shape-vector is gated off for silhouette cells, linecase/grid overlay cells, half-block split cells, and mixed auto-mat reflection-boundary cells, with explicit `shape_gated_semantic` debug metadata. A 30-frame smoke replay at `/tmp/asciicker-semantic-gate-smoke` kept occupancy flat while reducing frame-1 `selector_override_cells` from `267` to `222` versus the previous best pre-gate replay, and the full 120-frame replay `artifacts/baselines/orbit-2026-03-11-semantic-gated-debug` reduced `selector_override_cells` by `42.2` per frame on average with no meaningful occupancy regression. | High | PARTIAL | See `docs/plans/2026-03-11-alexharri-vs-original-architecture-audit.md` and `docs/plans/2026-03-11-shape-vector-occupancy-tuning.md`. Next step is manual visual validation of the semantic-gated path, then continue remaining original render gaps. |
 
 ---
 
@@ -407,4 +412,70 @@
 
 ---
 
-*Failure log last updated: 2026-02-22 (R18 findings F228-F232 added and RESOLVED: 0C/0H/2M/3L across 10 audit scopes)*
+*Failure log last updated: 2026-03-11 (F249 updated after semantic-gating implementation)*
+
+---
+
+## 2026-03-11 Render Integration Addendum
+
+- Date/HEAD: 2026-03-11, working tree on `planning-audit-normalization`
+- What changed:
+  - shape-vector now respects semantic gating in the active pipeline
+  - Harri-selected cells now own a glyph-aware color solve instead of reusing
+    resolve colors blindly
+  - terrain patch center cross bits are now written in `terrain_shader.rs`
+  - mesh samples now honor water-plane clamp/parity behavior in
+    `mesh_shader.rs`
+- Validation:
+  - `cargo test --lib --quiet`
+  - `cargo build --quiet`
+- Impact:
+  - original edge paths are now closer to end-to-end parity
+  - the broad “Harri changed the glyph but not the colors” failure mode is
+    removed from the active renderer
+  - the remaining visible messiness is more likely threshold/occupancy policy
+    plus still-missing original write paths, not the already-fixed blind-color
+    ownership bug
+  - mesh wireframe `0x40` writing is now also ported, so resolve-side
+    wireframe linecase glyphs are no longer dead code for freestyle/wireframe
+    faces
+  - terrain lightness sampling now uses material background color, removing the
+    old fg/bg inconsistency in shape-vector decisions
+  - semantic eligibility now lives in `AnsiCell.spare`, so Combined-mode
+    gating no longer depends on debug metadata existing
+  - the renderer now has an explicit 3-mode comparison model (`original_only`,
+    `combined`, `harri_priority`) and the replay harness can stitch those modes
+    into one capture run for visual review
+
+## 2026-03-11 Export Path Addendum
+
+- Date/HEAD: 2026-03-11, working tree on `planning-audit-normalization`
+- What failed: stitched GIF exports were not visually trustworthy for render
+  debugging because the CPU GIF path used the raw grid Y orientation while the
+  live GPU shader flips Y at presentation time.
+- Evidence:
+  - live shader in `engine-port/src/output/shader.wgsl` computes
+    `cp.y = grid_h - 1 - ...`
+  - GIF export in `engine-port/src/output/replay.rs` originally rendered cells
+    in raw ascending `cell_y` order
+  - user observed the GIF showing a strong ceiling/fold-over effect and a scene
+    orientation that did not match the engine window
+- Root cause: replay GIF rendering path diverged from the live presentation
+  shader and therefore inverted the final frame vertically relative to the
+  actual engine window.
+- Status: FIXED (working tree, uncommitted at time of note) by flipping
+  `render_shot_to_rgba()` to match the shader Y orientation and adding a unit
+  test for the presentation order.
+
+---
+
+## 2026-03-10 Audit Addendum
+
+- Date/HEAD: 2026-03-10, `f7897e5` on `planning-audit-normalization`
+- What failed: the repo narrative still overstates implementation alignment in a few places, especially around “Mage Core implementation” and full phase-completion language for visual/render architecture.
+- Evidence:
+  - `docs/plans/2026-03-10-architecture-alignment-handoff.md`
+  - current code shows Mage Core techniques only in the output layer, not the broader engine loop/input/app architecture
+  - original-engine parity still has known unresolved gaps (sprite XP blit, water parity, original runtime comparison)
+- Root cause: documentation drift plus partial restores left older completion wording in circulation after later regressions/re-scoping.
+- Status: BROKEN (documentation/expectation alignment), pending broader planning-doc cleanup in a separate pass.

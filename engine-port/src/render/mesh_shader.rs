@@ -9,7 +9,7 @@ use crate::asset_loader::constants::HEIGHT_SCALE;
 use crate::render::camera::GameCamera;
 use crate::render::math::transform_vertex_perspective;
 use crate::render::quantize::{pack_rgb555, rgb8_to_rgb5};
-use crate::render::rasterizer::{RasterShader, rasterize};
+use crate::render::rasterizer::{RasterShader, bresenham, rasterize};
 use crate::render::sample_buffer::{Sample, spare_bits};
 
 /// Mesh shader implementing `RasterShader` for mesh face triangles.
@@ -21,18 +21,51 @@ pub struct MeshShader {
     pub rgb555: u16,
     /// Lighting intensity.
     pub diffuse: u8,
+    /// Water level used for normal/reflection mesh clamping.
+    pub water_z: Option<f32>,
+    /// Whether this pass is rendering reflected geometry.
+    pub reflection_mode: bool,
 }
 
 impl RasterShader for MeshShader {
     fn blend(&self, sample: &mut Sample, z: f32, _bc: [f32; 3]) {
         // Depth test: LARGER z = closer/on top (Z-up world; higher objects occlude lower).
         // C++ render.cpp uses `if(sam.z < z)` — write if new fragment is higher.
-        if sample.height < z || sample.height == Sample::CLEAR_HEIGHT {
-            sample.visual = self.rgb555;
-            sample.diffuse = self.diffuse;
-            sample.spare = spare_bits::MESH_FLAG;
-            sample.height = z;
+        if !(sample.height < z || sample.height == Sample::CLEAR_HEIGHT) {
+            return;
         }
+
+        let mut write_z = z;
+        let mut spare =
+            (sample.spare & !(spare_bits::GRID | spare_bits::WIREFRAME)) | spare_bits::MESH_FLAG;
+
+        if let Some(water_z) = self.water_z {
+            let epsilon = HEIGHT_SCALE as f32 / 8.0;
+            if self.reflection_mode {
+                if z >= water_z + epsilon {
+                    return;
+                }
+                if z > water_z {
+                    write_z = water_z;
+                }
+                spare = (spare & !spare_bits::PARITY_MASK) | spare_bits::REFLECTION;
+            } else {
+                if z < water_z - epsilon {
+                    return;
+                }
+                if z < water_z {
+                    write_z = water_z;
+                }
+                spare = (spare & !spare_bits::PARITY_MASK) | 0x01;
+            }
+        } else {
+            spare &= !spare_bits::PARITY_MASK;
+        }
+
+        sample.visual = self.rgb555;
+        sample.diffuse = self.diffuse;
+        sample.spare = spare;
+        sample.height = write_z;
     }
 }
 
@@ -111,6 +144,11 @@ fn apply_instance_tm(model: [f64; 3], instance_tm: &[f64; 16]) -> [f64; 3] {
     [wx, wy, wz]
 }
 
+#[inline]
+fn is_wireframe_face(face: &crate::asset_loader::akm_mesh::AkmFace) -> bool {
+    face.freestyle || (face.visual & (1 << 31)) != 0 || (face.visual & (1 << 30)) != 0
+}
+
 /// Rasterize a mesh instance into the sample buffer.
 ///
 /// For each face in the mesh, transforms vertices from model space to world
@@ -133,6 +171,8 @@ pub fn render_mesh(
     mesh: &AkmMesh,
     instance_tm: &[f64; 16],
     camera: &GameCamera,
+    water_z: Option<f32>,
+    reflection_mode: bool,
 ) {
     for face in &mesh.faces {
         let i0 = face.indices[0] as usize;
@@ -175,6 +215,34 @@ pub fn render_mesh(
             None => continue,
         };
 
+        if is_wireframe_face(face) {
+            bresenham(
+                buf,
+                buf_w,
+                buf_h,
+                [sv0[0], sv0[1], sv0[2]],
+                [sv1[0], sv1[1], sv1[2]],
+                spare_bits::WIREFRAME,
+            );
+            bresenham(
+                buf,
+                buf_w,
+                buf_h,
+                [sv1[0], sv1[1], sv1[2]],
+                [sv2[0], sv2[1], sv2[2]],
+                spare_bits::WIREFRAME,
+            );
+            bresenham(
+                buf,
+                buf_w,
+                buf_h,
+                [sv2[0], sv2[1], sv2[2]],
+                [sv0[0], sv0[1], sv0[2]],
+                spare_bits::WIREFRAME,
+            );
+            continue;
+        }
+
         // Average vertex colors for face color
         let avg_r = ((vert0.r as u16 + vert1.r as u16 + vert2.r as u16) / 3) as u8;
         let avg_g = ((vert0.g as u16 + vert1.g as u16 + vert2.g as u16) / 3) as u8;
@@ -196,9 +264,236 @@ pub fn render_mesh(
             camera.light_ambient,
         );
 
-        let shader = MeshShader { rgb555, diffuse };
+        let shader = MeshShader {
+            rgb555,
+            diffuse,
+            water_z,
+            reflection_mode,
+        };
 
         // Double-sided for meshes
         rasterize(buf, buf_w, buf_h, &shader, [&sv0, &sv1, &sv2], true);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::render::sample_buffer::spare_bits;
+
+    #[test]
+    fn test_mesh_shader_writes_rgb555() {
+        let mut sample = Sample::clear_state();
+        let shader = MeshShader {
+            rgb555: 0x1234,
+            diffuse: 200,
+            water_z: None,
+            reflection_mode: false,
+        };
+        shader.blend(&mut sample, 100.0, [0.33, 0.33, 0.34]);
+
+        assert_eq!(sample.visual, 0x1234, "Should write RGB555 color");
+        assert_eq!(sample.diffuse, 200, "Should write diffuse");
+        assert_eq!(
+            sample.spare & spare_bits::MESH_FLAG,
+            spare_bits::MESH_FLAG,
+            "Mesh must have MESH_FLAG set"
+        );
+        assert_eq!(sample.height, 100.0, "Should write depth");
+    }
+
+    #[test]
+    fn test_mesh_shader_depth_test() {
+        // Write an initial fragment (via CLEAR_HEIGHT path)
+        let mut sample = Sample::clear_state();
+        let shader_low = MeshShader {
+            rgb555: 0x1111,
+            diffuse: 200,
+            water_z: None,
+            reflection_mode: false,
+        };
+        shader_low.blend(&mut sample, 50.0, [0.33, 0.33, 0.34]);
+        assert_eq!(sample.visual, 0x1111);
+
+        // Write a HIGHER z fragment -- SHOULD overwrite (higher = on top in Z-up)
+        let shader_high = MeshShader {
+            rgb555: 0x2222,
+            diffuse: 100,
+            water_z: None,
+            reflection_mode: false,
+        };
+        shader_high.blend(&mut sample, 200.0, [0.33, 0.33, 0.34]);
+        assert_eq!(
+            sample.visual, 0x2222,
+            "Higher z fragment should overwrite lower (on top in Z-up)"
+        );
+
+        // Write a LOWER z fragment -- should NOT overwrite
+        let shader_below = MeshShader {
+            rgb555: 0x3333,
+            diffuse: 255,
+            water_z: None,
+            reflection_mode: false,
+        };
+        shader_below.blend(&mut sample, 25.0, [0.33, 0.33, 0.34]);
+        assert_eq!(
+            sample.visual, 0x2222,
+            "Lower z fragment should not overwrite higher (underneath in Z-up)"
+        );
+    }
+
+    #[test]
+    fn test_mesh_shader_clamps_normal_mesh_to_water_plane_and_sets_normal_parity() {
+        let mut sample = Sample::clear_state();
+        let shader = MeshShader {
+            rgb555: 0x4321,
+            diffuse: 180,
+            water_z: Some(55.0),
+            reflection_mode: false,
+        };
+
+        shader.blend(&mut sample, 54.0, [0.33, 0.33, 0.34]);
+
+        assert_eq!(sample.height, 55.0, "Normal mesh should clamp up to water");
+        assert_eq!(
+            sample.spare & spare_bits::PARITY_MASK,
+            0x01,
+            "Normal mesh should set normal parity bit"
+        );
+        assert_ne!(
+            sample.spare & spare_bits::MESH_FLAG,
+            0,
+            "Normal mesh should keep MESH_FLAG"
+        );
+    }
+
+    #[test]
+    fn test_mesh_shader_clamps_reflection_mesh_to_water_plane_and_sets_reflection_parity() {
+        let mut sample = Sample::clear_state();
+        let shader = MeshShader {
+            rgb555: 0x2468,
+            diffuse: 180,
+            water_z: Some(55.0),
+            reflection_mode: true,
+        };
+
+        shader.blend(&mut sample, 56.0, [0.33, 0.33, 0.34]);
+
+        assert_eq!(
+            sample.height, 55.0,
+            "Reflected mesh should clamp down to water"
+        );
+        assert_eq!(
+            sample.spare & spare_bits::PARITY_MASK,
+            spare_bits::REFLECTION,
+            "Reflected mesh should set reflection parity bits"
+        );
+        assert_ne!(
+            sample.spare & spare_bits::MESH_FLAG,
+            0,
+            "Reflected mesh should keep MESH_FLAG"
+        );
+    }
+
+    #[test]
+    fn test_mesh_shader_rejects_geometry_far_below_water_in_normal_pass() {
+        let mut sample = Sample::clear_state();
+        let shader = MeshShader {
+            rgb555: 0x7777,
+            diffuse: 180,
+            water_z: Some(55.0),
+            reflection_mode: false,
+        };
+
+        shader.blend(&mut sample, 40.0, [0.33, 0.33, 0.34]);
+
+        assert_eq!(
+            sample.height,
+            Sample::CLEAR_HEIGHT,
+            "Normal mesh below water gate should not render"
+        );
+    }
+
+    #[test]
+    fn test_render_mesh_writes_wireframe_bits_for_freestyle_faces() {
+        use crate::asset_loader::akm_mesh::{AkmFace, AkmMesh, AkmVertex};
+
+        let mesh = AkmMesh {
+            vertices: vec![
+                AkmVertex {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                    r: 255,
+                    g: 255,
+                    b: 255,
+                    alpha: 255,
+                },
+                AkmVertex {
+                    x: 1.0,
+                    y: 0.0,
+                    z: 0.0,
+                    r: 255,
+                    g: 255,
+                    b: 255,
+                    alpha: 255,
+                },
+                AkmVertex {
+                    x: 0.0,
+                    y: 1.0,
+                    z: 0.0,
+                    r: 255,
+                    g: 255,
+                    b: 255,
+                    alpha: 255,
+                },
+            ],
+            faces: vec![AkmFace {
+                indices: [0, 1, 2],
+                visual: 0,
+                freestyle: true,
+            }],
+            edges: vec![],
+        };
+
+        let mut camera = GameCamera::default();
+        let buf_w = 128;
+        let buf_h = 128;
+        camera.pos = [0.0, -20.0, 0.0];
+        camera.update(buf_w as f64, buf_h as f64);
+
+        let instance_tm: [f64; 16] = [
+            40.0, 0.0, 0.0, 0.0, 0.0, 40.0, 0.0, 0.0, 0.0, 0.0, 40.0, 0.0, 20.0, 20.0, 0.0, 1.0,
+        ];
+        let mut buf = vec![Sample::clear_state(); (buf_w * buf_h) as usize];
+
+        render_mesh(
+            &mut buf,
+            buf_w,
+            buf_h,
+            &mesh,
+            &instance_tm,
+            &camera,
+            None,
+            false,
+        );
+
+        let wireframe_samples = buf
+            .iter()
+            .filter(|s| (s.spare & spare_bits::WIREFRAME) != 0)
+            .count();
+        let filled_mesh_samples = buf
+            .iter()
+            .filter(|s| s.height != Sample::CLEAR_HEIGHT && (s.spare & spare_bits::MESH_FLAG) != 0)
+            .count();
+
+        assert!(
+            wireframe_samples > 0,
+            "Freestyle face should emit wireframe bits"
+        );
+        assert_eq!(
+            filled_mesh_samples, 0,
+            "Freestyle face should skip filled triangle rasterization"
+        );
     }
 }

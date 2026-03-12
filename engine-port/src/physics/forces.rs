@@ -27,7 +27,8 @@ pub fn accumulate_forces(state: &mut PhysicsState, io: &PhysicsIO, dt: f32) {
     let cnt: f32 = 0.78;
     let acc = (io.water - (io.pos[2] + cnt * h)) / (2.0 * cnt * h);
     let acc = acc.clamp(-cnt, 1.0 - cnt);
-    state.vel[2] += dt * acc;
+    let vertical_accel_scale = GRAVITY_ACCEL_AIR / BUOYANCY_CENTER_BASE;
+    state.vel[2] += dt * acc * vertical_accel_scale;
 
     // 2. Input forces (already camera-relative from accumulate_player_input)
     // F233 FIX: input.rs already rotates by camera.yaw -- do NOT rotate again here.
@@ -56,6 +57,13 @@ pub fn accumulate_forces(state: &mut PhysicsState, io: &PhysicsIO, dt: f32) {
     let damp = VEL_DAMPING.powf(dt);
     state.vel[0] *= damp;
     state.vel[1] *= damp;
+
+    // Original physics applies extra drag while submerged. Keep air behavior
+    // unchanged and only damp Z in proportion to submersion depth.
+    let mut res = (io.water - io.pos[2]) / io.world_height.max(1e-6);
+    res = res.clamp(0.0, 1.0);
+    let z_res = (1.0 - 0.1 * res).powf(dt);
+    state.vel[2] *= z_res;
 }
 
 /// Apply jump if grounded.
@@ -70,6 +78,7 @@ pub fn accumulate_forces(state: &mut PhysicsState, io: &PhysicsIO, dt: f32) {
 pub fn apply_jump(state: &mut PhysicsState, io: &mut PhysicsIO) {
     if io.jump {
         if state.accum_contact >= GROUNDED_THRESHOLD {
+            state.accum_contact = 0.0;
             // R19-M08: conditional add-vs-set
             if state.vel[2] < 0.0 {
                 state.vel[2] = JUMP_VELOCITY;
@@ -93,4 +102,246 @@ pub fn apply_jump(state: &mut PhysicsState, io: &mut PhysicsIO) {
 /// - Grounded: `accum_contact >= GROUNDED_THRESHOLD`
 pub fn update_grounded(state: &mut PhysicsState, _dt: f32) {
     state.accum_contact *= GROUNDED_DECAY;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn default_io() -> PhysicsIO {
+        PhysicsIO {
+            water: f32::NEG_INFINITY,
+            world_height: 86.2,
+            world_radius: 1.333,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_gravity_negative_vel_z() {
+        // R16-F194: After accumulate_forces with water=NEG_INFINITY, dt=1/66.667
+        // vel[2] must be < 0 and abs > 0.01
+        let mut state = PhysicsState::default();
+        let io = default_io();
+        let dt = 1.0 / 66.667;
+        accumulate_forces(&mut state, &io, dt);
+        assert!(
+            state.vel[2] < 0.0,
+            "gravity must produce negative vel_z, got {}",
+            state.vel[2]
+        );
+        assert!(
+            state.vel[2].abs() > 0.01,
+            "vel_z must be significant, got {}",
+            state.vel[2]
+        );
+    }
+
+    #[test]
+    fn test_gravity_formula_no_double_count() {
+        // With water=NEG_INFINITY, acc clamps to -cnt (~-0.78), then scales
+        // to roughly -9.8 world units/sec^2 in air.
+        let mut state = PhysicsState::default();
+        let io = default_io();
+        let dt = 1.0;
+        accumulate_forces(&mut state, &io, dt);
+        assert!(
+            (state.vel[2] - (-9.8)).abs() < 0.1,
+            "gravity acc should be ~-9.8, got {}",
+            state.vel[2]
+        );
+    }
+
+    #[test]
+    fn test_jump_consumed_when_grounded() {
+        // R16-F194: set jump=true, grounded > threshold
+        // After apply_jump: jump=false, vel_z > 0
+        let mut state = PhysicsState {
+            accum_contact: 2.0, // > GROUNDED_THRESHOLD
+            ..Default::default()
+        };
+        let mut io = PhysicsIO {
+            jump: true,
+            ..default_io()
+        };
+        apply_jump(&mut state, &mut io);
+        assert!(!io.jump, "jump must be cleared after evaluation");
+        assert!(state.vel[2] > 0.0, "vel_z must be positive after jump");
+        assert_eq!(
+            state.accum_contact, 0.0,
+            "jump should clear grounded accumulation"
+        );
+        assert!(
+            (state.vel[2] - JUMP_VELOCITY).abs() < 0.01,
+            "vel_z should equal JUMP_VELOCITY"
+        );
+    }
+
+    #[test]
+    fn test_jump_not_consumed_when_airborne() {
+        // TRAP-P05: jump not consumed when not grounded
+        let mut state = PhysicsState {
+            accum_contact: 0.0, // Below threshold
+            ..Default::default()
+        };
+        let mut io = PhysicsIO {
+            jump: true,
+            ..default_io()
+        };
+        apply_jump(&mut state, &mut io);
+        assert!(!io.jump, "jump flag must be cleared even when airborne");
+        assert!(
+            (state.vel[2] - 0.0).abs() < 1e-6,
+            "vel_z should remain 0 when airborne, got {}",
+            state.vel[2]
+        );
+    }
+
+    #[test]
+    fn test_jump_conditional_add_vs_set() {
+        // R19-M08: falling -> SET, rising -> ADD
+        // Falling case
+        let mut state = PhysicsState {
+            vel: [0.0, 0.0, -5.0],
+            accum_contact: 2.0,
+        };
+        let mut io = PhysicsIO {
+            jump: true,
+            ..default_io()
+        };
+        apply_jump(&mut state, &mut io);
+        assert!(
+            (state.vel[2] - JUMP_VELOCITY).abs() < 0.01,
+            "falling: should SET to JUMP_VELOCITY, got {}",
+            state.vel[2]
+        );
+
+        // Rising case
+        state.vel[2] = 3.0;
+        state.accum_contact = 2.0;
+        io.jump = true;
+        apply_jump(&mut state, &mut io);
+        assert!(
+            (state.vel[2] - (3.0 + JUMP_VELOCITY)).abs() < 0.01,
+            "rising: should ADD JUMP_VELOCITY, got {}",
+            state.vel[2]
+        );
+    }
+
+    #[test]
+    fn test_grounded_accumulation_decay() {
+        // TRAP-P02: grounded uses accumulation pattern
+        let mut state = PhysicsState {
+            accum_contact: 3.0,
+            ..Default::default()
+        };
+        assert!(state.accum_contact >= GROUNDED_THRESHOLD);
+        update_grounded(&mut state, 1.0 / 66.667);
+        // After decay: 3.0 * 0.9 = 2.7, still above threshold
+        assert!((state.accum_contact - 2.7).abs() < 0.01);
+        assert!(state.accum_contact >= GROUNDED_THRESHOLD);
+    }
+
+    #[test]
+    fn test_grounded_decays_below_threshold() {
+        let mut state = PhysicsState {
+            accum_contact: 1.05,
+            ..Default::default()
+        };
+        update_grounded(&mut state, 1.0 / 66.667);
+        // 1.05 * 0.9 = 0.945, below threshold
+        assert!(
+            state.accum_contact < GROUNDED_THRESHOLD,
+            "should decay below threshold, got {}",
+            state.accum_contact
+        );
+    }
+
+    #[test]
+    fn test_damping_reduces_velocity() {
+        // R16-F194: initial vel=[10,0,0], after accumulate with dt=1/66.667 → vel[0] < 10.0
+        let mut state = PhysicsState {
+            vel: [10.0, 0.0, 0.0],
+            ..Default::default()
+        };
+        let io = default_io();
+        let dt = 1.0 / 66.667;
+        accumulate_forces(&mut state, &io, dt);
+        assert!(
+            state.vel[0] < 10.0,
+            "damping should reduce velocity, got {}",
+            state.vel[0]
+        );
+    }
+
+    #[test]
+    fn test_velocity_clamped_at_max_vel_air() {
+        // R18-F231: set vel=[100, 0, 0], after accumulate → vel[0] == MAX_VEL_AIR
+        let mut state = PhysicsState {
+            vel: [100.0, 0.0, 0.0],
+            ..Default::default()
+        };
+        let io = default_io();
+        let dt = 1.0 / 66.667;
+        accumulate_forces(&mut state, &io, dt);
+        // After clamping and damping, |vel_xy| should be <= MAX_VEL_AIR
+        let speed = (state.vel[0] * state.vel[0] + state.vel[1] * state.vel[1]).sqrt();
+        assert!(
+            speed <= MAX_VEL_AIR + 0.01,
+            "velocity should be clamped to MAX_VEL_AIR, got {}",
+            speed
+        );
+    }
+
+    #[test]
+    fn test_impulse_applied() {
+        let mut state = PhysicsState::default();
+        let io = PhysicsIO {
+            x_impulse: 5.0,
+            y_impulse: 3.0,
+            ..default_io()
+        };
+        let dt = 1.0 / 66.667;
+        accumulate_forces(&mut state, &io, dt);
+        // Impulse should be reflected in velocity
+        assert!(state.vel[0].abs() > 0.0, "x_impulse should affect vel[0]");
+        assert!(state.vel[1].abs() > 0.0, "y_impulse should affect vel[1]");
+    }
+
+    #[test]
+    fn test_input_forces_pass_through() {
+        // F233 FIX: accumulate_forces no longer rotates by yaw.
+        // Input forces are already camera-relative from accumulate_player_input.
+        let mut state = PhysicsState::default();
+        let io = PhysicsIO {
+            x_force: 1.0,
+            y_force: 0.0,
+            yaw: std::f32::consts::FRAC_PI_2, // yaw should have no effect
+            ..default_io()
+        };
+        let dt = 1.0 / 66.667;
+        accumulate_forces(&mut state, &io, dt);
+        // x_force=1.0 should go directly into vel[0] (plus damping)
+        assert!(
+            state.vel[0].abs() > 0.5,
+            "x_force should pass through to vel[0], got {}",
+            state.vel[0]
+        );
+        assert!(
+            state.vel[1].abs() < 0.01,
+            "y_force=0 should leave vel[1] near zero, got {}",
+            state.vel[1]
+        );
+    }
+
+    #[test]
+    fn test_height_conversion() {
+        // R16-F196: verify HEIGHT_SCALE conversion
+        use crate::asset_loader::constants::HEIGHT_SCALE;
+        assert_eq!(
+            16u16 as f32 / HEIGHT_SCALE as f32,
+            1.0,
+            "16 raw height units / HEIGHT_SCALE should equal 1.0 world unit"
+        );
+    }
 }

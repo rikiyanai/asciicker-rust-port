@@ -3,6 +3,7 @@ name = "asciicker-engine"
 version = "0.1.0"
 edition = "2024"
 description = "Asciicker game engine port from C++ to Rust using Bevy"
+build = "build.rs"
 
 [features]
 # Enable for fast iterative development: `cargo run --features dev`
@@ -38,6 +39,8 @@ bevy_kira_audio = "0.25"
 bevy_replicon = "0.39"
 bevy_replicon_renet2 = { version = "0.14", features = ["memory_transport"] }
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+image = { version = "0.25", default-features = false, features = ["png", "gif"] }
 bincode = "=1.3.3"
 
 [dev-dependencies]

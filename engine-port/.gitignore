@@ -1,4 +1,3 @@
 # Binary game assets (local only)
 *.a3d
-node_modules/
-artifacts/testing/
+*.akm

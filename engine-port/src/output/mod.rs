@@ -1,6 +1,8 @@
 pub mod ascii_cell_grid;
+pub mod capture;
 pub mod gpu_plugin;
 pub mod gpu_types;
+pub mod replay;
 pub mod test_pattern;
 
 use bevy::image::ImageLoaderSettings;
@@ -8,7 +10,16 @@ use bevy::prelude::*;
 use bevy::window::{Window, WindowResized};
 
 use ascii_cell_grid::AsciiCellGrid;
+use capture::{VisualCaptureConfig, VisualCaptureState, visual_capture_system};
 use gpu_types::AsciiRenderConfig;
+use replay::{
+    ReplayHarnessConfig, ReplayHarnessState, baseline_apply_replay_system,
+    baseline_auto_start_system, baseline_capture_system, baseline_load_trace_system,
+    baseline_orbit_trigger_system, baseline_variant_overlay_system,
+};
+
+use crate::game::weather::weather_composite_system;
+use crate::render::pipeline::render_pipeline_system;
 
 /// Plugin that sets up the ASCII output pipeline.
 ///
@@ -24,6 +35,10 @@ impl Plugin for AsciiOutputPlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<WindowResized>();
         app.init_resource::<AsciiCellGrid>();
+        app.init_resource::<VisualCaptureConfig>();
+        app.init_resource::<VisualCaptureState>();
+        app.init_resource::<ReplayHarnessConfig>();
+        app.init_resource::<ReplayHarnessState>();
 
         // Load font atlas with is_srgb=false to ensure Rgba8Unorm format (Pitfall 1).
         // This prevents gamma correction artifacts on data textures.
@@ -47,6 +62,28 @@ impl Plugin for AsciiOutputPlugin {
 
         app.add_plugins(gpu_plugin::AsciiGpuPlugin);
         app.add_systems(Startup, spawn_camera);
+        app.add_systems(
+            Update,
+            (
+                baseline_load_trace_system,
+                baseline_auto_start_system,
+                baseline_orbit_trigger_system,
+                baseline_apply_replay_system,
+                visual_capture_system,
+            ),
+        );
+        app.add_systems(
+            PostUpdate,
+            (
+                baseline_variant_overlay_system
+                    .after(render_pipeline_system)
+                    .after(weather_composite_system),
+                baseline_capture_system
+                    .after(baseline_variant_overlay_system)
+                    .after(render_pipeline_system)
+                    .after(weather_composite_system),
+            ),
+        );
         #[cfg(feature = "test_pattern")]
         app.add_systems(
             Update,
@@ -124,4 +161,58 @@ fn compute_grid_dimensions(
     let w = window_width as u32 / font_width;
     let h = window_height as u32 / font_height;
     if w == 0 || h == 0 { None } else { Some((w, h)) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resize_1280x720_with_10x16_font() {
+        // 1280 / 10 = 128, 720 / 16 = 45
+        let result = compute_grid_dimensions(1280.0, 720.0, 10, 16);
+        assert_eq!(result, Some((128, 45)));
+    }
+
+    #[test]
+    fn resize_1920x1080_with_10x16_font() {
+        // 1920 / 10 = 192, 1080 / 16 = 67
+        let result = compute_grid_dimensions(1920.0, 1080.0, 10, 16);
+        assert_eq!(result, Some((192, 67)));
+    }
+
+    #[test]
+    fn resize_zero_width_returns_none() {
+        let result = compute_grid_dimensions(5.0, 720.0, 10, 16);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn resize_zero_height_returns_none() {
+        let result = compute_grid_dimensions(1280.0, 10.0, 10, 16);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn resize_default_2400x2160_with_10x16_font() {
+        // Physical pixel size that produces the default 240x135 grid
+        let result = compute_grid_dimensions(2400.0, 2160.0, 10, 16);
+        assert_eq!(result, Some((240, 135)));
+    }
+
+    #[test]
+    fn resize_retina_2x_1280x720_logical_with_10x16_font() {
+        // 2x Retina: logical 1280x720 → physical 2560x1440
+        // Physical: 2560 / 10 = 256, 1440 / 16 = 90
+        let result = compute_grid_dimensions(2560.0, 1440.0, 10, 16);
+        assert_eq!(result, Some((256, 90)));
+    }
+
+    #[test]
+    fn resize_retina_1_5x_1280x720_logical_with_10x16_font() {
+        // 1.5x scale: logical 1280x720 → physical 1920x1080
+        // Physical: 1920 / 10 = 192, 1080 / 16 = 67
+        let result = compute_grid_dimensions(1920.0, 1080.0, 10, 16);
+        assert_eq!(result, Some((192, 67)));
+    }
 }

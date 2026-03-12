@@ -1,0 +1,33 @@
+{
+  "story": "menu",
+  "updatedAt": "2026-03-09T10:20:34.079Z",
+  "summary": {
+    "status": "passed",
+    "stepCount": 5,
+    "detail": {
+      "baseUrl": "http://127.0.0.1:4173"
+    }
+  },
+  "screenshots": [
+    {
+      "action": "open_url",
+      "fileName": "001-open-url.png"
+    },
+    {
+      "action": "click_element",
+      "fileName": "002-click-element.png"
+    },
+    {
+      "action": "capture_state_playing",
+      "fileName": "003-capture-state-playing.png"
+    },
+    {
+      "action": "click_element",
+      "fileName": "004-click-element.png"
+    },
+    {
+      "action": "capture_camera_panned",
+      "fileName": "005-capture-camera-panned.png"
+    }
+  ]
+}

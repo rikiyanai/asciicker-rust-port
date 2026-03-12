@@ -1,0 +1,37 @@
+{
+  "story": "water",
+  "updatedAt": "2026-03-09T10:20:35.119Z",
+  "summary": {
+    "status": "passed",
+    "stepCount": 6,
+    "detail": {
+      "baseUrl": "http://127.0.0.1:4173"
+    }
+  },
+  "screenshots": [
+    {
+      "action": "open_url",
+      "fileName": "001-open-url.png"
+    },
+    {
+      "action": "click_element",
+      "fileName": "002-click-element.png"
+    },
+    {
+      "action": "click_element",
+      "fileName": "003-click-element.png"
+    },
+    {
+      "action": "capture_water_active",
+      "fileName": "004-capture-water-active.png"
+    },
+    {
+      "action": "click_element",
+      "fileName": "005-click-element.png"
+    },
+    {
+      "action": "capture_water_frame_advanced",
+      "fileName": "006-capture-water-frame-advanced.png"
+    }
+  ]
+}

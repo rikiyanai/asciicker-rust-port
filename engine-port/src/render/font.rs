@@ -41,16 +41,34 @@ struct ColorReplace {
 /// Format: {count=3, src_r,src_g,src_b, dst_r,dst_g,dst_b, ...}
 /// Trailing 0,0 is a C++ sentinel (R14-M03 FIX), ignored.
 const GOLD_RECOLORS: [ColorReplace; 3] = [
-    ColorReplace { src: [85, 85, 85], dst: [255, 255, 85] },
-    ColorReplace { src: [170, 170, 170], dst: [255, 204, 0] },
-    ColorReplace { src: [255, 255, 255], dst: [255, 204, 0] },
+    ColorReplace {
+        src: [85, 85, 85],
+        dst: [255, 255, 85],
+    },
+    ColorReplace {
+        src: [170, 170, 170],
+        dst: [255, 204, 0],
+    },
+    ColorReplace {
+        src: [255, 255, 255],
+        dst: [255, 204, 0],
+    },
 ];
 
 /// Pink skin recolor table (C++ font1.cpp:247-250).
 const PINK_RECOLORS: [ColorReplace; 3] = [
-    ColorReplace { src: [85, 85, 85], dst: [255, 153, 255] },
-    ColorReplace { src: [170, 170, 170], dst: [255, 0, 255] },
-    ColorReplace { src: [255, 255, 255], dst: [255, 51, 255] },
+    ColorReplace {
+        src: [85, 85, 85],
+        dst: [255, 153, 255],
+    },
+    ColorReplace {
+        src: [170, 170, 170],
+        dst: [255, 0, 255],
+    },
+    ColorReplace {
+        src: [255, 255, 255],
+        dst: [255, 51, 255],
+    },
 ];
 
 /// Apply recolor table to a color. Returns the replacement if matched,
@@ -116,20 +134,19 @@ impl Font1 {
     ///
     /// P7-207 FIX: Uses u32 parameters matching AsciiCellGrid::set_cell.
     /// Out-of-bounds coordinates are silently ignored (boundary safety).
-    pub fn paint_char(
-        &self,
-        grid: &mut AsciiCellGrid,
-        x: u32,
-        y: u32,
-        ch: u8,
-        skin: FontSkin,
-    ) {
+    pub fn paint_char(&self, grid: &mut AsciiCellGrid, x: u32, y: u32, ch: u8, skin: FontSkin) {
         if x >= grid.width || y >= grid.height {
             return; // boundary safety
         }
         let fg = self.fg_color(skin);
         let bg = self.bg_color(skin);
-        grid.set_cell(x, y, ch as u16, [fg[0], fg[1], fg[2], 255], [bg[0], bg[1], bg[2], 255]);
+        grid.set_cell(
+            x,
+            y,
+            ch as u16,
+            [fg[0], fg[1], fg[2], 255],
+            [bg[0], bg[1], bg[2], 255],
+        );
     }
 
     /// Paint a string to the grid starting at (x, y), left-to-right.
@@ -155,6 +172,15 @@ impl Font1 {
         }
     }
 
+    /// Paint a string centered on the current grid width.
+    pub fn paint_centered(&self, grid: &mut AsciiCellGrid, y: u32, text: &str, skin: FontSkin) {
+        if y >= grid.height {
+            return;
+        }
+        let start_x = (grid.width.saturating_sub(Self::measure_string(text))) / 2;
+        self.paint_string(grid, start_x, y, text, skin);
+    }
+
     /// Measure the width of a string in cells.
     ///
     /// Each byte = 1 cell (CP437 is a fixed-width encoding).
@@ -166,3 +192,146 @@ impl Font1 {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_grid() -> AsciiCellGrid {
+        AsciiCellGrid::new(80, 25)
+    }
+
+    #[test]
+    fn test_paint_char_writes_correct_glyph() {
+        let font = Font1::default();
+        let mut grid = make_grid();
+        font.paint_char(&mut grid, 5, 3, b'A', FontSkin::Grey);
+        let (ch, _, _) = grid.cell_at(5, 3);
+        assert_eq!(ch, b'A' as u16, "Should write glyph 'A'");
+    }
+
+    #[test]
+    fn test_paint_string_writes_correct_indices() {
+        let font = Font1::default();
+        let mut grid = make_grid();
+        font.paint_string(&mut grid, 0, 0, "Hello", FontSkin::Grey);
+
+        assert_eq!(grid.cell_at(0, 0).0, b'H' as u16);
+        assert_eq!(grid.cell_at(1, 0).0, b'e' as u16);
+        assert_eq!(grid.cell_at(2, 0).0, b'l' as u16);
+        assert_eq!(grid.cell_at(3, 0).0, b'l' as u16);
+        assert_eq!(grid.cell_at(4, 0).0, b'o' as u16);
+    }
+
+    #[test]
+    fn test_measure_string_returns_length() {
+        assert_eq!(Font1::measure_string("Hello"), 5);
+        assert_eq!(Font1::measure_string(""), 0);
+        assert_eq!(Font1::measure_string("A"), 1);
+    }
+
+    #[test]
+    fn test_grey_skin_uses_terminal_default() {
+        let font = Font1::default();
+        let mut grid = make_grid();
+        font.paint_char(&mut grid, 0, 0, b'X', FontSkin::Grey);
+        let (_, fg, _) = grid.cell_at(0, 0);
+        // Grey skin: default_fg = [170, 170, 170]
+        assert_eq!(
+            fg,
+            [170, 170, 170, 255],
+            "Grey skin should use terminal default fg"
+        );
+    }
+
+    #[test]
+    fn test_gold_skin_fg_color() {
+        // R16-F208 FIX: Concrete color assertion
+        let font = Font1::default();
+        let mut grid = make_grid();
+        font.paint_char(&mut grid, 0, 0, b'X', FontSkin::Gold);
+        let (_, fg, _) = grid.cell_at(0, 0);
+        // default_fg [170,170,170] matches Gold recolor src -> dst [255, 204, 0]
+        assert_eq!(
+            fg,
+            [255, 204, 0, 255],
+            "Gold skin should recolor to [255, 204, 0]"
+        );
+    }
+
+    #[test]
+    fn test_pink_skin_fg_color() {
+        // R16-F208 FIX: Concrete color assertion
+        let font = Font1::default();
+        let mut grid = make_grid();
+        font.paint_char(&mut grid, 0, 0, b'X', FontSkin::Pink);
+        let (_, fg, _) = grid.cell_at(0, 0);
+        // default_fg [170,170,170] matches Pink recolor src -> dst [255, 0, 255]
+        assert_eq!(
+            fg,
+            [255, 0, 255, 255],
+            "Pink skin should recolor to [255, 0, 255]"
+        );
+    }
+
+    #[test]
+    fn test_skins_have_different_colors() {
+        let font = Font1::default();
+        let grey_fg = font.fg_color(FontSkin::Grey);
+        let gold_fg = font.fg_color(FontSkin::Gold);
+        let pink_fg = font.fg_color(FontSkin::Pink);
+        assert_ne!(grey_fg, gold_fg, "Grey and Gold should have different fg");
+        assert_ne!(grey_fg, pink_fg, "Grey and Pink should have different fg");
+        assert_ne!(gold_fg, pink_fg, "Gold and Pink should have different fg");
+    }
+
+    #[test]
+    fn test_boundary_safety_does_not_panic() {
+        let font = Font1::default();
+        let mut grid = make_grid();
+        // Out-of-bounds -- should not panic
+        font.paint_char(&mut grid, 80, 0, b'X', FontSkin::Grey);
+        font.paint_char(&mut grid, 0, 25, b'X', FontSkin::Grey);
+        font.paint_char(&mut grid, 100, 100, b'X', FontSkin::Grey);
+    }
+
+    #[test]
+    fn test_paint_string_clips_at_edge() {
+        let font = Font1::default();
+        let mut grid = AsciiCellGrid::new(5, 1);
+        font.paint_string(&mut grid, 3, 0, "Hello", FontSkin::Grey);
+        // Only 'H' and 'e' should be written (positions 3, 4)
+        assert_eq!(grid.cell_at(3, 0).0, b'H' as u16);
+        assert_eq!(grid.cell_at(4, 0).0, b'e' as u16);
+    }
+
+    #[test]
+    fn test_paint_string_clips_y_out_of_bounds() {
+        let font = Font1::default();
+        let mut grid = make_grid();
+        // y=25 is out of bounds (grid height=25, max index=24)
+        font.paint_string(&mut grid, 0, 25, "Hello", FontSkin::Grey);
+        // Should not panic; grid unchanged at row 24
+        let (ch, _, _) = grid.cell_at(0, 24);
+        assert_eq!(ch, 32, "Should not have written to last valid row");
+    }
+
+    #[test]
+    fn test_paint_centered_places_text_mid_grid() {
+        let font = Font1::default();
+        let mut grid = make_grid();
+        font.paint_centered(&mut grid, 1, "ABC", FontSkin::Grey);
+
+        let start_x = (grid.width - 3) / 2;
+        assert_eq!(grid.cell_at(start_x, 1).0, b'A' as u16);
+        assert_eq!(grid.cell_at(start_x + 1, 1).0, b'B' as u16);
+        assert_eq!(grid.cell_at(start_x + 2, 1).0, b'C' as u16);
+    }
+
+    #[test]
+    fn test_font_skin_enum_values() {
+        assert_eq!(FontSkin::Grey as u8, 0);
+        assert_eq!(FontSkin::Gold as u8, 1);
+        assert_eq!(FontSkin::Pink as u8, 2);
+    }
+}

@@ -8,8 +8,8 @@
 use crate::asset_loader::constants::{HEIGHT_CELLS, HEIGHT_SCALE, VISUAL_CELLS};
 use crate::render::camera::GameCamera;
 use crate::render::math::transform_vertex;
-use crate::render::rasterizer::{RasterShader, rasterize};
-use crate::render::sample_buffer::Sample;
+use crate::render::rasterizer::{RasterShader, bresenham, rasterize};
+use crate::render::sample_buffer::{Sample, spare_bits};
 use crate::terrain::patch_runtime::RuntimePatch;
 
 /// Default light direction `[lx, ly, lz, ambient]`.
@@ -104,6 +104,7 @@ pub fn render_patch(
     patch_y: i32,
     camera: &GameCamera,
     water_z: Option<f32>,
+    draw_grid_cross: bool,
 ) {
     let view_tm = &camera.view_tm;
 
@@ -277,5 +278,393 @@ pub fn render_patch(
                 }
             }
         }
+    }
+
+    if draw_grid_cross {
+        draw_patch_grid_cross(buf, buf_w, buf_h, patch, patch_x, patch_y, camera, view_tm);
+    }
+}
+
+fn project_patch_vertex(
+    wx: f64,
+    wy: f64,
+    wz: f64,
+    camera: &GameCamera,
+    view_tm: &[f64; 16],
+    buf_w: i32,
+    buf_h: i32,
+) -> Option<[i32; 3]> {
+    if camera.perspective {
+        let eye_x = wx as f32 - camera.view_pos[0];
+        let eye_y = wy as f32 - camera.view_pos[1];
+        let eye_z = wz as f32 - camera.view_pos[2];
+        let viewer_dist =
+            eye_x * camera.view_dir[0] + eye_y * camera.view_dir[1] + eye_z * camera.view_dir[2];
+        if viewer_dist <= 0.0 {
+            return None;
+        }
+
+        let recp_dist = 1.0 / viewer_dist;
+        let fx = (camera.mul[0] * wx + camera.mul[2] * wy) as f32 * recp_dist;
+        let fy = (camera.mul[1] * wx + camera.mul[3] * wy + camera.mul[5] * wz) as f32 * recp_dist;
+        let qx = (camera.add[0] as f32 - camera.view_ofs[0]) * recp_dist + camera.view_ofs[0];
+        let qy = (camera.add[1] as f32 - camera.view_ofs[1]) * recp_dist + camera.view_ofs[1];
+        let sx = (fx + qx + 0.5).floor() as i32;
+        let sy = (fy + qy + 0.5).floor() as i32;
+        if sx < -1 || sx > buf_w + 1 || sy < -1 || sy > buf_h + 1 {
+            return None;
+        }
+        Some([sx, sy, wz.floor() as i32])
+    } else {
+        let v = transform_vertex([wx, wy, wz], view_tm);
+        if v[0] < -1 || v[0] > buf_w + 1 || v[1] < -1 || v[1] > buf_h + 1 {
+            return None;
+        }
+        Some([v[0], v[1], v[2]])
+    }
+}
+
+fn draw_patch_grid_cross(
+    buf: &mut [Sample],
+    buf_w: i32,
+    buf_h: i32,
+    patch: &RuntimePatch,
+    patch_x: i32,
+    patch_y: i32,
+    camera: &GameCamera,
+    view_tm: &[f64; 16],
+) {
+    let mid = HEIGHT_CELLS / 2;
+    let lift = HEIGHT_SCALE as f64 * 0.5;
+
+    let world_vertex = |vx: usize, vy: usize| -> (f64, f64, f64) {
+        (
+            (patch_x * HEIGHT_CELLS as i32 + vx as i32 * VISUAL_CELLS as i32) as f64,
+            (patch_y * HEIGHT_CELLS as i32 + vy as i32 * VISUAL_CELLS as i32) as f64,
+            patch.height[vy][vx] as f64 + lift,
+        )
+    };
+
+    let (hx0, hy0, hz0) = world_vertex(0, mid);
+    let (hx1, hy1, hz1) = world_vertex(HEIGHT_CELLS, mid);
+    let (vx0, vy0, vz0) = world_vertex(mid, 0);
+    let (vx1, vy1, vz1) = world_vertex(mid, HEIGHT_CELLS);
+
+    if let (Some(from), Some(to)) = (
+        project_patch_vertex(hx0, hy0, hz0, camera, view_tm, buf_w, buf_h),
+        project_patch_vertex(hx1, hy1, hz1, camera, view_tm, buf_w, buf_h),
+    ) {
+        bresenham(buf, buf_w, buf_h, from, to, spare_bits::GRID);
+    }
+
+    if let (Some(from), Some(to)) = (
+        project_patch_vertex(vx0, vy0, vz0, camera, view_tm, buf_w, buf_h),
+        project_patch_vertex(vx1, vy1, vz1, camera, view_tm, buf_w, buf_h),
+    ) {
+        bresenham(buf, buf_w, buf_h, from, to, spare_bits::GRID);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::asset_loader::a3d_terrain::TerrainPatch;
+    use crate::asset_loader::constants::{HEIGHT_CELLS_PLUS_ONE, VISUAL_CELLS};
+    use crate::render::sample_buffer::spare_bits;
+    use crate::terrain::patch_runtime::RuntimePatch;
+
+    /// Create a flat test patch at given height.
+    fn make_flat_patch(base_height: u16) -> RuntimePatch {
+        let tp = TerrainPatch {
+            x: 0,
+            y: 0,
+            height: [[base_height; HEIGHT_CELLS_PLUS_ONE]; HEIGHT_CELLS_PLUS_ONE],
+            visual: [[1u16; VISUAL_CELLS]; VISUAL_CELLS],
+            diag: 0,
+        };
+        RuntimePatch::from_terrain_patch(&tp)
+    }
+
+    /// Create a simple identity-like view matrix that maps world coords
+    /// to sample buffer coords with offset for the 2-pixel border.
+    /// Buffer must be >= 48x48 to hold a patch at (0,0) with C++ vertex scaling
+    /// (vertices span 0..32 + offset 4 = 4..36).
+    fn make_test_view_tm() -> [f64; 16] {
+        let mut tm = [0.0f64; 16];
+        tm[0] = 1.0; // x -> screen x
+        tm[5] = 1.0; // y -> screen y
+        tm[10] = 1.0; // z -> screen z
+        tm[15] = 1.0;
+        tm[12] = 4.0; // offset to stay within buffer
+        tm[13] = 4.0;
+        tm
+    }
+
+    /// Create a non-perspective camera with a test view matrix.
+    /// Used by existing tests that don't need perspective projection.
+    fn make_test_camera() -> GameCamera {
+        let tm = make_test_view_tm();
+        GameCamera {
+            perspective: false,
+            view_tm: tm,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_terrain_shader_writes_material_index() {
+        let mut sample = Sample::clear_state();
+        let shader = TerrainShader {
+            material_index: 42,
+            diffuse_base: 200,
+            water_z: None,
+        };
+        shader.blend(&mut sample, 100.0, [0.33, 0.33, 0.34]);
+
+        assert_eq!(sample.visual, 42, "Should write material index");
+        assert_eq!(sample.diffuse, 200, "Should write diffuse");
+        assert_eq!(sample.spare, 0, "Terrain must have spare=0 (no MESH_FLAG)");
+        assert_eq!(sample.height, 100.0, "Should write depth");
+    }
+
+    #[test]
+    fn test_terrain_shader_depth_test() {
+        // Write an initial fragment (via CLEAR_HEIGHT path)
+        let mut sample = Sample::clear_state();
+        let shader_low = TerrainShader {
+            material_index: 10,
+            diffuse_base: 200,
+            water_z: None,
+        };
+        shader_low.blend(&mut sample, 50.0, [0.33, 0.33, 0.34]);
+        assert_eq!(sample.visual, 10);
+
+        // Write a HIGHER z fragment -- SHOULD overwrite (higher = on top in Z-up world)
+        let shader_high = TerrainShader {
+            material_index: 20,
+            diffuse_base: 100,
+            water_z: None,
+        };
+        shader_high.blend(&mut sample, 200.0, [0.33, 0.33, 0.34]);
+        assert_eq!(
+            sample.visual, 20,
+            "Higher z fragment should overwrite lower (on top in Z-up)"
+        );
+
+        // Write a LOWER z fragment -- should NOT overwrite
+        let shader_below = TerrainShader {
+            material_index: 30,
+            diffuse_base: 255,
+            water_z: None,
+        };
+        shader_below.blend(&mut sample, 25.0, [0.33, 0.33, 0.34]);
+        assert_eq!(
+            sample.visual, 20,
+            "Lower z fragment should not overwrite higher (underneath in Z-up)"
+        );
+    }
+
+    #[test]
+    fn test_render_patch_produces_samples() {
+        // Create a flat patch at height=0
+        let patch = make_flat_patch(0);
+        let camera = make_test_camera();
+
+        // Buffer large enough to hold the projected patch
+        let buf_w = 48;
+        let buf_h = 48;
+        let mut buf = vec![Sample::clear_state(); (buf_w * buf_h) as usize];
+
+        render_patch(&mut buf, buf_w, buf_h, &patch, 0, 0, &camera, None, true);
+
+        // Count non-clear samples
+        let non_clear = buf
+            .iter()
+            .filter(|s| s.height != Sample::CLEAR_HEIGHT)
+            .count();
+
+        // R16-F188 FIX: For a flat 8x8 patch, we expect at least
+        // VISUAL_CELLS * VISUAL_CELLS = 64 non-clear samples
+        assert!(
+            non_clear >= VISUAL_CELLS * VISUAL_CELLS,
+            "Expected at least {} non-clear samples, got {}",
+            VISUAL_CELLS * VISUAL_CELLS,
+            non_clear
+        );
+    }
+
+    #[test]
+    fn test_render_patch_material_mapping() {
+        // Create a patch with distinct materials
+        let tp = TerrainPatch {
+            x: 0,
+            y: 0,
+            height: [[0u16; HEIGHT_CELLS_PLUS_ONE]; HEIGHT_CELLS_PLUS_ONE],
+            visual: {
+                let mut v = [[0u16; VISUAL_CELLS]; VISUAL_CELLS];
+                v[0][0] = 5;
+                v[3][3] = 10;
+                v[7][7] = 15;
+                v
+            },
+            diag: 0,
+        };
+        let patch = RuntimePatch::from_terrain_patch(&tp);
+        let camera = make_test_camera();
+
+        let buf_w = 48;
+        let buf_h = 48;
+        let mut buf = vec![Sample::clear_state(); (buf_w * buf_h) as usize];
+
+        render_patch(&mut buf, buf_w, buf_h, &patch, 0, 0, &camera, None, true);
+
+        // Collect all unique visual values from non-clear samples
+        let visuals: std::collections::HashSet<u16> = buf
+            .iter()
+            .filter(|s| s.height != Sample::CLEAR_HEIGHT)
+            .map(|s| s.visual)
+            .collect();
+
+        // Should contain the materials we set
+        assert!(
+            visuals.contains(&5),
+            "Should contain material 5, found: {:?}",
+            visuals
+        );
+        assert!(
+            visuals.contains(&10),
+            "Should contain material 10, found: {:?}",
+            visuals
+        );
+        assert!(
+            visuals.contains(&15),
+            "Should contain material 15, found: {:?}",
+            visuals
+        );
+    }
+
+    #[test]
+    fn test_render_patch_shadow_modulates_diffuse() {
+        // Create a patch with shadow on some cells
+        let tp = TerrainPatch {
+            x: 0,
+            y: 0,
+            height: [[0u16; HEIGHT_CELLS_PLUS_ONE]; HEIGHT_CELLS_PLUS_ONE],
+            visual: [[1u16; VISUAL_CELLS]; VISUAL_CELLS],
+            diag: 0,
+        };
+        let mut patch = RuntimePatch::from_terrain_patch(&tp);
+        // Set shadow on cell (0,0): bit 0
+        patch.dark = 1;
+
+        let camera = make_test_camera();
+        let buf_w = 48;
+        let buf_h = 48;
+        let mut buf = vec![Sample::clear_state(); (buf_w * buf_h) as usize];
+
+        render_patch(&mut buf, buf_w, buf_h, &patch, 0, 0, &camera, None, true);
+
+        // Collect diffuse values from non-clear samples
+        let diffuse_values: std::collections::HashSet<u8> = buf
+            .iter()
+            .filter(|s| s.height != Sample::CLEAR_HEIGHT)
+            .map(|s| s.diffuse)
+            .collect();
+
+        // Should have both full diffuse (0xFF) and half diffuse (0xFF/2 = 127)
+        assert!(
+            diffuse_values.contains(&0xFF),
+            "Should have full diffuse for unshadowed cells"
+        );
+        assert!(
+            diffuse_values.contains(&(0xFF / 2)),
+            "Should have half diffuse for shadowed cells, found: {:?}",
+            diffuse_values
+        );
+    }
+
+    #[test]
+    fn test_terrain_shader_no_mesh_flag() {
+        // Verify that terrain samples never have MESH_FLAG
+        let patch = make_flat_patch(100);
+        let camera = make_test_camera();
+        let buf_w = 48;
+        let buf_h = 48;
+        let mut buf = vec![Sample::clear_state(); (buf_w * buf_h) as usize];
+
+        render_patch(&mut buf, buf_w, buf_h, &patch, 0, 0, &camera, None, true);
+
+        for s in &buf {
+            if s.height != Sample::CLEAR_HEIGHT {
+                assert_eq!(
+                    s.spare & spare_bits::MESH_FLAG,
+                    0,
+                    "Terrain samples must NOT have MESH_FLAG"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_render_patch_with_real_camera_tm() {
+        // Reproduce the exact runtime scenario: camera at pos=[0,15,0], yaw=45°,
+        // buffer 516x184, rendering patch at grid (0,15).
+        use crate::render::camera::GameCamera;
+
+        let mut camera = GameCamera {
+            pos: [0.0, 15.0, 0.0],
+            yaw: 45.0,
+            zoom: 1.0,
+            perspective: true,
+            ..Default::default()
+        };
+        camera.update(516.0, 184.0);
+
+        let patch = make_flat_patch(100); // flat at height 100
+        let buf_w: i32 = 516;
+        let buf_h: i32 = 184;
+        let mut buf = vec![Sample::clear_state(); (buf_w * buf_h) as usize];
+
+        // Render patch at grid (0, 15) — near the camera
+        render_patch(&mut buf, buf_w, buf_h, &patch, 0, 15, &camera, None, true);
+
+        let non_clear = buf
+            .iter()
+            .filter(|s| s.height != Sample::CLEAR_HEIGHT)
+            .count();
+
+        // Debug: print first 4 sub-quad vertices
+        let hc = HEIGHT_CELLS;
+        let vc = VISUAL_CELLS;
+        let base_x = (0 * hc as i32 + 0 * vc as i32) as f64;
+        let base_y = (15 * hc as i32 + 0 * vc as i32) as f64;
+        let sv00 = transform_vertex([base_x, base_y, 100.0], &camera.view_tm);
+        let sv10 = transform_vertex([base_x + 4.0, base_y, 100.0], &camera.view_tm);
+        let sv01 = transform_vertex([base_x, base_y + 4.0, 100.0], &camera.view_tm);
+        eprintln!(
+            "TEST: base=({},{}) sv00=({},{},{}) sv10=({},{},{}) sv01=({},{},{})",
+            base_x,
+            base_y,
+            sv00[0],
+            sv00[1],
+            sv00[2],
+            sv10[0],
+            sv10[1],
+            sv10[2],
+            sv01[0],
+            sv01[1],
+            sv01[2],
+        );
+        let area = 2
+            * ((sv10[0] - sv00[0]) * (sv01[1] - sv00[1])
+                - (sv10[1] - sv00[1]) * (sv01[0] - sv00[0]));
+        eprintln!("TEST: triangle area={}, non_clear={}", area, non_clear);
+
+        assert!(
+            non_clear > 0,
+            "Patch at (0,15) with real camera should produce samples, got {} non-clear out of {}",
+            non_clear,
+            buf.len()
+        );
     }
 }

@@ -112,3 +112,32 @@ pub fn handle_player_disconnect(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_connected_players_add_remove() {
+        let mut players = ConnectedPlayers::default();
+        let id = Entity::from_bits(1);
+
+        assert_eq!(players.count(), 0);
+        assert!(!players.contains(&id));
+
+        players.add(id, "TestPlayer".to_string());
+        assert_eq!(players.count(), 1);
+        assert!(players.contains(&id));
+
+        let name = players.remove(&id);
+        assert_eq!(name, Some("TestPlayer".to_string()));
+        assert_eq!(players.count(), 0);
+        assert!(!players.contains(&id));
+    }
+
+    #[test]
+    fn test_connected_players_default() {
+        let players = ConnectedPlayers::default();
+        assert_eq!(players.count(), 0);
+    }
+}

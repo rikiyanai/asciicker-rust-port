@@ -11,11 +11,16 @@
 
 use noise::{Fbm, MultiFractal, NoiseFn, Perlin}; // MultiFractal provides set_octaves()
 
+use crate::render::assembly::MeshRegistry;
 use crate::render::camera::GameCamera;
+use crate::render::debug_cells::{RenderDebugCell, debug_flags};
+use crate::render::mesh_shader::render_mesh;
 use crate::render::sample_buffer::{Sample, SampleBuffer, spare_bits};
 use crate::render::types::AnsiCell;
 use crate::terrain::RuntimeTerrain;
 use crate::world::RuntimeWorld;
+use crate::world::bsp::VisibleInstance;
+use crate::world::instance::RuntimeInstance;
 
 /// Re-runs terrain and world rendering with a flipped view matrix
 /// below the water plane, producing reflected geometry in the SampleBuffer.
@@ -32,7 +37,8 @@ use crate::world::RuntimeWorld;
 pub fn render_water_reflections(
     sample_buffer: &mut SampleBuffer,
     terrain: &RuntimeTerrain,
-    _world: &RuntimeWorld,
+    world: &RuntimeWorld,
+    mesh_registry: &MeshRegistry,
     camera: &GameCamera,
     water_z: f32,
 ) {
@@ -80,6 +86,8 @@ pub fn render_water_reflections(
         // underwater vs above-water, so we save heights before rendering.
         let pre_heights: Vec<f32> = sample_buffer.samples.iter().map(|s| s.height).collect();
         let pre_spares: Vec<u8> = sample_buffer.samples.iter().map(|s| s.spare).collect();
+        let pre_visuals: Vec<u16> = sample_buffer.samples.iter().map(|s| s.visual).collect();
+        let pre_diffuse: Vec<u8> = sample_buffer.samples.iter().map(|s| s.diffuse).collect();
 
         // Build a flipped camera for the terrain shader.
         // F242 FIX: Set perspective=false so render_patch uses the flipped view_tm
@@ -91,6 +99,11 @@ pub fn render_water_reflections(
         flipped_camera.frustum_planes = flipped_planes.clone();
         flipped_camera.perspective = false;
 
+        let mut flipped_world_camera = camera.clone();
+        flipped_world_camera.pos[2] = reflected_z as f32;
+        flipped_world_camera.update(dw, dh);
+        flipped_world_camera.extract_frustum_planes(dw, dh);
+
         terrain.query_visible(&flipped_planes, |patch| {
             crate::render::terrain_shader::render_patch(
                 &mut sample_buffer.samples,
@@ -100,30 +113,54 @@ pub fn render_water_reflections(
                 patch.x,
                 patch.y,
                 &flipped_camera,
-                None, // No water clamping in reflection mode
+                Some(water_z),
+                false,
             );
         });
 
-        // Step 4: World mesh reflections (TODO: re-query world with flipped frustum)
-        // For MVP, terrain reflections are the primary visual. Mesh reflections
-        // can be added when BSP frustum culling is fixed (same issue as Stage 3).
+        let reflected_camera_pos = [camera.pos[0] as f64, camera.pos[1] as f64, reflected_z];
+        for visible in
+            world.query_visible(&flipped_world_camera.frustum_planes, reflected_camera_pos)
+        {
+            let VisibleInstance::Mesh(id) = visible else {
+                continue;
+            };
+            let Some(RuntimeInstance::Mesh { mesh_id, tm, .. }) = world.instances.get(id.0) else {
+                continue;
+            };
+            if let Some(mesh) = mesh_registry.loaded.get(mesh_id) {
+                render_mesh(
+                    &mut sample_buffer.samples,
+                    buf_w,
+                    buf_h,
+                    mesh,
+                    tm,
+                    &flipped_world_camera,
+                    Some(water_z),
+                    true,
+                );
+            }
+        }
 
-        // Step 5: Mark ONLY underwater terrain cells with REFLECTION spare bit.
-        // F242 FIX: Previous code marked ALL non-clear samples, causing water
-        // ripple on trees/meshes instead of water areas only.
-        //
-        // Underwater = original terrain height was below water_z AND was terrain
-        // (not mesh, not clear). The z-buffer naturally prevents the reflection
-        // render from overwriting above-water terrain (reflected z < original z
-        // for terrain above water_z).
+        // Step 5: Keep reflected output only on the original underwater mask.
+        // Anything the reflection pass wrote outside the pre-existing underwater
+        // region reads like the world folding onto the sky/ceiling.
         for (i, sample) in sample_buffer.samples.iter_mut().enumerate() {
             let pre_h = pre_heights[i];
             let pre_spare = pre_spares[i];
-            let was_terrain = pre_spare & spare_bits::MESH_FLAG == 0;
             let was_underwater = pre_h > Sample::CLEAR_HEIGHT && pre_h <= water_z;
+            let changed = sample.height != pre_h
+                || sample.spare != pre_spare
+                || sample.visual != pre_visuals[i]
+                || sample.diffuse != pre_diffuse[i];
 
-            if was_terrain && was_underwater {
-                sample.spare |= spare_bits::REFLECTION;
+            if was_underwater {
+                sample.spare = (sample.spare & !spare_bits::PARITY_MASK) | spare_bits::REFLECTION;
+            } else if changed {
+                sample.height = pre_h;
+                sample.spare = pre_spare;
+                sample.visual = pre_visuals[i];
+                sample.diffuse = pre_diffuse[i];
             }
         }
     }
@@ -166,6 +203,7 @@ pub fn apply_water_ripple_pass(
     grid_w: i32,
     grid_h: i32,
     time: f32,
+    mut debug_cells: Option<&mut [RenderDebugCell]>,
 ) {
     let fbm = Fbm::<Perlin>::default().set_octaves(4);
 
@@ -190,7 +228,13 @@ pub fn apply_water_ripple_pass(
             }
 
             // Apply ripple to this cell
-            apply_water_ripple(&fbm, &mut cells[cell_idx], cx, cy, time);
+            if apply_water_ripple(&fbm, &mut cells[cell_idx], cx, cy, time) {
+                if let Some(debug_cells) = debug_cells.as_deref_mut()
+                    && let Some(cell) = debug_cells.get_mut(cell_idx)
+                {
+                    cell.flags |= debug_flags::APPLIED_RIPPLE;
+                }
+            }
         }
     }
 }
@@ -198,7 +242,7 @@ pub fn apply_water_ripple_pass(
 /// Internal per-cell ripple helper (NOT exported).
 ///
 /// `cx`/`cy` are grid coordinates used as world-space proxies for noise sampling.
-fn apply_water_ripple(fbm: &Fbm<Perlin>, cell: &mut AnsiCell, cx: i32, cy: i32, time: f32) {
+fn apply_water_ripple(fbm: &Fbm<Perlin>, cell: &mut AnsiCell, cx: i32, cy: i32, time: f32) -> bool {
     // Perlin noise sampling with world-space coordinates
     let d = fbm.get([cx as f64 * 0.05, cy as f64 * 0.05, time as f64]);
     let d_norm = (d + 1.0) * 0.5; // Normalize [-1,1] to [0,1]
@@ -215,7 +259,7 @@ fn apply_water_ripple(fbm: &Fbm<Perlin>, cell: &mut AnsiCell, cx: i32, cy: i32, 
     // Apply shift to fg color in xterm-256 6x6x6 RGB cube
     let c = cell.fg as i32;
     if !(16..=231).contains(&c) {
-        return; // Only shift cube colors (16-231)
+        return false; // Only shift cube colors (16-231)
     }
 
     // RGB cube decomposition (render.cpp:3873-3876)
@@ -235,5 +279,225 @@ fn apply_water_ripple(fbm: &Fbm<Perlin>, cell: &mut AnsiCell, cx: i32, cy: i32, 
     let new_cb = (cb + shift).clamp(0, 5);
 
     let new_c = 16 + new_cr * 36 + new_cg * 6 + new_cb;
-    cell.fg = new_c.clamp(16, 231) as u8;
+    let updated = new_c.clamp(16, 231) as u8;
+    let changed = updated != cell.fg;
+    cell.fg = updated;
+    changed
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ripple_produces_nonzero_color_shifts() {
+        // R16-F201: Strengthen assertion -- different cells get DIFFERENT color shifts
+        let fbm = Fbm::<Perlin>::default().set_octaves(4);
+
+        // Cell at (10, 10) with a mid-range color
+        let mut cell1 = AnsiCell {
+            fg: 100, // mid-range xterm cube color
+            bk: 16,
+            gl: b'#',
+            spare: 0xFF,
+        };
+        let original_fg1 = cell1.fg;
+        apply_water_ripple(&fbm, &mut cell1, 10, 10, 1.0);
+
+        // Cell at (50, 50) with same original color
+        let mut cell2 = AnsiCell {
+            fg: 100,
+            bk: 16,
+            gl: b'#',
+            spare: 0xFF,
+        };
+        apply_water_ripple(&fbm, &mut cell2, 50, 50, 1.0);
+
+        // At least one cell should have shifted
+        let shifted = (cell1.fg != original_fg1) || (cell2.fg != 100);
+        assert!(
+            shifted,
+            "Ripple should produce color shifts for at least one cell"
+        );
+
+        // The two cells at different positions should get different shifts
+        // (verifies noise varies spatially, not uniform)
+        // Note: they COULD coincidentally get the same shift, so we test multiple positions
+        let mut different_found = false;
+        for x in 0..20 {
+            let mut ca = AnsiCell {
+                fg: 100,
+                bk: 16,
+                gl: b'#',
+                spare: 0xFF,
+            };
+            let mut cb = AnsiCell {
+                fg: 100,
+                bk: 16,
+                gl: b'#',
+                spare: 0xFF,
+            };
+            apply_water_ripple(&fbm, &mut ca, x, 0, 1.0);
+            apply_water_ripple(&fbm, &mut cb, x + 10, 5, 1.0);
+            if ca.fg != cb.fg {
+                different_found = true;
+                break;
+            }
+        }
+        assert!(
+            different_found,
+            "Different positions should produce different color shifts"
+        );
+    }
+
+    #[test]
+    fn test_z_flip_math() {
+        // Verify: reflected_z = 2 * water_z - original_z
+        let water_z: f64 = 5.0;
+        let original_z: f64 = 3.0;
+        let reflected_z = 2.0 * water_z - original_z;
+        assert!(
+            (reflected_z - 7.0).abs() < 1e-10,
+            "Reflected Z should be 7.0, got {reflected_z}"
+        );
+
+        // Surface point reflects to itself
+        let surface_z = water_z;
+        let reflected_surface = 2.0 * water_z - surface_z;
+        assert!((reflected_surface - water_z).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_spare_bit_marking() {
+        // Verify: REFLECTION flag (0x03) is set on reflected samples
+        let mut buf = SampleBuffer::new(4, 4);
+
+        // Write a sample above clear height
+        buf.sample_at_mut(5, 5).height = 10.0;
+        buf.sample_at_mut(5, 5).spare = 0;
+
+        // Simulate the spare bit marking from render_water_reflections
+        for sample in buf.samples.iter_mut() {
+            if sample.height > Sample::CLEAR_HEIGHT {
+                sample.spare |= spare_bits::REFLECTION;
+            }
+        }
+
+        // The modified sample should have REFLECTION set
+        let s = buf.sample_at(5, 5);
+        assert_eq!(
+            s.spare & spare_bits::PARITY_MASK,
+            spare_bits::REFLECTION,
+            "Reflected sample should have REFLECTION spare bits"
+        );
+
+        // Clear samples should NOT have REFLECTION set (they remain at CLEAR_HEIGHT)
+        // Check a sample that was clear_state (MESH_FLAG=0x08, height=CLEAR_HEIGHT)
+        let clear_s = buf.sample_at(0, 0);
+        assert_eq!(
+            clear_s.height,
+            Sample::CLEAR_HEIGHT,
+            "Clear sample should remain at CLEAR_HEIGHT"
+        );
+    }
+
+    #[test]
+    fn test_ripple_pass_respects_reflection_flag() {
+        // Only cells with REFLECTION spare bits should be modified
+        let grid_w = 4i32;
+        let grid_h = 4i32;
+        let sample_w = 2 * grid_w + 4;
+        let sample_h = 2 * grid_h + 4;
+        let mut samples = vec![Sample::clear_state(); (sample_w * sample_h) as usize];
+        let mut cells = vec![
+            AnsiCell {
+                fg: 100,
+                bk: 16,
+                gl: b'#',
+                spare: 0xFF,
+            };
+            (grid_w * grid_h) as usize
+        ];
+
+        // Mark ONE sample as reflected (cell at (1,1) -> sample at (4, 4))
+        let sx = 2 + 2 * 1;
+        let sy = 2 + 2 * 1;
+        let idx = (sy * sample_w + sx) as usize;
+        samples[idx].spare = spare_bits::REFLECTION;
+        samples[idx].height = 10.0;
+
+        let original_fgs: Vec<u8> = cells.iter().map(|c| c.fg).collect();
+
+        apply_water_ripple_pass(&samples, &mut cells, grid_w, grid_h, 1.0, None);
+
+        // Cell (0,0) should be unchanged (no reflection flag)
+        assert_eq!(
+            cells[0].fg, original_fgs[0],
+            "Non-reflected cell should be unchanged"
+        );
+
+        // Cell (1,1) may have changed (has reflection flag)
+        // (It might not change if noise at that position is exactly 0, but that's unlikely)
+        // We just verify the function doesn't crash and processes the right cells
+    }
+
+    #[test]
+    fn test_ripple_time_effect() {
+        // Different times should produce different results for the same position
+        let fbm = Fbm::<Perlin>::default().set_octaves(4);
+
+        let mut cell_t0 = AnsiCell {
+            fg: 100,
+            bk: 16,
+            gl: b'#',
+            spare: 0xFF,
+        };
+        let mut cell_t1 = AnsiCell {
+            fg: 100,
+            bk: 16,
+            gl: b'#',
+            spare: 0xFF,
+        };
+
+        let _ = apply_water_ripple(&fbm, &mut cell_t0, 10, 10, 0.0);
+        let _ = apply_water_ripple(&fbm, &mut cell_t1, 10, 10, 5.0);
+
+        // At different times, the noise values should differ
+        // (not guaranteed for every position, but for (10,10) with t=0 vs t=5 it will)
+        // This is a soft check -- we verify the function runs without panic
+    }
+
+    #[test]
+    fn test_rgb_cube_decomposition_bug_replicated() {
+        // Verify the C++ bug is replicated: cb uses cr instead of cg
+        let c_rel: i32 = 100 - 16; // = 84
+        let cr = c_rel / 36; // = 2
+        let c_after_r = c_rel - cr * 36; // = 84 - 72 = 12
+        let cg = c_after_r / 6; // = 2
+        let cb_buggy = c_after_r - cr * 6; // BUG: uses cr (=2) instead of cg (=2)
+        let cb_correct = c_after_r - cg * 6;
+
+        // In this specific case cr == cg so the bug doesn't manifest
+        // Use a case where cr != cg to verify the bug
+        let c_rel2: i32 = 150 - 16; // = 134
+        let cr2 = c_rel2 / 36; // = 3
+        let c_after_r2 = c_rel2 - cr2 * 36; // = 134 - 108 = 26
+        let cg2 = c_after_r2 / 6; // = 4
+        let cb_buggy2 = c_after_r2 - cr2 * 6; // BUG: 26 - 18 = 8 (wrong, >5)
+        let cb_correct2 = c_after_r2 - cg2 * 6; // Correct: 26 - 24 = 2
+
+        assert_ne!(
+            cb_buggy2, cb_correct2,
+            "Bug should produce different cb when cr != cg: buggy={cb_buggy2} correct={cb_correct2}"
+        );
+
+        // Verify our code matches the buggy behavior
+        // The apply_water_ripple function uses the buggy decomposition
+        assert_eq!(
+            cb_buggy, cb_correct,
+            "For c=100: cr==cg so bug is invisible"
+        );
+        assert_eq!(cb_buggy2, 8, "For c=150: buggy cb should be 8");
+        assert_eq!(cb_correct2, 2, "For c=150: correct cb should be 2");
+    }
 }

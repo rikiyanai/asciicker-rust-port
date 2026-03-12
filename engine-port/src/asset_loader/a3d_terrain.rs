@@ -189,3 +189,23 @@ pub fn parse_material_section(data: &[u8]) -> Result<(MaterialTable, usize), Ass
 
     Ok((MaterialTable { materials }, MATERIAL_TABLE_SIZE))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn file_header_size() {
+        assert_eq!(std::mem::size_of::<FileHeader>(), 16);
+    }
+
+    #[test]
+    fn file_patch_size() {
+        assert_eq!(std::mem::size_of::<FilePatch>(), FILE_PATCH_SIZE);
+    }
+
+    #[test]
+    fn mat_cell_size() {
+        assert_eq!(std::mem::size_of::<MatCell>(), 8);
+    }
+}

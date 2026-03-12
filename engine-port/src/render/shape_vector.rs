@@ -1,205 +1,611 @@
-//! 6D shape-vector glyph matching using k-d tree nearest-neighbor.
+//! Alex Harri shape-vector glyph matching with the upstream default alphabet.
 //!
-//! Port of Alex Harri's CharacterMatcher / generateSamplingData system.
-//! Uses the `six-samples` alphabet (95 printable ASCII characters, each
-//! represented as a 6D vector of per-cell lightness samples).
+//! This uses the real `default.json` alphabet metadata:
+//! - 95 printable ASCII glyph vectors
+//! - 6 internal sampling circles
+//! - 10 external sampling circles
+//! - directional crunch affects-mapping
 //!
-//! The `ShapeVectorMatcher` builds a k-d tree at startup and provides
-//! `find_glyph_with_distance` for nearest-neighbor lookup with a quantized
-//! LRU cache to avoid redundant tree traversals.
-//!
-//! The `ShapeVectorGlyphSelector` implements the `GlyphSelector` trait
-//! from `resolve_bridge.rs`, allowing shape-vector glyph selection to be
-//! injected into the render pipeline without modifying `resolve.rs`.
+//! The runtime path stays CPU-side and feeds the existing `GlyphSelector`
+//! extension point at resolve time.
 
+use std::collections::BTreeSet;
 use std::num::NonZeroUsize;
+use std::sync::OnceLock;
 
 use bevy::prelude::*;
-use kiddo::float::distance::SquaredEuclidean;
+use image::{RgbaImage, load_from_memory};
 use kiddo::KdTree;
+use kiddo::float::distance::SquaredEuclidean;
 use lru::LruCache;
+use serde::Deserialize;
 
 use crate::render::material::Material;
+use crate::render::quantize::rgb555_to_rgb888;
 use crate::render::resolve_bridge::GlyphSelector;
 use crate::render::sample_buffer::{SampleBuffer, spare_bits};
 
-// ---------------------------------------------------------------------------
-// Sampling positions (from six-samples.json metadata)
-// ---------------------------------------------------------------------------
+const DEFAULT_ALPHABET_JSON: &str = include_str!("alphabets/default.json");
+const RUNTIME_FONT_PNG: &[u8] = include_bytes!("../../assets/fonts/cp437_10x16.png");
+const GOLDEN_ANGLE: f32 = 3.883_222;
+const DEFAULT_SAMPLING_QUALITY: usize = 8;
+const RUNTIME_FONT_CHAR_WIDTH: u32 = 10;
+const RUNTIME_FONT_CHAR_HEIGHT: u32 = 16;
 
-/// 6 sampling positions within each character cell (normalized [0,1] coords).
-/// 2-column x 3-row grid matching Alex Harri's six-samples alphabet.
-/// These MUST match the positions used to generate the alphabet data.
-pub const SAMPLING_POSITIONS: [(f32, f32); 6] = [
-    (0.27, 0.18), (0.73, 0.18), // top row: left, right
-    (0.27, 0.50), (0.73, 0.50), // middle row: left, right
-    (0.27, 0.82), (0.73, 0.82), // bottom row: left, right
-];
-
-// ---------------------------------------------------------------------------
-// CharacterEntry and alphabet data
-// ---------------------------------------------------------------------------
-
-/// A single entry in the shape-vector alphabet.
 #[derive(Debug, Clone, Copy)]
 pub struct CharacterEntry {
-    /// CP437 glyph byte value.
     pub glyph: u8,
-    /// 6D shape vector (lightness samples at 6 positions).
     pub vector: [f32; 6],
 }
 
-/// The six-samples alphabet: 95 printable ASCII characters (0x20-0x7E).
-/// Data from Alex Harri's six-samples.json.
-const ALPHABET: [CharacterEntry; 95] = [
-    CharacterEntry { glyph: 32, vector: [0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000] },
-    CharacterEntry { glyph: 33, vector: [0.0168962752, 0.0097820541, 0.0662531194, 0.0473868093, 0.0037320504, 0.0013120490] },
-    CharacterEntry { glyph: 34, vector: [0.1257526059, 0.1214811575, 0.0038787879, 0.0029518717, 0.0000000000, 0.0000000000] },
-    CharacterEntry { glyph: 35, vector: [0.0602522050, 0.0765653473, 0.3232513369, 0.2949590018, 0.0456884613, 0.0196807347] },
-    CharacterEntry { glyph: 36, vector: [0.1474597274, 0.1632772068, 0.1762852050, 0.2883137255, 0.0887819812, 0.0951089730] },
-    CharacterEntry { glyph: 37, vector: [0.1591952766, 0.0857351119, 0.2814688057, 0.2644135472, 0.0505430425, 0.0894963190] },
-    CharacterEntry { glyph: 38, vector: [0.1203003134, 0.0645090750, 0.3153654189, 0.2836791444, 0.0711713682, 0.0370726729] },
-    CharacterEntry { glyph: 39, vector: [0.0374079743, 0.0300167651, 0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000] },
-    CharacterEntry { glyph: 42, vector: [0.0000000000, 0.0000000000, 0.2984812834, 0.2829233512, 0.0000000000, 0.0000000000] },
-    CharacterEntry { glyph: 43, vector: [0.0000000000, 0.0000000000, 0.1816755793, 0.1643208556, 0.0000000000, 0.0000000000] },
-    CharacterEntry { glyph: 44, vector: [0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000, 0.1045848823, 0.0247831475] },
-    CharacterEntry { glyph: 46, vector: [0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000, 0.0094613310, 0.0050295211] },
-    CharacterEntry { glyph: 47, vector: [0.0000000000, 0.1555944311, 0.1382816399, 0.0537183601, 0.1119615132, 0.0000000000] },
-    CharacterEntry { glyph: 91, vector: [0.1753189008, 0.0782126977, 0.2003422460, 0.0000000000, 0.1295283913, 0.0771922152] },
-    CharacterEntry { glyph: 93, vector: [0.0826590859, 0.1676069684, 0.0000000000, 0.1929696970, 0.0810263139, 0.1217289890] },
-    CharacterEntry { glyph: 124, vector: [0.0494934033, 0.0363437568, 0.0632442068, 0.0474010695, 0.0246519426, 0.0165901305] },
-    CharacterEntry { glyph: 40, vector: [0.0955171660, 0.0775858299, 0.2544884135, 0.0000000000, 0.0207157956, 0.0637218456] },
-    CharacterEntry { glyph: 41, vector: [0.0832567971, 0.0826153510, 0.0000000000, 0.2486559715, 0.0686784751, 0.0141409724] },
-    CharacterEntry { glyph: 58, vector: [0.0000000000, 0.0000000000, 0.0414117647, 0.0334973262, 0.0071433778, 0.0033530141] },
-    CharacterEntry { glyph: 59, vector: [0.0000000000, 0.0000000000, 0.0414117647, 0.0334973262, 0.1059844012, 0.0234273635] },
-    CharacterEntry { glyph: 60, vector: [0.0000000000, 0.0127997667, 0.2344099822, 0.0334973262, 0.0000000000, 0.0168379620] },
-    CharacterEntry { glyph: 61, vector: [0.0000000000, 0.0000000000, 0.2081568627, 0.1993440285, 0.0000000000, 0.0000000000] },
-    CharacterEntry { glyph: 62, vector: [0.0132371164, 0.0000000000, 0.0401711230, 0.2298181818, 0.0173482032, 0.0000000000] },
-    CharacterEntry { glyph: 63, vector: [0.1155332021, 0.1153874189, 0.0779322638, 0.1349590018, 0.0147532619, 0.0000000000] },
-    CharacterEntry { glyph: 64, vector: [0.1653035936, 0.1321962242, 0.2693903743, 0.3741033868, 0.1316714046, 0.1764122749] },
-    CharacterEntry { glyph: 92, vector: [0.1570085283, 0.0000000000, 0.0661818182, 0.1224812834, 0.0000000000, 0.1108244041] },
-    CharacterEntry { glyph: 94, vector: [0.1844303521, 0.1804504702, 0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000] },
-    CharacterEntry { glyph: 96, vector: [0.0666520883, 0.0514323201, 0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000] },
-    CharacterEntry { glyph: 123, vector: [0.0559516000, 0.0988993367, 0.1594581105, 0.0385026738, 0.0271448356, 0.0854872804] },
-    CharacterEntry { glyph: 125, vector: [0.1089146439, 0.0452948466, 0.0487557932, 0.1492905526, 0.0898024637, 0.0189372403] },
-    CharacterEntry { glyph: 126, vector: [0.0000000000, 0.0000000000, 0.1757290553, 0.1702531194, 0.0000000000, 0.0000000000] },
-    CharacterEntry { glyph: 45, vector: [0.0000000000, 0.0000000000, 0.1282994652, 0.1239215686, 0.0000000000, 0.0000000000] },
-    CharacterEntry { glyph: 95, vector: [0.0000000000, 0.0000000000, 0.0000000000, 0.0000000000, 0.1563379255, 0.1517749107] },
-    CharacterEntry { glyph: 48, vector: [0.1125154895, 0.1042204242, 0.3766417112, 0.3198859180, 0.0403673737, 0.0347401414] },
-    CharacterEntry { glyph: 49, vector: [0.0653400394, 0.0301042350, 0.0184385027, 0.1231229947, 0.0672206429, 0.0847146293] },
-    CharacterEntry { glyph: 50, vector: [0.1346599606, 0.0872075224, 0.0675080214, 0.1809483066, 0.1004592171, 0.0691012464] },
-    CharacterEntry { glyph: 51, vector: [0.1177491071, 0.0931846344, 0.0456042781, 0.2820962567, 0.0867701728, 0.0262409797] },
-    CharacterEntry { glyph: 52, vector: [0.0198848313, 0.0038778337, 0.2747094474, 0.2356791444, 0.0000000000, 0.0378015890] },
-    CharacterEntry { glyph: 53, vector: [0.1307967053, 0.0874553539, 0.1491622103, 0.2434367201, 0.0730519717, 0.0316641155] },
-    CharacterEntry { glyph: 54, vector: [0.0889423427, 0.0789416138, 0.3336327986, 0.2531764706, 0.0404111087, 0.0427873752] },
-    CharacterEntry { glyph: 55, vector: [0.1078650047, 0.1442087616, 0.0437504456, 0.1454260250, 0.0372476128, 0.0000000000] },
-    CharacterEntry { glyph: 56, vector: [0.1166265763, 0.1157372986, 0.3243778966, 0.3193582888, 0.0609956994, 0.0535461768] },
-    CharacterEntry { glyph: 57, vector: [0.1277935710, 0.1038851228, 0.2303885918, 0.3300819964, 0.0549019608, 0.0000000000] },
-    CharacterEntry { glyph: 65, vector: [0.0363291785, 0.0295356804, 0.3014046346, 0.3053832442, 0.0543917195, 0.0578905168] },
-    CharacterEntry { glyph: 66, vector: [0.1534076828, 0.1067716306, 0.3491622103, 0.3290695187, 0.0860995699, 0.0392594212] },
-    CharacterEntry { glyph: 67, vector: [0.0888548728, 0.1374006852, 0.2890409982, 0.0000998217, 0.0179896494, 0.1040309060] },
-    CharacterEntry { glyph: 68, vector: [0.1613382900, 0.0938115023, 0.2844491979, 0.3052834225, 0.0934762009, 0.0155842263] },
-    CharacterEntry { glyph: 69, vector: [0.1328230921, 0.1106931992, 0.3239215686, 0.0963850267, 0.0677600408, 0.0906334281] },
-    CharacterEntry { glyph: 70, vector: [0.1223267002, 0.1270938115, 0.3055115865, 0.1114295900, 0.0485603907, 0.0000000000] },
-    CharacterEntry { glyph: 71, vector: [0.1082003061, 0.1243239303, 0.3037433155, 0.2685204991, 0.0438224360, 0.0860995699] },
-    CharacterEntry { glyph: 72, vector: [0.0963627087, 0.0964647569, 0.3606702317, 0.3540962567, 0.0553101538, 0.0553538888] },
-    CharacterEntry { glyph: 73, vector: [0.1043662074, 0.1001239157, 0.0746951872, 0.0607344029, 0.0780231795, 0.0737517312] },
-    CharacterEntry { glyph: 74, vector: [0.0442160507, 0.1441212916, 0.0000000000, 0.2730409982, 0.0867118595, 0.0242729062] },
-    CharacterEntry { glyph: 75, vector: [0.0956629492, 0.1011006633, 0.3714509804, 0.1337754011, 0.0547270209, 0.0689117283] },
-    CharacterEntry { glyph: 76, vector: [0.0907208980, 0.0000000000, 0.2633155080, 0.0000000000, 0.0613601574, 0.0994095780] },
-    CharacterEntry { glyph: 77, vector: [0.1479699687, 0.1469786428, 0.4216470588, 0.4136042781, 0.0519717181, 0.0534295503] },
-    CharacterEntry { glyph: 78, vector: [0.1441212916, 0.0895254756, 0.3323208556, 0.3567771836, 0.0514323201, 0.0782710110] },
-    CharacterEntry { glyph: 79, vector: [0.1237407974, 0.1197463372, 0.2962994652, 0.2941176471, 0.0484583424, 0.0423791822] },
-    CharacterEntry { glyph: 80, vector: [0.1394853852, 0.1319775494, 0.3346595365, 0.2414688057, 0.0531379838, 0.0000000000] },
-    CharacterEntry { glyph: 81, vector: [0.1236970625, 0.1195713973, 0.2938894831, 0.2906381462, 0.0490268970, 0.2111815730] },
-    CharacterEntry { glyph: 82, vector: [0.1500255121, 0.1233034478, 0.3496898396, 0.3217540107, 0.0555725636, 0.0657628107] },
-    CharacterEntry { glyph: 83, vector: [0.1358262264, 0.1158539252, 0.1799358289, 0.2533048128, 0.0881988483, 0.0521466579] },
-    CharacterEntry { glyph: 84, vector: [0.1493840659, 0.1416721335, 0.0765775401, 0.0560285205, 0.0018368686, 0.0006851811] },
-    CharacterEntry { glyph: 85, vector: [0.0956629492, 0.0973831912, 0.2829090909, 0.2862032086, 0.0514468985, 0.0446971354] },
-    CharacterEntry { glyph: 86, vector: [0.1023106640, 0.0958670457, 0.2390873440, 0.2228021390, 0.0027698812, 0.0012828923] },
-    CharacterEntry { glyph: 87, vector: [0.0959253590, 0.0885778847, 0.4182245989, 0.4021247772, 0.0745243822, 0.0696406444] },
-    CharacterEntry { glyph: 88, vector: [0.1022231941, 0.0949486114, 0.2262245989, 0.2097967914, 0.0589401560, 0.0625993148] },
-    CharacterEntry { glyph: 89, vector: [0.1054012683, 0.0989576500, 0.1806488414, 0.1629803922, 0.0017202420, 0.0009475909] },
-    CharacterEntry { glyph: 90, vector: [0.1070486187, 0.1666010642, 0.1678573975, 0.0856755793, 0.1021940375, 0.0936365624] },
-    CharacterEntry { glyph: 97, vector: [0.0000000000, 0.0000000000, 0.2250837790, 0.2924491979, 0.0817989649, 0.0576281070] },
-    CharacterEntry { glyph: 98, vector: [0.1327939354, 0.0000000000, 0.2951016043, 0.2881568627, 0.0683140171, 0.0501785844] },
-    CharacterEntry { glyph: 99, vector: [0.0000000000, 0.0000000000, 0.2690481283, 0.0547878788, 0.0277571252, 0.0741599242] },
-    CharacterEntry { glyph: 100, vector: [0.0000000000, 0.1323128508, 0.2863315508, 0.2864598930, 0.0609519644, 0.0568554559] },
-    CharacterEntry { glyph: 101, vector: [0.0000000000, 0.0000000000, 0.3347736185, 0.2466167558, 0.0377432757, 0.0627305197] },
-    CharacterEntry { glyph: 102, vector: [0.0389532765, 0.1364385159, 0.2223030303, 0.0670374332, 0.0131788031, 0.0000000000] },
-    CharacterEntry { glyph: 103, vector: [0.0000000000, 0.0080326554, 0.2854616756, 0.2267950089, 0.1918215613, 0.2613747358] },
-    CharacterEntry { glyph: 104, vector: [0.1315839347, 0.0000000000, 0.2960855615, 0.2654973262, 0.0536336468, 0.0532837670] },
-    CharacterEntry { glyph: 105, vector: [0.0471754501, 0.0413878563, 0.0608342246, 0.1084777184, 0.0661418471, 0.0824112545] },
-    CharacterEntry { glyph: 106, vector: [0.0005831329, 0.0938406589, 0.0263672014, 0.2314866310, 0.1240032072, 0.1325169473] },
-    CharacterEntry { glyph: 107, vector: [0.1326627305, 0.0000000000, 0.3520427807, 0.1865383244, 0.0534003936, 0.0671331730] },
-    CharacterEntry { glyph: 108, vector: [0.1647641956, 0.0014578322, 0.1495187166, 0.0064171123, 0.0000000000, 0.0781252278] },
-    CharacterEntry { glyph: 109, vector: [0.0000000000, 0.0000000000, 0.3458680927, 0.3270160428, 0.0507762956, 0.0503243677] },
-    CharacterEntry { glyph: 110, vector: [0.0000000000, 0.0000000000, 0.2944741533, 0.2687344029, 0.0536336468, 0.0532837670] },
-    CharacterEntry { glyph: 111, vector: [0.0000000000, 0.0000000000, 0.2753226381, 0.2723279857, 0.0471171368, 0.0405277353] },
-    CharacterEntry { glyph: 112, vector: [0.0000000000, 0.0000000000, 0.2930766488, 0.2829376114, 0.2185436256, 0.0492455718] },
-    CharacterEntry { glyph: 113, vector: [0.0000000000, 0.0000000000, 0.2803707665, 0.2849625668, 0.0620161819, 0.2074349442] },
-    CharacterEntry { glyph: 114, vector: [0.0000000000, 0.0000000000, 0.2529910873, 0.1310516934, 0.0727458270, 0.0088927764] },
-    CharacterEntry { glyph: 115, vector: [0.0000000000, 0.0000000000, 0.2163707665, 0.2084420677, 0.0811429404, 0.0445659305] },
-    CharacterEntry { glyph: 116, vector: [0.0328303812, 0.0000000000, 0.2348377897, 0.0222745098, 0.0001166266, 0.0847875210] },
-    CharacterEntry { glyph: 117, vector: [0.0000000000, 0.0000000000, 0.2709447415, 0.2687344029, 0.0670165464, 0.0534732852] },
-    CharacterEntry { glyph: 118, vector: [0.0000000000, 0.0000000000, 0.2437076649, 0.2309162210, 0.0041985567, 0.0018368686] },
-    CharacterEntry { glyph: 119, vector: [0.0000000000, 0.0000000000, 0.3799786096, 0.3740178253, 0.0714775129, 0.0709235367] },
-    CharacterEntry { glyph: 120, vector: [0.0000000000, 0.0000000000, 0.2474866310, 0.2303743316, 0.0591150959, 0.0612726875] },
-    CharacterEntry { glyph: 121, vector: [0.0000000000, 0.0000000000, 0.2474153298, 0.2339251337, 0.1434798455, 0.0169545885] },
-    CharacterEntry { glyph: 122, vector: [0.0000000000, 0.0000000000, 0.1135401070, 0.1896042781, 0.0819884831, 0.0722501640] },
-];
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct SamplingPoint {
+    x: f32,
+    y: f32,
+}
 
-// ---------------------------------------------------------------------------
-// Quantization
-// ---------------------------------------------------------------------------
+#[derive(Debug, Clone)]
+pub struct ShapeVectorAlphabetData {
+    entries: Vec<CharacterEntry>,
+    sampling_points: [SamplingPoint; 6],
+    external_points: Vec<SamplingPoint>,
+    affects_mapping: [Vec<usize>; 6],
+    circle_radius: f32,
+}
 
-/// Quantize a 6D vector to a 30-bit cache key (5 bits per component).
-///
-/// Uses `((v * 32.0).floor() as u32).min(31)` per component and packs
-/// into a single `u32` via 5-bit shifts.
-///
-/// P7-001 FIX: Corrected from original research's buggy 3-bit quantization.
-/// R19-M3: Actual alphabet values only reach ~0.42, so levels 14-31 are
-/// unused. This is acceptable -- unused key space does not affect correctness.
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ShapeVectorAlphabetId {
+    Default,
+    Minimal,
+}
+
+impl ShapeVectorAlphabetId {
+    pub fn next(self) -> Self {
+        match self {
+            Self::Default => Self::Minimal,
+            Self::Minimal => Self::Default,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Default => "default",
+            Self::Minimal => "minimal",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShapeVectorMode {
+    OriginalOnly,
+    Combined,
+    HarriPriority,
+}
+
+impl ShapeVectorMode {
+    pub fn next(self) -> Self {
+        match self {
+            Self::OriginalOnly => Self::Combined,
+            Self::Combined => Self::HarriPriority,
+            Self::HarriPriority => Self::OriginalOnly,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::OriginalOnly => "original_only",
+            Self::Combined => "combined",
+            Self::HarriPriority => "harri_priority",
+        }
+    }
+
+    pub fn parse(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "original_only" | "original" => Some(Self::OriginalOnly),
+            "combined" | "original_edges" => Some(Self::Combined),
+            "harri_priority" | "harri" => Some(Self::HarriPriority),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Resource, Debug)]
+pub struct ShapeVectorAlphabetRegistry {
+    default: ShapeVectorAlphabetData,
+    minimal: ShapeVectorAlphabetData,
+}
+
+#[derive(Deserialize)]
+struct AlphabetJson {
+    metadata: AlphabetMetadataJson,
+    characters: Vec<CharacterJson>,
+}
+
+#[derive(Deserialize)]
+struct AlphabetMetadataJson {
+    #[serde(rename = "samplingConfig")]
+    sampling_config: SamplingConfigJson,
+}
+
+#[derive(Deserialize)]
+struct SamplingConfigJson {
+    points: Vec<PointJson>,
+    #[serde(rename = "externalPoints", default)]
+    external_points: Vec<PointJson>,
+    #[serde(rename = "affectsMapping", default)]
+    affects_mapping: Vec<Vec<usize>>,
+    #[serde(rename = "circleRadius")]
+    circle_radius: f32,
+}
+
+#[derive(Deserialize)]
+struct PointJson {
+    x: f32,
+    y: f32,
+}
+
+#[derive(Deserialize)]
+struct CharacterJson {
+    char: String,
+    vector: [f32; 6],
+}
+
+fn default_alphabet() -> &'static ShapeVectorAlphabetData {
+    static DEFAULT_ALPHABET: OnceLock<ShapeVectorAlphabetData> = OnceLock::new();
+    DEFAULT_ALPHABET.get_or_init(parse_default_alphabet)
+}
+
+fn parse_default_alphabet() -> ShapeVectorAlphabetData {
+    let parsed: AlphabetJson =
+        serde_json::from_str(DEFAULT_ALPHABET_JSON).expect("default Alex Harri alphabet JSON");
+
+    let entries = build_runtime_font_entries(&parsed.characters).unwrap_or_else(|| {
+        parsed
+            .characters
+            .iter()
+            .map(|entry| {
+                let glyph = entry
+                    .char
+                    .bytes()
+                    .next()
+                    .expect("alphabet character must be a single-byte ASCII glyph");
+                CharacterEntry {
+                    glyph,
+                    vector: entry.vector,
+                }
+            })
+            .collect::<Vec<_>>()
+    });
+
+    let sampling_points = parsed
+        .metadata
+        .sampling_config
+        .points
+        .into_iter()
+        .map(|p| SamplingPoint { x: p.x, y: p.y })
+        .collect::<Vec<_>>()
+        .try_into()
+        .expect("default alphabet must define exactly 6 internal sampling points");
+
+    let external_points = parsed
+        .metadata
+        .sampling_config
+        .external_points
+        .into_iter()
+        .map(|p| SamplingPoint { x: p.x, y: p.y })
+        .collect::<Vec<_>>();
+
+    let affects_mapping = parsed
+        .metadata
+        .sampling_config
+        .affects_mapping
+        .try_into()
+        .expect("default alphabet must define exactly 6 affects mappings");
+
+    ShapeVectorAlphabetData {
+        entries,
+        sampling_points,
+        external_points,
+        affects_mapping,
+        circle_radius: parsed.metadata.sampling_config.circle_radius,
+    }
+}
+
+impl Default for ShapeVectorAlphabetRegistry {
+    fn default() -> Self {
+        let default = default_alphabet().clone();
+        let minimal = build_minimal_alphabet(&default);
+        Self { default, minimal }
+    }
+}
+
+impl ShapeVectorAlphabetRegistry {
+    pub fn get(&self, id: ShapeVectorAlphabetId) -> &ShapeVectorAlphabetData {
+        match id {
+            ShapeVectorAlphabetId::Default => &self.default,
+            ShapeVectorAlphabetId::Minimal => &self.minimal,
+        }
+    }
+}
+
+fn build_minimal_alphabet(default: &ShapeVectorAlphabetData) -> ShapeVectorAlphabetData {
+    let wanted: BTreeSet<u8> = [b' ', b'.', b':', b'-', b'=', b'+', b'*', b'#', b'%', b'@']
+        .into_iter()
+        .collect();
+    let entries = default
+        .entries
+        .iter()
+        .copied()
+        .filter(|entry| wanted.contains(&entry.glyph))
+        .collect::<Vec<_>>();
+    ShapeVectorAlphabetData {
+        entries,
+        sampling_points: default.sampling_points,
+        external_points: default.external_points.clone(),
+        affects_mapping: default.affects_mapping.clone(),
+        circle_radius: default.circle_radius,
+    }
+}
+
+fn build_runtime_font_entries(characters: &[CharacterJson]) -> Option<Vec<CharacterEntry>> {
+    let image = load_from_memory(RUNTIME_FONT_PNG).ok()?.to_rgba8();
+    let alphabet_json: AlphabetJson = serde_json::from_str(DEFAULT_ALPHABET_JSON).ok()?;
+    let points: [SamplingPoint; 6] = alphabet_json
+        .metadata
+        .sampling_config
+        .points
+        .into_iter()
+        .map(|p| SamplingPoint { x: p.x, y: p.y })
+        .collect::<Vec<_>>()
+        .try_into()
+        .ok()?;
+    let circle_radius = alphabet_json.metadata.sampling_config.circle_radius;
+
+    Some(
+        characters
+            .iter()
+            .map(|entry| {
+                let glyph = entry
+                    .char
+                    .bytes()
+                    .next()
+                    .expect("alphabet character must be a single-byte ASCII glyph");
+                CharacterEntry {
+                    glyph,
+                    vector: sample_runtime_font_glyph(&image, glyph, &points, circle_radius),
+                }
+            })
+            .collect(),
+    )
+}
+
+fn sample_runtime_font_glyph(
+    image: &RgbaImage,
+    glyph: u8,
+    points: &[SamplingPoint; 6],
+    circle_radius: f32,
+) -> [f32; 6] {
+    let glyph_x = (glyph as u32 % 16) * RUNTIME_FONT_CHAR_WIDTH;
+    let glyph_y = (glyph as u32 / 16) * RUNTIME_FONT_CHAR_HEIGHT;
+    let mut vector = [0.0f32; 6];
+    for (idx, point) in points.iter().copied().enumerate() {
+        vector[idx] = sample_runtime_font_region(image, glyph_x, glyph_y, point, circle_radius, 24);
+    }
+    vector
+}
+
+fn runtime_font_image() -> &'static RgbaImage {
+    static RUNTIME_FONT_IMAGE: OnceLock<RgbaImage> = OnceLock::new();
+    RUNTIME_FONT_IMAGE.get_or_init(|| {
+        load_from_memory(RUNTIME_FONT_PNG)
+            .expect("runtime font png")
+            .to_rgba8()
+    })
+}
+
+fn sample_runtime_font_region(
+    image: &RgbaImage,
+    glyph_x: u32,
+    glyph_y: u32,
+    point: SamplingPoint,
+    circle_radius: f32,
+    quality: usize,
+) -> f32 {
+    let center_x = glyph_x as f32 + point.x * RUNTIME_FONT_CHAR_WIDTH as f32;
+    let center_y = glyph_y as f32 + point.y * RUNTIME_FONT_CHAR_HEIGHT as f32;
+    let radius = circle_radius * RUNTIME_FONT_CHAR_WIDTH as f32;
+    let mut total = 0.0f32;
+
+    for i in 0..quality {
+        let radial = (((i as f32) + 0.5) / quality as f32).sqrt() * radius;
+        let angle = GOLDEN_ANGLE * i as f32;
+        let px = (center_x + radial * angle.cos()).clamp(
+            glyph_x as f32,
+            (glyph_x + RUNTIME_FONT_CHAR_WIDTH - 1) as f32,
+        );
+        let py = (center_y + radial * angle.sin()).clamp(
+            glyph_y as f32,
+            (glyph_y + RUNTIME_FONT_CHAR_HEIGHT - 1) as f32,
+        );
+        let pixel = image.get_pixel(px.round() as u32, py.round() as u32);
+        let r = pixel[0] as f32 / 255.0;
+        let g = pixel[1] as f32 / 255.0;
+        let b = pixel[2] as f32 / 255.0;
+        let a = pixel[3] as f32 / 255.0;
+        total += (0.2126 * r + 0.7152 * g + 0.0722 * b) * a;
+    }
+
+    total / quality as f32
+}
+
 fn quantize_to_key(v: &[f32; 6]) -> u32 {
     let mut key: u32 = 0;
-    for &c in v.iter() {
-        let q = ((c * 32.0).floor() as u32).min(31);
+    for &component in v {
+        let q = ((component * 32.0).floor() as u32).min(31);
         key = (key << 5) | q;
     }
     key
 }
 
-// ---------------------------------------------------------------------------
-// Contrast crunch (R20-F04)
-// ---------------------------------------------------------------------------
-
-/// Apply global contrast crunch: normalize and exponentiate to exaggerate
-/// the dominant direction of the 6D vector, making edges sharper.
-/// Cost: ~0.01ms/frame (negligible).
 fn crunch_vector(v: &mut [f32; 6], exponent: f32) {
     let max = v.iter().copied().fold(0.0f32, f32::max);
-    if max < 1e-6 {
-        return; // avoid div-by-zero for black cells
+    if max <= 1e-6 {
+        return;
     }
-    for c in v.iter_mut() {
-        *c = (*c / max).powf(exponent) * max;
+    for component in v.iter_mut() {
+        let normalized = *component / max;
+        let enhanced = normalized.powf(exponent);
+        *component = enhanced * max;
     }
 }
 
-// ---------------------------------------------------------------------------
-// ShapeVectorMatcher
-// ---------------------------------------------------------------------------
+fn directional_crunch_vector(
+    vector: &mut [f32; 6],
+    external_vector: &[f32],
+    affects_mapping: &[Vec<usize>; 6],
+    exponent: f32,
+) {
+    for idx in 0..vector.len() {
+        let value = vector[idx];
+        let mut context_value = 0.0f32;
+        for &external_idx in &affects_mapping[idx] {
+            if let Some(&external) = external_vector.get(external_idx) {
+                context_value = context_value.max(external);
+            }
+        }
 
-/// K-d tree backed nearest-neighbor matcher for 6D shape vectors.
-///
-/// Builds a k-d tree from the six-samples alphabet at startup and provides
-/// cached glyph lookup via `find_glyph_with_distance`.
-///
-/// Cache: bounded LRU with 8192 entries (~130KB), mapping quantized 30-bit
-/// keys to (glyph, distance) pairs. R61 FIX: prevents unbounded growth.
+        if context_value <= value || context_value <= 1e-6 {
+            continue;
+        }
+
+        let normalized = value / context_value;
+        let enhanced = normalized.powf(exponent);
+        vector[idx] = enhanced * context_value;
+    }
+}
+
+fn vector_contrast(vector: &[f32; 6]) -> f32 {
+    let mut min = f32::INFINITY;
+    let mut max = f32::NEG_INFINITY;
+    for &component in vector {
+        min = min.min(component);
+        max = max.max(component);
+    }
+    (max - min).max(0.0)
+}
+
+fn effective_distance_threshold(
+    base_threshold: f32,
+    contrast: f32,
+    boost: f32,
+    adaptive_enabled: bool,
+) -> f32 {
+    if adaptive_enabled {
+        (base_threshold + contrast.max(0.0) * boost.max(0.0)).min(4.0)
+    } else {
+        base_threshold
+    }
+}
+
+#[derive(Resource, Debug, Clone, Copy)]
+pub struct ShapeVectorConfig {
+    pub mode: ShapeVectorMode,
+    pub alphabet: ShapeVectorAlphabetId,
+    pub global_crunch_exponent: f32,
+    pub directional_crunch_exponent: f32,
+    pub distance_threshold: f32,
+    pub contrast_adaptive_threshold_boost: f32,
+    pub structural_fallback_distance_threshold: f32,
+    pub structural_fallback_contrast_threshold: u16,
+    pub sampling_quality: usize,
+    pub enable_global_crunch: bool,
+    pub enable_directional_crunch: bool,
+    pub enable_contrast_adaptive_threshold: bool,
+    pub enable_structural_fallback: bool,
+}
+
+impl Default for ShapeVectorConfig {
+    fn default() -> Self {
+        Self {
+            mode: ShapeVectorMode::Combined,
+            alphabet: ShapeVectorAlphabetId::Default,
+            global_crunch_exponent: 2.5,
+            directional_crunch_exponent: 6.0,
+            distance_threshold: 0.08,
+            contrast_adaptive_threshold_boost: 0.25,
+            structural_fallback_distance_threshold: 0.22,
+            structural_fallback_contrast_threshold: 96,
+            sampling_quality: DEFAULT_SAMPLING_QUALITY,
+            enable_global_crunch: true,
+            enable_directional_crunch: true,
+            enable_contrast_adaptive_threshold: false,
+            enable_structural_fallback: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShapeVectorSkipReason {
+    Clear,
+    Underwater,
+    DistanceThreshold,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ShapeVectorDecision {
+    pub glyph: Option<u8>,
+    pub candidate_glyph: Option<u8>,
+    pub distance: Option<f32>,
+    pub skip_reason: Option<ShapeVectorSkipReason>,
+}
+
+impl ShapeVectorDecision {
+    fn skipped(skip_reason: ShapeVectorSkipReason, distance: Option<f32>) -> Self {
+        Self {
+            glyph: None,
+            candidate_glyph: None,
+            distance,
+            skip_reason: Some(skip_reason),
+        }
+    }
+
+    fn accepted(glyph: u8, distance: f32) -> Self {
+        Self {
+            glyph: Some(glyph),
+            candidate_glyph: Some(glyph),
+            distance: Some(distance),
+            skip_reason: None,
+        }
+    }
+
+    fn threshold_rejected(glyph: u8, distance: f32) -> Self {
+        Self {
+            glyph: None,
+            candidate_glyph: Some(glyph),
+            distance: Some(distance),
+            skip_reason: Some(ShapeVectorSkipReason::DistanceThreshold),
+        }
+    }
+
+    pub fn resolve_fallback() -> Self {
+        Self::default()
+    }
+}
+
+#[derive(Resource, Debug, Clone, Copy, Default)]
+pub struct ShapeVectorFrameStats {
+    pub total_cells: u32,
+    pub semantic_gate_cells: u32,
+    pub clear_skip_cells: u32,
+    pub underwater_skip_cells: u32,
+    pub threshold_skip_cells: u32,
+    pub selector_match_cells: u32,
+    pub selector_override_cells: u32,
+    pub resolve_fallback_cells: u32,
+    pub fallback_space_cells: u32,
+    pub fallback_structural_cells: u32,
+    pub final_space_cells: u32,
+    pub final_non_space_cells: u32,
+    pub colored_space_cells: u32,
+    pub matched_distance_count: u32,
+    pub threshold_distance_count: u32,
+    pub matched_distance_sum: f32,
+    pub threshold_distance_sum: f32,
+    pub matched_distance_max: f32,
+    pub threshold_distance_max: f32,
+}
+
+impl ShapeVectorFrameStats {
+    pub fn begin_frame(&mut self, total_cells: usize) {
+        *self = Self {
+            total_cells: total_cells as u32,
+            ..Self::default()
+        };
+    }
+
+    pub fn note_selection(
+        &mut self,
+        decision: ShapeVectorDecision,
+        resolve_glyph: u8,
+        final_glyph: u8,
+        fg_rgb: [u8; 3],
+        bg_rgb: [u8; 3],
+    ) {
+        match decision.skip_reason {
+            Some(ShapeVectorSkipReason::Clear) => self.clear_skip_cells += 1,
+            Some(ShapeVectorSkipReason::Underwater) => self.underwater_skip_cells += 1,
+            Some(ShapeVectorSkipReason::DistanceThreshold) => self.threshold_skip_cells += 1,
+            None => {}
+        }
+
+        if let Some(distance) = decision.distance {
+            if decision.skip_reason == Some(ShapeVectorSkipReason::DistanceThreshold) {
+                self.threshold_distance_count += 1;
+                self.threshold_distance_sum += distance;
+                self.threshold_distance_max = self.threshold_distance_max.max(distance);
+            } else {
+                self.matched_distance_count += 1;
+                self.matched_distance_sum += distance;
+                self.matched_distance_max = self.matched_distance_max.max(distance);
+            }
+        }
+
+        if decision.glyph.is_some() {
+            self.selector_match_cells += 1;
+            if final_glyph != resolve_glyph {
+                self.selector_override_cells += 1;
+            }
+        } else {
+            self.resolve_fallback_cells += 1;
+            if final_glyph == b' ' {
+                self.fallback_space_cells += 1;
+            } else {
+                self.fallback_structural_cells += 1;
+            }
+        }
+
+        if final_glyph == b' ' {
+            self.final_space_cells += 1;
+            if !rgb_is_black(bg_rgb) || fg_rgb != bg_rgb {
+                self.colored_space_cells += 1;
+            }
+        } else {
+            self.final_non_space_cells += 1;
+        }
+    }
+
+    pub fn percent_of_total(&self, value: u32) -> f32 {
+        if self.total_cells == 0 {
+            0.0
+        } else {
+            value as f32 * 100.0 / self.total_cells as f32
+        }
+    }
+
+    pub fn avg_matched_distance(&self) -> f32 {
+        if self.matched_distance_count == 0 {
+            0.0
+        } else {
+            self.matched_distance_sum / self.matched_distance_count as f32
+        }
+    }
+
+    pub fn avg_threshold_distance(&self) -> f32 {
+        if self.threshold_distance_count == 0 {
+            0.0
+        } else {
+            self.threshold_distance_sum / self.threshold_distance_count as f32
+        }
+    }
+}
+
+fn rgb_is_black(rgb: [u8; 3]) -> bool {
+    rgb == [0, 0, 0]
+}
+
 #[derive(Resource)]
 pub struct ShapeVectorMatcher {
+    active_alphabet: ShapeVectorAlphabetId,
     tree: KdTree<f32, 6>,
     cache: LruCache<u32, (u8, f32)>,
     entries: Vec<CharacterEntry>,
@@ -208,18 +614,18 @@ pub struct ShapeVectorMatcher {
 }
 
 impl ShapeVectorMatcher {
-    /// Create a new matcher from the built-in alphabet data.
     pub fn new_default() -> Self {
-        Self::new(&ALPHABET)
+        Self::new(ShapeVectorAlphabetId::Default, &default_alphabet().entries)
     }
 
-    /// Create a new matcher from custom character entries.
-    pub fn new(characters: &[CharacterEntry]) -> Self {
-        let mut tree: KdTree<f32, 6> = KdTree::new();
-        for (i, entry) in characters.iter().enumerate() {
-            tree.add(&entry.vector, i as u64);
+    pub fn new(active_alphabet: ShapeVectorAlphabetId, characters: &[CharacterEntry]) -> Self {
+        let mut tree = KdTree::<f32, 6>::new();
+        for (idx, entry) in characters.iter().enumerate() {
+            tree.add(&entry.vector, idx as u64);
         }
+
         Self {
+            active_alphabet,
             tree,
             cache: LruCache::new(NonZeroUsize::new(8192).unwrap()),
             entries: characters.to_vec(),
@@ -228,161 +634,438 @@ impl ShapeVectorMatcher {
         }
     }
 
-    /// Find the nearest glyph and return it with squared Euclidean distance.
-    ///
-    /// Uses LRU cache for repeated vectors. R20-F05: distance enables
-    /// threshold-based fallback to auto_mat.
-    ///
-    /// `&mut self` required because `LruCache::get()` promotes to most-recent.
     pub fn find_glyph_with_distance(&mut self, vector: [f32; 6]) -> (u8, f32) {
         let key = quantize_to_key(&vector);
-        if let Some(&(glyph, dist)) = self.cache.get(&key) {
+        if let Some(&(glyph, distance)) = self.cache.get(&key) {
             self.cache_hits += 1;
-            return (glyph, dist);
+            return (glyph, distance);
         }
+
         self.cache_misses += 1;
         let nearest = self.tree.nearest_one::<SquaredEuclidean>(&vector);
         let glyph = self.entries[nearest.item as usize].glyph;
-        let dist = nearest.distance;
-        self.cache.put(key, (glyph, dist));
-        (glyph, dist)
+        let distance = nearest.distance;
+        self.cache.put(key, (glyph, distance));
+        (glyph, distance)
     }
 
-    /// Find the nearest glyph (convenience wrapper, ignores distance).
     pub fn find_glyph(&mut self, vector: [f32; 6]) -> u8 {
         self.find_glyph_with_distance(vector).0
     }
 
-    /// Cache hit rate for Pitfall 3 monitoring.
-    /// R19-M1: 32-level quantization may produce lower hit rates than
-    /// Alex Harri's 8-level. Monitor during profiling.
     pub fn cache_hit_rate(&self) -> f64 {
         let total = self.cache_hits + self.cache_misses;
         if total == 0 {
-            return 0.0;
+            0.0
+        } else {
+            self.cache_hits as f64 / total as f64
         }
-        self.cache_hits as f64 / total as f64
     }
 
-    /// Clear the LRU cache and reset hit/miss counters.
     pub fn clear_cache(&mut self) {
         self.cache.clear();
         self.cache_hits = 0;
         self.cache_misses = 0;
     }
+
+    pub fn active_alphabet(&self) -> ShapeVectorAlphabetId {
+        self.active_alphabet
+    }
+
+    pub fn rebuild_from_alphabet(
+        &mut self,
+        active_alphabet: ShapeVectorAlphabetId,
+        alphabet: &ShapeVectorAlphabetData,
+    ) {
+        *self = Self::new(active_alphabet, &alphabet.entries);
+    }
 }
 
-// ---------------------------------------------------------------------------
-// Sampling from SampleBuffer
-// ---------------------------------------------------------------------------
+pub fn shape_vector_tuning_input_system(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut config: ResMut<ShapeVectorConfig>,
+) {
+    let mut changed = false;
 
-/// Extract lightness from a single sample, using dual-path for mesh vs terrain.
-///
-/// P7-002/P7-003 FIX: Mesh (MESH_FLAG set) uses RGB555 + diffuse scaling.
-/// Terrain (MESH_FLAG clear) uses material shade table lookup.
-/// R19-H1 FIX: Diffuse scaling applied before BT.709 for mesh samples.
-/// R20-F06 FIX: Bounds check for invalid terrain material index.
-pub fn sample_to_lightness(sample: &crate::render::sample_buffer::Sample, materials: &[Material]) -> f32 {
+    if keys.just_pressed(KeyCode::BracketLeft) {
+        config.distance_threshold = (config.distance_threshold - 0.005).max(0.0);
+        changed = true;
+    }
+    if keys.just_pressed(KeyCode::BracketRight) {
+        config.distance_threshold = (config.distance_threshold + 0.005).min(1.0);
+        changed = true;
+    }
+    if keys.just_pressed(KeyCode::Semicolon) {
+        config.global_crunch_exponent = (config.global_crunch_exponent - 0.25).max(0.25);
+        changed = true;
+    }
+    if keys.just_pressed(KeyCode::Quote) {
+        config.global_crunch_exponent = (config.global_crunch_exponent + 0.25).min(16.0);
+        changed = true;
+    }
+    if keys.just_pressed(KeyCode::Comma) {
+        config.directional_crunch_exponent = (config.directional_crunch_exponent - 0.5).max(0.5);
+        changed = true;
+    }
+    if keys.just_pressed(KeyCode::Period) {
+        config.directional_crunch_exponent = (config.directional_crunch_exponent + 0.5).min(20.0);
+        changed = true;
+    }
+    if keys.just_pressed(KeyCode::Minus) {
+        config.sampling_quality = config.sampling_quality.saturating_sub(1).max(1);
+        changed = true;
+    }
+    if keys.just_pressed(KeyCode::Equal) {
+        config.sampling_quality = (config.sampling_quality + 1).min(32);
+        changed = true;
+    }
+    if keys.just_pressed(KeyCode::F7) {
+        config.enable_global_crunch = !config.enable_global_crunch;
+        changed = true;
+    }
+    if keys.just_pressed(KeyCode::F8) {
+        config.enable_directional_crunch = !config.enable_directional_crunch;
+        changed = true;
+    }
+    if keys.just_pressed(KeyCode::F6) {
+        config.alphabet = config.alphabet.next();
+        changed = true;
+    }
+    if keys.just_pressed(KeyCode::F12) {
+        config.mode = config.mode.next();
+        changed = true;
+    }
+    if keys.just_pressed(KeyCode::Digit9) {
+        config.structural_fallback_distance_threshold =
+            (config.structural_fallback_distance_threshold - 0.01).max(0.0);
+        changed = true;
+    }
+    if keys.just_pressed(KeyCode::Digit7) {
+        config.contrast_adaptive_threshold_boost =
+            (config.contrast_adaptive_threshold_boost - 0.05).max(0.0);
+        changed = true;
+    }
+    if keys.just_pressed(KeyCode::Digit8) {
+        config.contrast_adaptive_threshold_boost =
+            (config.contrast_adaptive_threshold_boost + 0.05).min(4.0);
+        changed = true;
+    }
+    if keys.just_pressed(KeyCode::Digit0) {
+        config.structural_fallback_distance_threshold =
+            (config.structural_fallback_distance_threshold + 0.01).min(2.5);
+        changed = true;
+    }
+    if keys.just_pressed(KeyCode::F10) {
+        config.enable_structural_fallback = !config.enable_structural_fallback;
+        changed = true;
+    }
+    if keys.just_pressed(KeyCode::F11) {
+        config.enable_contrast_adaptive_threshold = !config.enable_contrast_adaptive_threshold;
+        changed = true;
+    }
+    if keys.just_pressed(KeyCode::Backslash) {
+        *config = ShapeVectorConfig::default();
+        changed = true;
+    }
+
+    if changed {
+        info!(
+            "Shape-vector tuning: mode={} alphabet={} threshold={:.3} adaptive={} boost={:.2} fallback={:.3} contrast={} global={:.2} directional={:.2} quality={} global_on={} directional_on={} structural_fb={} | keys: F12 mode F6 alphabet [] threshold 7/8 adaptive-boost 9/0 fallback ;' global ,./ directional -= quality F7/F8 toggles F10 structural F11 adaptive \\ reset",
+            config.mode.as_str(),
+            config.alphabet.as_str(),
+            config.distance_threshold,
+            config.enable_contrast_adaptive_threshold,
+            config.contrast_adaptive_threshold_boost,
+            config.structural_fallback_distance_threshold,
+            config.structural_fallback_contrast_threshold,
+            config.global_crunch_exponent,
+            config.directional_crunch_exponent,
+            config.sampling_quality,
+            config.enable_global_crunch,
+            config.enable_directional_crunch,
+            config.enable_structural_fallback,
+        );
+    }
+}
+
+pub fn sample_to_lightness(
+    sample: &crate::render::sample_buffer::Sample,
+    materials: &[Material],
+) -> f32 {
     if sample.spare & spare_bits::MESH_FLAG != 0 {
-        // Mesh path: RGB555 -> RGB888, scale by diffuse, then BT.709
         let r5 = (sample.visual & 0x1F) as f32;
         let g5 = ((sample.visual >> 5) & 0x1F) as f32;
         let b5 = ((sample.visual >> 10) & 0x1F) as f32;
-        let r8 = r5 * 255.0 / 31.0;
-        let g8 = g5 * 255.0 / 31.0;
-        let b8 = b5 * 255.0 / 31.0;
-        // R19-H1: Apply diffuse scaling before BT.709
         let diffuse_scale = sample.diffuse as f32 / 255.0;
-        let r = r8 * diffuse_scale;
-        let g = g8 * diffuse_scale;
-        let b = b8 * diffuse_scale;
-        // BT.709 luminance
+        let r = (r5 * 255.0 / 31.0) * diffuse_scale;
+        let g = (g5 * 255.0 / 31.0) * diffuse_scale;
+        let b = (b5 * 255.0 / 31.0) * diffuse_scale;
         (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0
     } else {
-        // Terrain path: material shade table lookup
         let mat_idx = (sample.visual & 0x00FF) as usize;
-        if mat_idx >= materials.len() {
-            return 0.0; // R20-F06: invalid material -> black
-        }
-        let elevation = 0u8; // default elevation for lightness sampling
-        let mat_cell = materials[mat_idx].lookup(elevation, sample.diffuse);
-        // Use fg color from shade table (already incorporates diffuse)
-        let r = mat_cell.fg[0] as f32;
-        let g = mat_cell.fg[1] as f32;
-        let b = mat_cell.fg[2] as f32;
+        let Some(material) = materials.get(mat_idx) else {
+            return 0.0;
+        };
+        let mat_cell = material.lookup(0, sample.diffuse);
+        let r = mat_cell.bg[0] as f32;
+        let g = mat_cell.bg[1] as f32;
+        let b = mat_cell.bg[2] as f32;
         (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255.0
     }
 }
 
-/// Compute the 6D shape vector for a cell by bilinear interpolation at
-/// 6 sampling positions within the 2x2 sample block.
-///
-/// P7-057 FIX (AUTHORITATIVE): bilinear interpolation, NOT circle-area averaging.
-/// P7-204 FIX: cast intermediate coordinates to u32 for sample_at().
-/// R20-F12: Y-axis orientation matches SampleBuffer convention (y-up).
+pub fn sample_to_rgb(
+    sample: &crate::render::sample_buffer::Sample,
+    materials: &[Material],
+) -> [f32; 3] {
+    let diffuse_divisor = if (sample.spare & spare_bits::PARITY_MASK) == spare_bits::REFLECTION
+        && !sample.is_mesh()
+    {
+        400.0
+    } else {
+        255.0
+    };
+
+    if sample.spare & spare_bits::MESH_FLAG != 0 {
+        let (r8, g8, b8) = rgb555_to_rgb888(sample.visual);
+        let diffuse_scale = sample.diffuse as f32 / diffuse_divisor;
+        return [
+            r8 as f32 * diffuse_scale,
+            g8 as f32 * diffuse_scale,
+            b8 as f32 * diffuse_scale,
+        ];
+    }
+
+    let mat_idx = (sample.visual & 0x00FF) as usize;
+    let Some(material) = materials.get(mat_idx) else {
+        return [0.0, 0.0, 0.0];
+    };
+    let mat_cell = material.lookup(0, sample.diffuse);
+    [
+        mat_cell.bg[0] as f32,
+        mat_cell.bg[1] as f32,
+        mat_cell.bg[2] as f32,
+    ]
+}
+
+fn bilinear_sample_rgb(
+    buffer: &SampleBuffer,
+    materials: &[Material],
+    px: f32,
+    py: f32,
+) -> [f32; 3] {
+    let px = px.clamp(0.0, (buffer.width - 1) as f32);
+    let py = py.clamp(0.0, (buffer.height - 1) as f32);
+
+    let x0 = px.floor() as u32;
+    let y0 = py.floor() as u32;
+    let x1 = (x0 + 1).min(buffer.width - 1);
+    let y1 = (y0 + 1).min(buffer.height - 1);
+    let fx = px - px.floor();
+    let fy = py - py.floor();
+
+    let c00 = sample_to_rgb(buffer.sample_at(x0, y0), materials);
+    let c10 = sample_to_rgb(buffer.sample_at(x1, y0), materials);
+    let c01 = sample_to_rgb(buffer.sample_at(x0, y1), materials);
+    let c11 = sample_to_rgb(buffer.sample_at(x1, y1), materials);
+
+    let lerp = |a: [f32; 3], b: [f32; 3], t: f32| -> [f32; 3] {
+        [
+            a[0] * (1.0 - t) + b[0] * t,
+            a[1] * (1.0 - t) + b[1] * t,
+            a[2] * (1.0 - t) + b[2] * t,
+        ]
+    };
+
+    let top = lerp(c00, c10, fx);
+    let bottom = lerp(c01, c11, fx);
+    lerp(top, bottom, fy)
+}
+
+fn glyph_ink(pixel: image::Rgba<u8>) -> f32 {
+    let r = pixel[0] as f32 / 255.0;
+    let g = pixel[1] as f32 / 255.0;
+    let b = pixel[2] as f32 / 255.0;
+    let a = pixel[3] as f32 / 255.0;
+    let lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    if a > 0.0 { lum * a } else { lum }
+}
+
+pub fn optimize_glyph_colors(
+    buffer: &SampleBuffer,
+    materials: &[Material],
+    cell_x: usize,
+    cell_y: usize,
+    glyph: u8,
+) -> Option<([u8; 3], [u8; 3])> {
+    if glyph == b' ' {
+        return None;
+    }
+
+    let image = runtime_font_image();
+    let glyph_x = (glyph as u32 % 16) * RUNTIME_FONT_CHAR_WIDTH;
+    let glyph_y = (glyph as u32 / 16) * RUNTIME_FONT_CHAR_HEIGHT;
+    let base_x = (2 + 2 * cell_x) as f32;
+    let base_y = (2 + 2 * cell_y) as f32;
+
+    let mut aa = 0.0f32;
+    let mut ab = 0.0f32;
+    let mut bb = 0.0f32;
+    let mut rhs_a = [0.0f32; 3];
+    let mut rhs_b = [0.0f32; 3];
+
+    for gy in 0..RUNTIME_FONT_CHAR_HEIGHT {
+        for gx in 0..RUNTIME_FONT_CHAR_WIDTH {
+            let ink = glyph_ink(*image.get_pixel(glyph_x + gx, glyph_y + gy)).clamp(0.0, 1.0);
+            let bg = 1.0 - ink;
+            let sample_x = base_x + ((gx as f32 + 0.5) / RUNTIME_FONT_CHAR_WIDTH as f32) * 2.0;
+            let sample_y = base_y + ((gy as f32 + 0.5) / RUNTIME_FONT_CHAR_HEIGHT as f32) * 2.0;
+            let src = bilinear_sample_rgb(buffer, materials, sample_x, sample_y);
+
+            aa += ink * ink;
+            ab += ink * bg;
+            bb += bg * bg;
+
+            for channel in 0..3 {
+                rhs_a[channel] += ink * src[channel];
+                rhs_b[channel] += bg * src[channel];
+            }
+        }
+    }
+
+    let det = aa * bb - ab * ab;
+    if det.abs() < 1e-6 {
+        return None;
+    }
+
+    let mut fg = [0u8; 3];
+    let mut bk = [0u8; 3];
+    for channel in 0..3 {
+        let fg_value = (rhs_a[channel] * bb - rhs_b[channel] * ab) / det;
+        let bk_value = (aa * rhs_b[channel] - ab * rhs_a[channel]) / det;
+        fg[channel] = fg_value.clamp(0.0, 255.0).round() as u8;
+        bk[channel] = bk_value.clamp(0.0, 255.0).round() as u8;
+    }
+
+    Some((fg, bk))
+}
+
+fn bilinear_sample_lightness(
+    buffer: &SampleBuffer,
+    materials: &[Material],
+    px: f32,
+    py: f32,
+) -> f32 {
+    let px = px.clamp(0.0, (buffer.width - 1) as f32);
+    let py = py.clamp(0.0, (buffer.height - 1) as f32);
+
+    let x0 = px.floor() as u32;
+    let y0 = py.floor() as u32;
+    let x1 = (x0 + 1).min(buffer.width - 1);
+    let y1 = (y0 + 1).min(buffer.height - 1);
+    let fx = px - px.floor();
+    let fy = py - py.floor();
+
+    let l00 = sample_to_lightness(buffer.sample_at(x0, y0), materials);
+    let l10 = sample_to_lightness(buffer.sample_at(x1, y0), materials);
+    let l01 = sample_to_lightness(buffer.sample_at(x0, y1), materials);
+    let l11 = sample_to_lightness(buffer.sample_at(x1, y1), materials);
+
+    (l00 * (1.0 - fx) * (1.0 - fy) + l10 * fx * (1.0 - fy) + l01 * (1.0 - fx) * fy + l11 * fx * fy)
+        .clamp(0.0, 1.0)
+}
+
+fn sample_circular_region(
+    buffer: &SampleBuffer,
+    materials: &[Material],
+    base_x: f32,
+    base_y: f32,
+    point: SamplingPoint,
+    circle_radius: f32,
+    quality: usize,
+) -> f32 {
+    let quality = quality.max(1);
+    let center_x = base_x + point.x * 2.0;
+    let center_y = base_y + point.y * 2.0;
+
+    if quality == 1 {
+        return bilinear_sample_lightness(buffer, materials, center_x, center_y);
+    }
+
+    let radius = circle_radius * 2.0;
+    let mut total = 0.0f32;
+    for i in 0..quality {
+        let radial = (((i as f32) + 0.5) / quality as f32).sqrt() * radius;
+        let angle = GOLDEN_ANGLE * i as f32;
+        let px = center_x + radial * angle.cos();
+        let py = center_y + radial * angle.sin();
+        total += bilinear_sample_lightness(buffer, materials, px, py);
+    }
+
+    total / quality as f32
+}
+
+fn sample_vector_with_points(
+    buffer: &SampleBuffer,
+    materials: &[Material],
+    cell_x: usize,
+    cell_y: usize,
+    points: &[SamplingPoint],
+    circle_radius: f32,
+    quality: usize,
+) -> Vec<f32> {
+    let base_x = (2 + 2 * cell_x) as f32;
+    let base_y = (2 + 2 * cell_y) as f32;
+    points
+        .iter()
+        .copied()
+        .map(|point| {
+            sample_circular_region(
+                buffer,
+                materials,
+                base_x,
+                base_y,
+                point,
+                circle_radius,
+                quality,
+            )
+        })
+        .collect()
+}
+
 pub fn sample_cell_vector(
     buffer: &SampleBuffer,
     materials: &[Material],
     cell_x: usize,
     cell_y: usize,
 ) -> [f32; 6] {
-    // Base sample coordinates for this cell's 2x2 block
-    let base_x = (2 + 2 * cell_x) as f32;
-    let base_y = (2 + 2 * cell_y) as f32;
-
-    let mut vector = [0.0f32; 6];
-
-    for (i, &(sx, sy)) in SAMPLING_POSITIONS.iter().enumerate() {
-        // Map normalized position [0,1] to sample-buffer sub-pixel position
-        // within the 2x2 block (0..2 range)
-        let px = base_x + sx * 2.0;
-        let py = base_y + sy * 2.0;
-
-        // Bilinear interpolation corners
-        let x0 = px.floor() as u32;
-        let y0 = py.floor() as u32;
-        let x1 = (x0 + 1).min(buffer.width - 1);
-        let y1 = (y0 + 1).min(buffer.height - 1);
-
-        let fx = px - px.floor();
-        let fy = py - py.floor();
-
-        // Four corner lightness values
-        let l00 = sample_to_lightness(buffer.sample_at(x0, y0), materials);
-        let l10 = sample_to_lightness(buffer.sample_at(x1, y0), materials);
-        let l01 = sample_to_lightness(buffer.sample_at(x0, y1), materials);
-        let l11 = sample_to_lightness(buffer.sample_at(x1, y1), materials);
-
-        // Bilinear interpolation
-        let l = l00 * (1.0 - fx) * (1.0 - fy)
-            + l10 * fx * (1.0 - fy)
-            + l01 * (1.0 - fx) * fy
-            + l11 * fx * fy;
-
-        vector[i] = l.clamp(0.0, 1.0);
-    }
-
-    vector
+    let alphabet = default_alphabet();
+    sample_vector_with_points(
+        buffer,
+        materials,
+        cell_x,
+        cell_y,
+        &alphabet.sampling_points,
+        alphabet.circle_radius,
+        DEFAULT_SAMPLING_QUALITY,
+    )
+    .try_into()
+    .expect("internal sampling must produce 6 values")
 }
 
-// ---------------------------------------------------------------------------
-// ShapeVectorGlyphSelector (GlyphSelector trait impl)
-// ---------------------------------------------------------------------------
-
-/// GlyphSelector implementation using 6D shape-vector k-d tree matching.
-///
-/// Created per-frame in render_pipeline_system from ShapeVectorMatcher resource.
-/// R20-F03: water_z field for underwater cell skipping.
-/// R20-F05: distance_threshold for auto_mat fallback.
 pub struct ShapeVectorGlyphSelector<'a> {
-    /// Mutable reference to the cached matcher.
+    pub alphabet: &'a ShapeVectorAlphabetData,
     pub matcher: &'a mut ShapeVectorMatcher,
-    /// Material library for terrain lightness extraction (P7-003).
     pub materials: &'a [Material],
-    /// Water surface height (R20-F03: skip underwater cells).
     pub water_z: f32,
-    /// Squared Euclidean distance threshold for fallback (R20-F05).
     pub distance_threshold: f32,
+    pub global_crunch_exponent: f32,
+    pub directional_crunch_exponent: f32,
+    pub sampling_quality: usize,
+    pub enable_global_crunch: bool,
+    pub enable_directional_crunch: bool,
+    pub contrast_adaptive_threshold_boost: f32,
+    pub enable_contrast_adaptive_threshold: bool,
 }
 
 impl GlyphSelector for ShapeVectorGlyphSelector<'_> {
@@ -392,44 +1075,405 @@ impl GlyphSelector for ShapeVectorGlyphSelector<'_> {
         cell_x: usize,
         cell_y: usize,
     ) -> Option<u8> {
-        let sx = (2 + 2 * cell_x) as u32;
-        let sy = (2 + 2 * cell_y) as u32;
-
-        // R20-F02: Guard against clear/sky cells
-        if sample_buffer.sample_at(sx, sy).height <= crate::render::sample_buffer::Sample::CLEAR_HEIGHT
-            && sample_buffer.sample_at(sx + 1, sy).height <= crate::render::sample_buffer::Sample::CLEAR_HEIGHT
-            && sample_buffer.sample_at(sx, sy + 1).height <= crate::render::sample_buffer::Sample::CLEAR_HEIGHT
-            && sample_buffer.sample_at(sx + 1, sy + 1).height <= crate::render::sample_buffer::Sample::CLEAR_HEIGHT
-        {
-            return None;
-        }
-
-        // R20-F03: Skip underwater cells to preserve ripple glyph
-        if self.water_z > f32::NEG_INFINITY {
-            let max_h = sample_buffer.sample_at(sx, sy).height
-                .max(sample_buffer.sample_at(sx + 1, sy).height)
-                .max(sample_buffer.sample_at(sx, sy + 1).height)
-                .max(sample_buffer.sample_at(sx + 1, sy + 1).height);
-            if max_h < self.water_z {
-                return None;
-            }
-        }
-
-        let mut vector = sample_cell_vector(sample_buffer, self.materials, cell_x, cell_y);
-
-        // R20-F04: Global contrast crunch
-        crunch_vector(&mut vector, 1.5);
-
-        // R20-F05: Distance threshold fallback
-        let (glyph, distance) = self.matcher.find_glyph_with_distance(vector);
-        if distance > self.distance_threshold {
-            return None; // Fall back to auto_mat
-        }
-
-        Some(glyph)
+        self.select_glyph_with_debug(sample_buffer, cell_x, cell_y)
+            .glyph
     }
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+impl ShapeVectorGlyphSelector<'_> {
+    pub fn select_glyph_with_debug(
+        &mut self,
+        sample_buffer: &SampleBuffer,
+        cell_x: usize,
+        cell_y: usize,
+    ) -> ShapeVectorDecision {
+        let sx = (2 + 2 * cell_x) as u32;
+        let sy = (2 + 2 * cell_y) as u32;
+
+        let heights = [
+            sample_buffer.sample_at(sx, sy).height,
+            sample_buffer.sample_at(sx + 1, sy).height,
+            sample_buffer.sample_at(sx, sy + 1).height,
+            sample_buffer.sample_at(sx + 1, sy + 1).height,
+        ];
+        if heights
+            .iter()
+            .all(|&height| height <= crate::render::sample_buffer::Sample::CLEAR_HEIGHT)
+        {
+            return ShapeVectorDecision::skipped(ShapeVectorSkipReason::Clear, None);
+        }
+
+        if self.water_z > f32::NEG_INFINITY
+            && heights.iter().copied().fold(f32::NEG_INFINITY, f32::max) < self.water_z
+        {
+            return ShapeVectorDecision::skipped(ShapeVectorSkipReason::Underwater, None);
+        }
+
+        let mut vector: [f32; 6] = sample_vector_with_points(
+            sample_buffer,
+            self.materials,
+            cell_x,
+            cell_y,
+            &self.alphabet.sampling_points,
+            self.alphabet.circle_radius,
+            self.sampling_quality,
+        )
+        .try_into()
+        .expect("internal sampling must produce 6 values");
+
+        if self.enable_directional_crunch && !self.alphabet.external_points.is_empty() {
+            let external_vector = sample_vector_with_points(
+                sample_buffer,
+                self.materials,
+                cell_x,
+                cell_y,
+                &self.alphabet.external_points,
+                self.alphabet.circle_radius,
+                self.sampling_quality,
+            );
+            directional_crunch_vector(
+                &mut vector,
+                &external_vector,
+                &self.alphabet.affects_mapping,
+                self.directional_crunch_exponent,
+            );
+        }
+
+        if self.enable_global_crunch {
+            crunch_vector(&mut vector, self.global_crunch_exponent);
+        }
+
+        let adaptive_contrast = vector_contrast(&vector);
+        let effective_threshold = effective_distance_threshold(
+            self.distance_threshold,
+            adaptive_contrast,
+            self.contrast_adaptive_threshold_boost,
+            self.enable_contrast_adaptive_threshold,
+        );
+        let (glyph, distance) = self.matcher.find_glyph_with_distance(vector);
+        if distance > effective_threshold {
+            return ShapeVectorDecision::threshold_rejected(glyph, distance);
+        }
+        ShapeVectorDecision::accepted(glyph, distance)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::render::material::test_materials;
+    use crate::render::sample_buffer::{Sample, spare_bits as sb};
+
+    #[test]
+    fn test_default_alphabet_metadata_loaded() {
+        let alphabet = default_alphabet();
+        assert_eq!(alphabet.entries.len(), 95);
+        assert_eq!(alphabet.sampling_points.len(), 6);
+        assert_eq!(alphabet.external_points.len(), 10);
+        assert_eq!(alphabet.affects_mapping.len(), 6);
+        assert!((alphabet.circle_radius - 0.28125).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_quantize_to_key_deterministic() {
+        let v = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6];
+        assert_eq!(quantize_to_key(&v), quantize_to_key(&v));
+    }
+
+    #[test]
+    fn test_quantize_to_key_distinct() {
+        let v1 = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6];
+        let v2 = [0.6, 0.5, 0.4, 0.3, 0.2, 0.1];
+        assert_ne!(quantize_to_key(&v1), quantize_to_key(&v2));
+    }
+
+    #[test]
+    fn test_effective_distance_threshold_uses_contrast_boost() {
+        let threshold = effective_distance_threshold(0.08, 0.8, 0.25, true);
+        assert!((threshold - 0.28).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_effective_distance_threshold_can_be_disabled() {
+        let threshold = effective_distance_threshold(0.08, 0.8, 0.25, false);
+        assert!((threshold - 0.08).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_find_glyph_returns_valid_cp437() {
+        let mut matcher = ShapeVectorMatcher::new_default();
+        let glyph = matcher.find_glyph([0.1, 0.1, 0.3, 0.3, 0.05, 0.05]);
+        assert!((0x20..=0x7E).contains(&glyph));
+    }
+
+    #[test]
+    fn test_cache_hit() {
+        let mut matcher = ShapeVectorMatcher::new_default();
+        let v = [0.1, 0.2, 0.3, 0.4, 0.05, 0.05];
+        let g1 = matcher.find_glyph(v);
+        let g2 = matcher.find_glyph(v);
+        assert_eq!(g1, g2);
+        assert_eq!(matcher.cache_hits, 1);
+        assert_eq!(matcher.cache_misses, 1);
+    }
+
+    #[test]
+    fn test_cache_bounded() {
+        let mut matcher = ShapeVectorMatcher::new_default();
+        for i in 0..8193u32 {
+            let v = [
+                (i % 32) as f32 / 32.0,
+                ((i / 32) % 32) as f32 / 32.0,
+                ((i / 1024) % 32) as f32 / 32.0,
+                0.0,
+                0.0,
+                0.0,
+            ];
+            matcher.find_glyph(v);
+        }
+        assert_eq!(matcher.cache.len(), 8192);
+    }
+
+    #[test]
+    fn test_find_glyph_with_distance_returns_zero_for_exact_match() {
+        let entries = [CharacterEntry {
+            glyph: b'X',
+            vector: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6],
+        }];
+        let mut matcher = ShapeVectorMatcher::new(ShapeVectorAlphabetId::Default, &entries);
+        let (glyph, dist) = matcher.find_glyph_with_distance([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]);
+        assert_eq!(glyph, b'X');
+        assert!(dist < 1e-10);
+    }
+
+    #[test]
+    fn test_sample_to_lightness_range() {
+        let materials = test_materials();
+        let sample = Sample {
+            visual: 31,
+            diffuse: 255,
+            spare: sb::MESH_FLAG,
+            height: 10.0,
+        };
+        let l = sample_to_lightness(&sample, &materials);
+        assert!((l - 0.2126).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_crunch_vector_preserves_max() {
+        let mut v = [0.1, 0.3, 0.2, 0.4, 0.15, 0.05];
+        let max_before = v.iter().copied().fold(0.0f32, f32::max);
+        crunch_vector(&mut v, 3.0);
+        let max_after = v.iter().copied().fold(0.0f32, f32::max);
+        assert!((max_before - max_after).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_directional_crunch_uses_external_context() {
+        let mut v = [0.2, 0.2, 0.2, 0.2, 0.2, 0.2];
+        let external = vec![0.8; 10];
+        let mapping = default_alphabet().affects_mapping.clone();
+        directional_crunch_vector(&mut v, &external, &mapping, 7.0);
+        assert!(v.iter().all(|&c| c < 0.2));
+    }
+
+    #[test]
+    fn test_sample_cell_vector_returns_six_values() {
+        let mut buf = SampleBuffer::new(4, 4);
+        let materials = test_materials();
+        for dy in 0..3u32 {
+            for dx in 0..3u32 {
+                *buf.sample_at_mut(2 + dx, 2 + dy) = Sample {
+                    visual: 31,
+                    diffuse: 255,
+                    spare: sb::MESH_FLAG,
+                    height: 50.0,
+                };
+            }
+        }
+        let v = sample_cell_vector(&buf, &materials, 0, 0);
+        assert_eq!(v.len(), 6);
+        assert!(v.iter().all(|&c| c >= 0.0 && c <= 1.0));
+    }
+
+    #[test]
+    fn test_glyph_selector_returns_none_for_clear_cells() {
+        let buf = SampleBuffer::new(4, 4);
+        let materials = test_materials();
+        let mut matcher = ShapeVectorMatcher::new_default();
+        let mut selector = ShapeVectorGlyphSelector {
+            alphabet: default_alphabet(),
+            matcher: &mut matcher,
+            materials: &materials,
+            water_z: f32::NEG_INFINITY,
+            distance_threshold: 0.05,
+            global_crunch_exponent: 3.0,
+            directional_crunch_exponent: 7.0,
+            sampling_quality: 8,
+            enable_global_crunch: true,
+            enable_directional_crunch: true,
+            contrast_adaptive_threshold_boost: 0.25,
+            enable_contrast_adaptive_threshold: true,
+        };
+        assert_eq!(selector.select_glyph(&buf, 0, 0), None);
+        let decision = selector.select_glyph_with_debug(&buf, 0, 0);
+        assert_eq!(decision.skip_reason, Some(ShapeVectorSkipReason::Clear));
+    }
+
+    #[test]
+    fn test_glyph_selector_returns_some_for_mesh_cells() {
+        let mut buf = SampleBuffer::new(4, 4);
+        let materials = test_materials();
+        for dy in 0..3u32 {
+            for dx in 0..3u32 {
+                *buf.sample_at_mut(2 + dx, 2 + dy) = Sample {
+                    visual: 31 | (15 << 5) | (10 << 10),
+                    diffuse: 200,
+                    spare: sb::MESH_FLAG,
+                    height: 50.0,
+                };
+            }
+        }
+
+        let mut matcher = ShapeVectorMatcher::new_default();
+        let mut selector = ShapeVectorGlyphSelector {
+            alphabet: default_alphabet(),
+            matcher: &mut matcher,
+            materials: &materials,
+            water_z: f32::NEG_INFINITY,
+            distance_threshold: 1.0,
+            global_crunch_exponent: 3.0,
+            directional_crunch_exponent: 7.0,
+            sampling_quality: 8,
+            enable_global_crunch: true,
+            enable_directional_crunch: true,
+            contrast_adaptive_threshold_boost: 0.25,
+            enable_contrast_adaptive_threshold: true,
+        };
+        assert!(selector.select_glyph(&buf, 0, 0).is_some());
+    }
+
+    #[test]
+    fn test_glyph_selector_skips_underwater() {
+        let mut buf = SampleBuffer::new(4, 4);
+        let materials = test_materials();
+        for dy in 0..3u32 {
+            for dx in 0..3u32 {
+                *buf.sample_at_mut(2 + dx, 2 + dy) = Sample {
+                    visual: 31,
+                    diffuse: 200,
+                    spare: sb::MESH_FLAG,
+                    height: 10.0,
+                };
+            }
+        }
+
+        let mut matcher = ShapeVectorMatcher::new_default();
+        let mut selector = ShapeVectorGlyphSelector {
+            alphabet: default_alphabet(),
+            matcher: &mut matcher,
+            materials: &materials,
+            water_z: 50.0,
+            distance_threshold: 1.0,
+            global_crunch_exponent: 3.0,
+            directional_crunch_exponent: 7.0,
+            sampling_quality: 8,
+            enable_global_crunch: true,
+            enable_directional_crunch: true,
+            contrast_adaptive_threshold_boost: 0.25,
+            enable_contrast_adaptive_threshold: true,
+        };
+        assert_eq!(selector.select_glyph(&buf, 0, 0), None);
+        let decision = selector.select_glyph_with_debug(&buf, 0, 0);
+        assert_eq!(
+            decision.skip_reason,
+            Some(ShapeVectorSkipReason::Underwater)
+        );
+    }
+
+    #[test]
+    fn test_glyph_selector_classifies_threshold_skip() {
+        let mut buf = SampleBuffer::new(4, 4);
+        let materials = test_materials();
+        for dy in 0..3u32 {
+            for dx in 0..3u32 {
+                *buf.sample_at_mut(2 + dx, 2 + dy) = Sample {
+                    visual: 31 | (15 << 5) | (10 << 10),
+                    diffuse: 200,
+                    spare: sb::MESH_FLAG,
+                    height: 50.0,
+                };
+            }
+        }
+
+        let mut matcher = ShapeVectorMatcher::new_default();
+        let mut selector = ShapeVectorGlyphSelector {
+            alphabet: default_alphabet(),
+            matcher: &mut matcher,
+            materials: &materials,
+            water_z: f32::NEG_INFINITY,
+            distance_threshold: 0.0,
+            global_crunch_exponent: 3.0,
+            directional_crunch_exponent: 7.0,
+            sampling_quality: 8,
+            enable_global_crunch: true,
+            enable_directional_crunch: true,
+            contrast_adaptive_threshold_boost: 0.25,
+            enable_contrast_adaptive_threshold: true,
+        };
+        let decision = selector.select_glyph_with_debug(&buf, 0, 0);
+        assert_eq!(
+            decision.skip_reason,
+            Some(ShapeVectorSkipReason::DistanceThreshold)
+        );
+        assert!(decision.distance.is_some());
+    }
+
+    #[test]
+    fn test_shape_vector_frame_stats_counts_colored_space_fallback() {
+        let mut stats = ShapeVectorFrameStats::default();
+        stats.begin_frame(1);
+        stats.note_selection(
+            ShapeVectorDecision::resolve_fallback(),
+            b' ',
+            b' ',
+            [153, 153, 255],
+            [102, 102, 204],
+        );
+        assert_eq!(stats.resolve_fallback_cells, 1);
+        assert_eq!(stats.fallback_space_cells, 1);
+        assert_eq!(stats.final_space_cells, 1);
+        assert_eq!(stats.colored_space_cells, 1);
+    }
+
+    #[test]
+    fn test_registry_exposes_two_alphabets() {
+        let registry = ShapeVectorAlphabetRegistry::default();
+        assert_eq!(
+            registry.get(ShapeVectorAlphabetId::Default).entries.len(),
+            95
+        );
+        assert!(registry.get(ShapeVectorAlphabetId::Minimal).entries.len() < 95);
+        assert!(registry.get(ShapeVectorAlphabetId::Minimal).entries.len() >= 8);
+    }
+
+    #[test]
+    fn test_matcher_rebuild_switches_alphabet() {
+        let registry = ShapeVectorAlphabetRegistry::default();
+        let mut matcher = ShapeVectorMatcher::new_default();
+        assert_eq!(matcher.active_alphabet(), ShapeVectorAlphabetId::Default);
+        matcher.rebuild_from_alphabet(
+            ShapeVectorAlphabetId::Minimal,
+            registry.get(ShapeVectorAlphabetId::Minimal),
+        );
+        assert_eq!(matcher.active_alphabet(), ShapeVectorAlphabetId::Minimal);
+        let allowed = registry
+            .get(ShapeVectorAlphabetId::Minimal)
+            .entries
+            .iter()
+            .map(|entry| entry.glyph)
+            .collect::<BTreeSet<_>>();
+        let glyph = matcher.find_glyph([0.1, 0.1, 0.3, 0.3, 0.05, 0.05]);
+        assert!(allowed.contains(&glyph));
+    }
+}

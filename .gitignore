@@ -8,10 +8,25 @@ target/
 .idea/
 .vscode/
 *.swp
+__pycache__/
+*.pyc
 
 # Build
 *.o
 *.d
 
-# Worktrees
-.worktrees/
+# Local/reference repos
+(ORIGINAL GAME)asciicker-Y9-2-main/
+.gitignore.local-backup-20260309
+
+# JS deps and local outputs
+engine-port/node_modules/
+engine-port/artifacts/
+
+# Local checkpoints and inspections
+artifacts/baselines/*
+!artifacts/baselines/BASELINE_MANIFEST.md
+artifacts/comparisons/
+artifacts/session_snapshots/
+artifacts/video_inspect/
+artifacts/worktrees/

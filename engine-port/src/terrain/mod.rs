@@ -202,10 +202,12 @@ impl RuntimeTerrain {
                 inv_dir,
                 max_dist as f64,
                 &mut |patch, current_max| {
-                    patch.ray_intersect(origin_f32, dir_f32, current_max as f32)
+                    patch
+                        .ray_intersect(origin_f32, dir_f32, current_max as f32)
                         .map(|t| t as f64)
                 },
-            ).map(|t| t as f32)
+            )
+            .map(|t| t as f32)
         } else {
             None
         }
@@ -280,3 +282,147 @@ impl Plugin for TerrainPlugin {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::asset_loader::a3d_terrain::TerrainPatch;
+    use crate::asset_loader::constants::HEIGHT_CELLS_PLUS_ONE;
+
+    fn make_patch(x: i32, y: i32, base_height: u16) -> TerrainPatch {
+        TerrainPatch {
+            x,
+            y,
+            height: [[base_height; HEIGHT_CELLS_PLUS_ONE]; HEIGHT_CELLS_PLUS_ONE],
+            visual: [[1u16; VISUAL_CELLS]; VISUAL_CELLS],
+            diag: 0,
+        }
+    }
+
+    fn make_runtime_terrain(patches: &[TerrainPatch]) -> RuntimeTerrain {
+        let terrain = A3dTerrain {
+            patches: patches.to_vec(),
+        };
+        RuntimeTerrain::build_from_parsed(&terrain)
+    }
+
+    #[test]
+    fn test_for_each_patch_visits_all() {
+        let patches = vec![
+            make_patch(0, 0, 100),
+            make_patch(1, 0, 100),
+            make_patch(0, 1, 100),
+            make_patch(1, 1, 100),
+        ];
+        let rt = make_runtime_terrain(&patches);
+
+        let mut visited = Vec::new();
+        rt.for_each_patch(|p| {
+            visited.push((p.x, p.y));
+        });
+
+        assert_eq!(visited.len(), 4, "for_each_patch must visit all 4 patches");
+        for &(x, y) in &[(0, 0), (1, 0), (0, 1), (1, 1)] {
+            assert!(
+                visited.contains(&(x, y)),
+                "Patch ({}, {}) must be visited",
+                x,
+                y
+            );
+        }
+    }
+
+    #[test]
+    fn test_get_patch_at_existing() {
+        let patches = vec![make_patch(5, 3, 100), make_patch(6, 3, 200)];
+        let rt = make_runtime_terrain(&patches);
+
+        let p = rt.get_patch_at(5, 3);
+        assert!(p.is_some(), "Patch at (5,3) must exist");
+        assert_eq!(p.unwrap().x, 5);
+        assert_eq!(p.unwrap().y, 3);
+        assert_eq!(p.unwrap().lo, 100);
+
+        let p2 = rt.get_patch_at(6, 3);
+        assert!(p2.is_some(), "Patch at (6,3) must exist");
+        assert_eq!(p2.unwrap().lo, 200);
+    }
+
+    #[test]
+    fn test_get_patch_at_missing() {
+        let patches = vec![make_patch(0, 0, 100)];
+        let rt = make_runtime_terrain(&patches);
+
+        assert!(
+            rt.get_patch_at(99, 99).is_none(),
+            "Patch at (99,99) should not exist"
+        );
+    }
+
+    #[test]
+    fn test_interpolate_height_center() {
+        // Single patch at (0,0) with uniform height 100
+        // World coord (4.0, 4.0) is center of patch
+        let patches = vec![make_patch(0, 0, 100)];
+        let rt = make_runtime_terrain(&patches);
+
+        let h = rt.interpolate_height(4.0, 4.0);
+        assert!(h.is_some(), "Height at patch center must return Some");
+        // F238 FIX: interpolate_height returns world units (raw / HEIGHT_SCALE)
+        let expected = 100.0 / HEIGHT_SCALE as f64;
+        assert!(
+            (h.unwrap() - expected).abs() < 1e-6,
+            "Height should be 100 / HEIGHT_SCALE = {}, got {}",
+            expected,
+            h.unwrap()
+        );
+    }
+
+    #[test]
+    fn test_interpolate_height_outside() {
+        let patches = vec![make_patch(0, 0, 100)];
+        let rt = make_runtime_terrain(&patches);
+
+        // Way outside any patch
+        assert!(
+            rt.interpolate_height(1000.0, 1000.0).is_none(),
+            "interpolate_height must return None outside terrain bounds"
+        );
+    }
+
+    #[test]
+    fn test_build_from_parsed() {
+        let terrain = A3dTerrain {
+            patches: vec![
+                make_patch(0, 0, 50),
+                make_patch(1, 0, 100),
+                make_patch(0, 1, 75),
+            ],
+        };
+        let rt = RuntimeTerrain::build_from_parsed(&terrain);
+
+        assert_eq!(rt.patch_count, 3);
+        assert!(rt.root.is_some());
+        assert_eq!(rt.base_x, 0);
+        assert_eq!(rt.base_y, 0);
+    }
+
+    #[test]
+    fn test_for_each_patch_mut_sets_dark() {
+        let patches = vec![make_patch(0, 0, 100), make_patch(1, 0, 100)];
+        let mut rt = make_runtime_terrain(&patches);
+
+        // Set dark bitmask on all patches
+        rt.for_each_patch_mut(|p| {
+            p.dark = 0xFFFF_FFFF_FFFF_FFFF;
+        });
+
+        // Verify dark was set
+        rt.for_each_patch(|p| {
+            assert_eq!(
+                p.dark, 0xFFFF_FFFF_FFFF_FFFF,
+                "dark must be set by for_each_patch_mut"
+            );
+        });
+    }
+}

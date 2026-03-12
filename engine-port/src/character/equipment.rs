@@ -126,3 +126,107 @@ impl SpriteReq {
         (world_radius, world_height)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sprite_index_defaults() {
+        let req = SpriteReq::default();
+        let (kind, a, h, s, w) = req.sprite_index();
+        assert_eq!(kind, SpriteKind::Human);
+        assert_eq!(a, 0);
+        assert_eq!(h, 0);
+        assert_eq!(s, 0);
+        assert_eq!(w, 0);
+    }
+
+    #[test]
+    fn test_sprite_index_full_equip() {
+        let req = SpriteReq {
+            kind: SpriteKind::Human,
+            armor: Armor::RegularArmor,
+            helmet: Helmet::RegularHelmet,
+            shield: Shield::RegularShield,
+            weapon: Weapon::RegularCrossbow,
+            ..Default::default()
+        };
+        let (kind, a, h, s, w) = req.sprite_index();
+        assert_eq!(kind, SpriteKind::Human);
+        assert_eq!(a, 1);
+        assert_eq!(h, 1);
+        assert_eq!(s, 1);
+        assert_eq!(w, 2);
+    }
+
+    #[test]
+    fn test_can_change_equipment_none() {
+        let req = SpriteReq {
+            action: ActionState::None,
+            ..Default::default()
+        };
+        assert!(req.can_change_equipment());
+    }
+
+    #[test]
+    fn test_can_change_equipment_attack() {
+        let req = SpriteReq {
+            action: ActionState::Attack,
+            ..Default::default()
+        };
+        assert!(!req.can_change_equipment());
+    }
+
+    #[test]
+    fn test_can_change_equipment_block() {
+        let req = SpriteReq {
+            action: ActionState::Block,
+            ..Default::default()
+        };
+        assert!(!req.can_change_equipment());
+    }
+
+    #[test]
+    fn test_human_collision_dimensions() {
+        let req = SpriteReq::default(); // Human, no mount
+        let (radius, height) = req.collision_dimensions();
+        // Human: world_radius = 2.0/12.0*8.0 = 1.333...
+        assert!(
+            (radius - 2.0 / 12.0 * 8.0).abs() < 0.01,
+            "Human world_radius should be ~1.333, got {radius}"
+        );
+        // Human: world_height = 7.0 * 2.0/3.0 / cos(30deg) * 16 ≈ 86.2
+        let expected_height = 7.0 * 2.0 / 3.0 / 30.0_f32.to_radians().cos() * 16.0;
+        assert!(
+            (height - expected_height).abs() < 0.1,
+            "Human world_height should be ~{expected_height}, got {height}"
+        );
+    }
+
+    #[test]
+    fn test_mounted_collision_dimensions() {
+        let req = SpriteReq {
+            mount: Mount::Wolf,
+            ..Default::default()
+        };
+        let (radius, height) = req.collision_dimensions();
+        // Mounted: world_radius = 3.0/12.0*8.0 = 2.0
+        assert!(
+            (radius - 2.0).abs() < 0.01,
+            "Mounted world_radius should be 2.0, got {radius}"
+        );
+        // Mounted: world_height = 9.0 * 2.0/3.0 / cos(30deg) * 16 ≈ 110.9
+        let expected_height = 9.0 * 2.0 / 3.0 / 30.0_f32.to_radians().cos() * 16.0;
+        assert!(
+            (height - expected_height).abs() < 0.1,
+            "Mounted world_height should be ~{expected_height}, got {height}"
+        );
+    }
+
+    #[test]
+    fn test_clr_field_default_zero() {
+        let req = SpriteReq::default();
+        assert_eq!(req.clr, 0);
+    }
+}

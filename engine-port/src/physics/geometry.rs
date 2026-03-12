@@ -6,7 +6,9 @@
 
 use bevy::prelude::warn;
 
+use crate::asset_loader::akm_mesh::AkmMesh;
 use crate::asset_loader::constants::{HEIGHT_CELLS, HEIGHT_SCALE, VISUAL_CELLS};
+use crate::render::assembly::MeshRegistry;
 use crate::terrain::RuntimeTerrain;
 use crate::world::RuntimeWorld;
 use crate::world::instance::RuntimeInstance;
@@ -135,14 +137,12 @@ pub fn collect_terrain_triangles(
 /// Collect world mesh collision triangles near `center` within `radius` (world-space).
 ///
 /// Uses RuntimeWorld's `query_sphere` for BSP-accelerated spatial lookup.
-/// For each mesh instance, generates bbox proxy (12 triangles from AABB faces).
-/// Transforms to sphere space.
+/// For each mesh instance, uses real AKM mesh triangles when available.
 ///
 /// R19-F003: Uses query_sphere which already exists on RuntimeWorld.
-///
-/// TODO (Phase 7): Replace bbox proxy with actual AkmMesh triangles.
 pub fn collect_world_triangles(
     world: &RuntimeWorld,
+    mesh_registry: &MeshRegistry,
     center: &[f32; 3],
     radius: f32,
     mul_xy: f32,
@@ -153,59 +153,341 @@ pub fn collect_world_triangles(
     let nearby = world.query_sphere(center_f64, radius as f64);
 
     for inst in nearby {
-        if let RuntimeInstance::Mesh { bbox, .. } = inst {
-            // Generate 12 triangles (2 per AABB face) as collision proxy
-            let [xmin, xmax, ymin, ymax, zmin, zmax] = [
-                bbox[0] as f32,
-                bbox[1] as f32,
-                bbox[2] as f32,
-                bbox[3] as f32,
-                bbox[4] as f32,
-                bbox[5] as f32,
-            ];
-
-            // 8 corners of AABB
-            let corners = [
-                [xmin, ymin, zmin], // 0: ---
-                [xmax, ymin, zmin], // 1: +--
-                [xmax, ymax, zmin], // 2: ++-
-                [xmin, ymax, zmin], // 3: -+-
-                [xmin, ymin, zmax], // 4: --+
-                [xmax, ymin, zmax], // 5: +-+
-                [xmax, ymax, zmax], // 6: +++
-                [xmin, ymax, zmax], // 7: -++
-            ];
-
-            // 6 faces, 2 triangles each (CCW winding from outside)
-            let faces: [[usize; 4]; 6] = [
-                [0, 3, 2, 1], // bottom (-Z)
-                [4, 5, 6, 7], // top (+Z)
-                [0, 1, 5, 4], // front (-Y)
-                [2, 3, 7, 6], // back (+Y)
-                [0, 4, 7, 3], // left (-X)
-                [1, 2, 6, 5], // right (+X)
-            ];
-
-            for face in &faces {
-                let quads = [
-                    [corners[face[0]], corners[face[1]], corners[face[2]]],
-                    [corners[face[0]], corners[face[2]], corners[face[3]]],
-                ];
-
-                for tri_verts in &quads {
-                    let sv0 = to_sphere_space(&tri_verts[0], center, mul_xy, mul_z);
-                    let sv1 = to_sphere_space(&tri_verts[1], center, mul_xy, mul_z);
-                    let sv2 = to_sphere_space(&tri_verts[2], center, mul_xy, mul_z);
-
-                    let nrm = compute_plane(&sv0, &sv1, &sv2);
-
-                    soup.push(SoupItem {
-                        tri: [sv0, sv1, sv2],
-                        material: 0, // mesh material = 0
-                        nrm,
-                    });
-                }
+        if let RuntimeInstance::Mesh { mesh_id, tm, .. } = inst {
+            if let Some(mesh) = mesh_registry.loaded.get(mesh_id) {
+                collect_mesh_triangles(mesh, tm, center, mul_xy, mul_z, soup);
             }
         }
+    }
+}
+
+fn collect_mesh_triangles(
+    mesh: &AkmMesh,
+    tm: &[f64; 16],
+    center: &[f32; 3],
+    mul_xy: f32,
+    mul_z: f32,
+    soup: &mut Vec<SoupItem>,
+) {
+    for face in &mesh.faces {
+        let Some(v0) = mesh.vertices.get(face.indices[0] as usize) else {
+            continue;
+        };
+        let Some(v1) = mesh.vertices.get(face.indices[1] as usize) else {
+            continue;
+        };
+        let Some(v2) = mesh.vertices.get(face.indices[2] as usize) else {
+            continue;
+        };
+
+        let w0 = transform_mesh_vertex(tm, v0.x, v0.y, v0.z);
+        let w1 = transform_mesh_vertex(tm, v1.x, v1.y, v1.z);
+        let w2 = transform_mesh_vertex(tm, v2.x, v2.y, v2.z);
+
+        let sv0 = to_sphere_space(&w0, center, mul_xy, mul_z);
+        let sv1 = to_sphere_space(&w1, center, mul_xy, mul_z);
+        let sv2 = to_sphere_space(&w2, center, mul_xy, mul_z);
+        let nrm = compute_plane(&sv0, &sv1, &sv2);
+
+        soup.push(SoupItem {
+            tri: [sv0, sv1, sv2],
+            material: face.visual as i32,
+            nrm,
+        });
+    }
+}
+
+fn transform_mesh_vertex(tm: &[f64; 16], x: f32, y: f32, z: f32) -> [f32; 3] {
+    let x = x as f64;
+    let y = y as f64;
+    let z = z as f64;
+    [
+        (tm[0] * x + tm[4] * y + tm[8] * z + tm[12]) as f32,
+        (tm[1] * x + tm[5] * y + tm[9] * z + tm[13]) as f32,
+        (tm[2] * x + tm[6] * y + tm[10] * z + tm[14]) as f32,
+    ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::asset_loader::a3d_terrain::{A3dTerrain, TerrainPatch};
+    use crate::asset_loader::a3d_world::{A3dWorld, WorldInstance};
+    use crate::asset_loader::akm_mesh::{AkmFace, AkmMesh, AkmVertex};
+    use crate::asset_loader::constants::HEIGHT_CELLS_PLUS_ONE;
+    use crate::render::assembly::MeshRegistry;
+    use crate::world::instance::{INST_USE_TREE, INST_VISIBLE};
+
+    fn make_flat_patch(x: i32, y: i32, height: u16) -> TerrainPatch {
+        TerrainPatch {
+            x,
+            y,
+            height: [[height; HEIGHT_CELLS_PLUS_ONE]; HEIGHT_CELLS_PLUS_ONE],
+            visual: [[1u16; VISUAL_CELLS]; VISUAL_CELLS],
+            diag: 0,
+        }
+    }
+
+    #[test]
+    fn test_collect_terrain_triangles_produces_32_per_patch() {
+        // R16-F195: One patch with HEIGHT_CELLS=4 must produce 4*4*2 = 32 triangles
+        let terrain_data = A3dTerrain {
+            patches: vec![make_flat_patch(0, 0, 160)], // height=160 -> 10.0 world
+        };
+        let terrain = RuntimeTerrain::build_from_parsed(&terrain_data);
+
+        let mut soup = Vec::new();
+        let center = [4.0, 4.0, 10.0]; // Center of patch
+        let radius = 20.0;
+        let mul_xy = 1.0;
+        let mul_z = 1.0;
+
+        collect_terrain_triangles(&terrain, &center, radius, mul_xy, mul_z, &mut soup);
+
+        assert_eq!(
+            soup.len(),
+            32,
+            "One patch must produce 32 triangles, got {}",
+            soup.len()
+        );
+    }
+
+    #[test]
+    fn test_collect_terrain_triangles_empty_terrain() {
+        let terrain = RuntimeTerrain::default();
+        let mut soup = Vec::new();
+        collect_terrain_triangles(&terrain, &[0.0, 0.0, 0.0], 10.0, 1.0, 1.0, &mut soup);
+        assert!(soup.is_empty(), "Empty terrain should produce no triangles");
+    }
+
+    #[test]
+    fn test_collect_terrain_triangles_multiple_patches() {
+        let terrain_data = A3dTerrain {
+            patches: vec![make_flat_patch(0, 0, 160), make_flat_patch(1, 0, 160)],
+        };
+        let terrain = RuntimeTerrain::build_from_parsed(&terrain_data);
+
+        let mut soup = Vec::new();
+        let center = [8.0, 4.0, 10.0]; // Between two patches
+        let radius = 20.0;
+
+        collect_terrain_triangles(&terrain, &center, radius, 1.0, 1.0, &mut soup);
+
+        assert_eq!(
+            soup.len(),
+            64,
+            "Two patches must produce 64 triangles, got {}",
+            soup.len()
+        );
+    }
+
+    #[test]
+    fn test_collect_terrain_triangles_has_material() {
+        let mut patch = make_flat_patch(0, 0, 160);
+        patch.visual[0][0] = 42;
+        let terrain_data = A3dTerrain {
+            patches: vec![patch],
+        };
+        let terrain = RuntimeTerrain::build_from_parsed(&terrain_data);
+
+        let mut soup = Vec::new();
+        collect_terrain_triangles(&terrain, &[4.0, 4.0, 10.0], 20.0, 1.0, 1.0, &mut soup);
+
+        // At least some triangles should have material 42
+        let has_mat_42 = soup.iter().any(|s| s.material == 42);
+        assert!(has_mat_42, "Some triangles should have material from vmap");
+    }
+
+    #[test]
+    fn test_collect_world_triangles_real_mesh() {
+        // Create a world with one mesh instance
+        let mut tm = vec![0.0; 16];
+        tm[0] = 1.0;
+        tm[5] = 1.0;
+        tm[10] = 1.0;
+        tm[15] = 1.0;
+        tm[12] = 5.0; // translate X
+        tm[13] = 5.0;
+        tm[14] = 5.0;
+
+        let world_data = A3dWorld {
+            format_version: 1,
+            instances: vec![WorldInstance::Mesh {
+                mesh_id: "test.akm".to_string(),
+                inst_name: "test_inst".to_string(),
+                tm,
+                flags: INST_VISIBLE | INST_USE_TREE,
+                story_id: -1,
+            }],
+        };
+        let world = RuntimeWorld::build_from_parsed(&world_data, None);
+        let mut registry = MeshRegistry::default();
+        registry.loaded.insert(
+            "test.akm".to_string(),
+            AkmMesh {
+                vertices: vec![
+                    AkmVertex {
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        r: 255,
+                        g: 0,
+                        b: 0,
+                        alpha: 255,
+                    },
+                    AkmVertex {
+                        x: 1.0,
+                        y: 0.0,
+                        z: 0.0,
+                        r: 255,
+                        g: 0,
+                        b: 0,
+                        alpha: 255,
+                    },
+                    AkmVertex {
+                        x: 0.0,
+                        y: 1.0,
+                        z: 0.0,
+                        r: 255,
+                        g: 0,
+                        b: 0,
+                        alpha: 255,
+                    },
+                ],
+                faces: vec![AkmFace {
+                    indices: [0, 1, 2],
+                    visual: 7,
+                    freestyle: false,
+                }],
+                edges: vec![],
+            },
+        );
+
+        let mut soup = Vec::new();
+        let center = [5.0, 5.0, 5.0]; // Near the mesh
+        let radius = 10.0;
+
+        collect_world_triangles(&world, &registry, &center, radius, 1.0, 1.0, &mut soup);
+
+        assert_eq!(
+            soup.len(),
+            1,
+            "One loaded AKM face should produce one collision triangle, got {}",
+            soup.len()
+        );
+        assert_eq!(
+            soup[0].material, 7,
+            "Real mesh triangle should preserve face visual"
+        );
+    }
+
+    #[test]
+    fn test_collect_world_triangles_empty_world() {
+        let world = RuntimeWorld::default();
+        let mut soup = Vec::new();
+        let registry = MeshRegistry::default();
+        collect_world_triangles(
+            &world,
+            &registry,
+            &[0.0, 0.0, 0.0],
+            10.0,
+            1.0,
+            1.0,
+            &mut soup,
+        );
+        assert!(soup.is_empty(), "Empty world should produce no triangles");
+    }
+
+    #[test]
+    fn test_collect_world_triangles_unloaded_mesh_is_skipped() {
+        let mut tm = vec![0.0; 16];
+        tm[0] = 1.0;
+        tm[5] = 1.0;
+        tm[10] = 1.0;
+        tm[15] = 1.0;
+
+        let world_data = A3dWorld {
+            format_version: 1,
+            instances: vec![WorldInstance::Mesh {
+                mesh_id: "missing.akm".to_string(),
+                inst_name: "missing_inst".to_string(),
+                tm,
+                flags: INST_VISIBLE | INST_USE_TREE,
+                story_id: -1,
+            }],
+        };
+        let world = RuntimeWorld::build_from_parsed(&world_data, None);
+        let registry = MeshRegistry::default();
+
+        let mut soup = Vec::new();
+        collect_world_triangles(
+            &world,
+            &registry,
+            &[0.0, 0.0, 0.0],
+            10.0,
+            1.0,
+            1.0,
+            &mut soup,
+        );
+
+        assert!(
+            soup.is_empty(),
+            "Unloaded meshes should not synthesize bbox collisions"
+        );
+    }
+
+    #[test]
+    fn test_collect_world_triangles_far_mesh_excluded() {
+        let mut tm = vec![0.0; 16];
+        tm[0] = 1.0;
+        tm[5] = 1.0;
+        tm[10] = 1.0;
+        tm[15] = 1.0;
+        tm[12] = 1000.0; // Far away
+        tm[13] = 1000.0;
+        tm[14] = 1000.0;
+
+        let world_data = A3dWorld {
+            format_version: 1,
+            instances: vec![WorldInstance::Mesh {
+                mesh_id: "far.akm".to_string(),
+                inst_name: "far_inst".to_string(),
+                tm,
+                flags: INST_VISIBLE | INST_USE_TREE,
+                story_id: -1,
+            }],
+        };
+        let world = RuntimeWorld::build_from_parsed(&world_data, None);
+        let registry = MeshRegistry::default();
+
+        let mut soup = Vec::new();
+        collect_world_triangles(
+            &world,
+            &registry,
+            &[0.0, 0.0, 0.0],
+            5.0,
+            1.0,
+            1.0,
+            &mut soup,
+        );
+
+        assert!(
+            soup.is_empty(),
+            "Far mesh should not be collected, got {} triangles",
+            soup.len()
+        );
+    }
+
+    #[test]
+    fn test_compute_plane_normal() {
+        let v0 = [0.0, 0.0, 0.0f32];
+        let v1 = [1.0, 0.0, 0.0];
+        let v2 = [0.0, 1.0, 0.0];
+        let plane = compute_plane(&v0, &v1, &v2);
+        // Normal should point in +Z for CCW triangle on XY plane
+        assert!((plane[0]).abs() < 1e-6);
+        assert!((plane[1]).abs() < 1e-6);
+        assert!((plane[2] - 1.0).abs() < 1e-6);
+        assert!((plane[3]).abs() < 1e-6); // passes through origin
     }
 }

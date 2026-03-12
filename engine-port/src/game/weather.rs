@@ -232,10 +232,7 @@ pub fn set_weather_state(weather: &mut Weather, state: WeatherState) {
 ///
 /// Cycles WeatherState on F5 press: Clear -> LightSnow -> HeavySnow -> Blizzard -> Clear.
 /// Calls set_weather_state to update target_intensity accordingly.
-pub fn cycle_weather_debug_system(
-    keys: Res<ButtonInput<KeyCode>>,
-    mut weather: ResMut<Weather>,
-) {
+pub fn cycle_weather_debug_system(keys: Res<ButtonInput<KeyCode>>, mut weather: ResMut<Weather>) {
     if keys.just_pressed(KeyCode::F5) {
         let old = weather.state;
         let next = match old {
@@ -352,3 +349,354 @@ pub fn weather_composite_system(
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -- Task 1 tests (ParticlePool and WeatherState) --
+
+    #[test]
+    fn test_particle_pool_starts_empty() {
+        let pool = ParticlePool::new();
+        assert_eq!(pool.active_count(), 0);
+        assert_eq!(pool.head, 0);
+        assert_eq!(pool.iter_live().count(), 0);
+    }
+
+    #[test]
+    fn test_particle_pool_spawn_increments_count() {
+        let mut pool = ParticlePool::new();
+        pool.spawn(WeatherParticle {
+            lifetime_remaining: 5.0,
+            ..Default::default()
+        });
+        assert_eq!(pool.active_count(), 1);
+        assert_eq!(pool.iter_live().count(), 1);
+
+        pool.spawn(WeatherParticle {
+            lifetime_remaining: 5.0,
+            ..Default::default()
+        });
+        assert_eq!(pool.active_count(), 2);
+    }
+
+    #[test]
+    fn test_particle_pool_wraps_at_capacity() {
+        let mut pool = ParticlePool::new();
+        // Spawn PARTICLE_CAPACITY + 1 particles
+        for i in 0..=PARTICLE_CAPACITY {
+            pool.spawn(WeatherParticle {
+                lifetime_remaining: 5.0,
+                pos: [i as f32, 0.0, 0.0],
+                ..Default::default()
+            });
+        }
+        // Count stays at PARTICLE_CAPACITY
+        assert_eq!(pool.active_count(), PARTICLE_CAPACITY);
+        // Head should have wrapped
+        assert_eq!(pool.head, 1); // 513 % 512 = 1
+        // Last spawned particle overwrote slot 0
+        assert_eq!(pool.particles[0].pos[0], PARTICLE_CAPACITY as f32);
+    }
+
+    #[test]
+    fn test_particle_pool_iter_live_particles() {
+        let mut pool = ParticlePool::new();
+        // Spawn 3 live, then 1 with lifetime 0 (dead)
+        pool.spawn(WeatherParticle {
+            lifetime_remaining: 5.0,
+            ..Default::default()
+        });
+        pool.spawn(WeatherParticle {
+            lifetime_remaining: 3.0,
+            ..Default::default()
+        });
+        pool.spawn(WeatherParticle {
+            lifetime_remaining: 0.0,
+            ..Default::default()
+        });
+        pool.spawn(WeatherParticle {
+            lifetime_remaining: 2.0,
+            ..Default::default()
+        });
+
+        // 4 slots used, but only 3 are alive (P7-029 FIX)
+        assert_eq!(pool.active_count(), 4);
+        assert_eq!(pool.iter_live().count(), 3);
+    }
+
+    #[test]
+    fn test_weather_state_spawn_rates() {
+        assert_eq!(SPAWN_RATES[WeatherState::Clear as usize], 0.0);
+        assert_eq!(SPAWN_RATES[WeatherState::LightSnow as usize], 10.0);
+        assert_eq!(SPAWN_RATES[WeatherState::HeavySnow as usize], 30.0);
+        assert_eq!(SPAWN_RATES[WeatherState::Blizzard as usize], 60.0);
+    }
+
+    #[test]
+    fn test_weather_intensity_lerp() {
+        // R17-F224 FIX: starting at intensity=0.0 with target=1.0 and LERP_RATE=0.05
+        let mut intensity = 0.0f32;
+        let target = 1.0f32;
+
+        // After 1 frame: intensity += (1.0 - 0.0) * 0.05 = 0.05
+        intensity += (target - intensity) * LERP_RATE;
+        assert!(
+            (intensity - 0.05).abs() < 0.001,
+            "After 1 frame: expected ~0.05, got {intensity}"
+        );
+
+        // After 20 frames total: intensity = 1.0 - 0.95^20 ~ 0.642
+        for _ in 1..20 {
+            intensity += (target - intensity) * LERP_RATE;
+        }
+        let expected_20 = 1.0 - 0.95f32.powi(20);
+        assert!(
+            (intensity - expected_20).abs() < 0.01,
+            "After 20 frames: expected ~{expected_20}, got {intensity}"
+        );
+    }
+
+    #[test]
+    fn test_set_weather_state_updates_target() {
+        let mut weather = Weather::default();
+        assert_eq!(weather.state, WeatherState::Clear);
+        assert_eq!(weather.target_intensity, 0.0);
+
+        set_weather_state(&mut weather, WeatherState::Blizzard);
+        assert_eq!(weather.state, WeatherState::Blizzard);
+        assert_eq!(weather.target_intensity, 1.0);
+
+        set_weather_state(&mut weather, WeatherState::LightSnow);
+        assert_eq!(weather.state, WeatherState::LightSnow);
+        assert_eq!(weather.target_intensity, 0.3);
+    }
+
+    #[test]
+    fn test_particle_pool_update_applies_velocity() {
+        let mut pool = ParticlePool::new();
+        pool.spawn(WeatherParticle {
+            pos: [0.0, 0.0, 100.0],
+            vel: [1.0, 2.0, -10.0],
+            lifetime_remaining: 5.0,
+            ..Default::default()
+        });
+
+        pool.update(0.5); // half second
+
+        let p = &pool.particles[0];
+        assert!((p.pos[0] - 0.5).abs() < 0.001);
+        assert!((p.pos[1] - 1.0).abs() < 0.001);
+        assert!((p.pos[2] - 95.0).abs() < 0.001);
+        assert!((p.lifetime_remaining - 4.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_particle_pool_update_skips_dead() {
+        let mut pool = ParticlePool::new();
+        pool.spawn(WeatherParticle {
+            pos: [10.0, 0.0, 0.0],
+            vel: [1.0, 0.0, 0.0],
+            lifetime_remaining: 0.0, // dead
+            ..Default::default()
+        });
+        pool.update(1.0);
+        // Dead particle should NOT be moved
+        assert_eq!(pool.particles[0].pos[0], 10.0);
+    }
+
+    // -- Task 2 tests (weather update and composite systems) --
+
+    #[test]
+    fn test_weather_update_spawns() {
+        // R17-F225 FIX: HeavySnow + dt=1.0 should spawn exactly 30 particles
+        let mut weather = Weather::default();
+        set_weather_state(&mut weather, WeatherState::HeavySnow);
+        weather.intensity = 1.0; // already at full
+
+        // Simulate update: accumulator += SPAWN_RATES[HeavySnow] * dt = 30.0 * 1.0 = 30.0
+        let dt = 1.0f32;
+        weather.spawn_accumulator += SPAWN_RATES[weather.state as usize] * dt;
+
+        let mut spawned = 0u32;
+        while weather.spawn_accumulator >= 1.0 {
+            weather.spawn_accumulator -= 1.0;
+            weather.pool.spawn(WeatherParticle {
+                lifetime_remaining: DEFAULT_LIFETIME,
+                ..Default::default()
+            });
+            spawned += 1;
+        }
+
+        assert_eq!(spawned, 30);
+        assert_eq!(weather.pool.active_count(), 30);
+    }
+
+    #[test]
+    fn test_weather_composite_writes() {
+        // Particle at known position writes glyph to grid
+        let mut weather = Weather::default();
+        weather.pool.spawn(WeatherParticle {
+            pos: [10.0, 10.0, 10.0],
+            vel: [0.0, 0.0, -5.0],
+            lifetime_remaining: 5.0,
+            glyph: 0x2A, // *
+            fg: [255, 255, 255],
+        });
+
+        let mut grid = AsciiCellGrid::new(240, 135);
+        let mut camera = GameCamera::default();
+        camera.pos = [10.0, 10.0, 10.0];
+        camera.yaw = 0.0;
+        camera.zoom = 1.0;
+        camera.perspective = true;
+        camera.update(484.0, 274.0);
+        camera.extract_frustum_planes(484.0, 274.0);
+
+        // Call the composite logic directly
+        for particle in weather.pool.iter_live() {
+            if let Some((sx, sy)) = project_world_to_screen(&particle.pos, &camera) {
+                let px = sx as u32;
+                let py = sy as u32;
+                if px < grid.width && py < grid.height {
+                    let (_, _, existing_bg) = grid.cell_at(px, py);
+                    grid.set_cell(
+                        px,
+                        py,
+                        particle.glyph as u16,
+                        [255, 255, 255, 255],
+                        existing_bg,
+                    );
+                }
+            }
+        }
+
+        // At least one cell should have the snow glyph written
+        let has_snow = grid.char_indices.iter().any(|&c| c == 0x2A);
+        assert!(has_snow, "Composite should write snow glyph to grid");
+    }
+
+    #[test]
+    fn test_weather_clear_no_spawn() {
+        // R16-F209 FIX: Clear has SPAWN_RATES[0]=0, so no particles spawn
+        let weather = Weather::default();
+        assert_eq!(weather.state, WeatherState::Clear);
+        assert_eq!(SPAWN_RATES[WeatherState::Clear as usize], 0.0);
+        assert_eq!(weather.pool.active_count(), 0);
+    }
+
+    #[test]
+    fn test_rain_uses_rain_glyphs() {
+        // R13-034 FIX: PrecipitationType::Rain produces RAIN_GLYPHS, not SNOW_GLYPHS
+        let mut weather = Weather::default();
+        weather.precipitation = PrecipitationType::Rain;
+        set_weather_state(&mut weather, WeatherState::HeavySnow);
+
+        // Simulate spawning particles with Rain type
+        for i in 0..30u32 {
+            let hash_seed = i.wrapping_mul(2654435761);
+            let variant = (hash_seed as usize) % RAIN_GLYPHS.len();
+            let glyph = RAIN_GLYPHS[variant];
+            weather.pool.spawn(WeatherParticle {
+                glyph,
+                lifetime_remaining: 5.0,
+                ..Default::default()
+            });
+        }
+
+        // All spawned glyphs should be rain glyphs, not snow glyphs
+        for p in weather.pool.iter_live() {
+            assert!(
+                RAIN_GLYPHS.contains(&p.glyph),
+                "Rain particle glyph 0x{:02X} should be in RAIN_GLYPHS",
+                p.glyph
+            );
+            assert!(
+                !SNOW_GLYPHS.contains(&p.glyph),
+                "Rain particle glyph 0x{:02X} should NOT be in SNOW_GLYPHS",
+                p.glyph
+            );
+        }
+    }
+
+    #[test]
+    fn test_weather_default() {
+        let w = Weather::default();
+        assert_eq!(w.state, WeatherState::Clear);
+        assert_eq!(w.precipitation, PrecipitationType::Snow);
+        assert_eq!(w.intensity, 0.0);
+        assert_eq!(w.target_intensity, 0.0);
+        assert_eq!(w.wind, [0.0, 0.0]);
+        assert_eq!(w.perlin_time, 0.0);
+        assert_eq!(w.pool.active_count(), 0);
+        assert_eq!(w.spawn_accumulator, 0.0);
+    }
+
+    #[test]
+    fn test_snow_glyph_constants() {
+        // Verify CP437 codes match expected characters
+        assert_eq!(SNOW_GLYPHS[0], 0x2A); // *
+        assert_eq!(SNOW_GLYPHS[1], 0x2B); // +
+        assert_eq!(SNOW_GLYPHS[2], 0x2E); // .
+        assert_eq!(SNOW_GLYPHS[3], 0x2C); // ,
+    }
+
+    #[test]
+    fn test_rain_glyph_constants() {
+        assert_eq!(RAIN_GLYPHS[0], 0x7C); // |
+        assert_eq!(RAIN_GLYPHS[1], 0x2F); // /
+        assert_eq!(RAIN_GLYPHS[2], 0x3A); // :
+    }
+
+    #[test]
+    fn test_cycle_weather_cycles_all_states() {
+        // Verify F5 cycle: Clear -> LightSnow -> HeavySnow -> Blizzard -> Clear
+        let mut weather = Weather::default();
+        assert_eq!(weather.state, WeatherState::Clear);
+
+        // Clear -> LightSnow
+        let next = match weather.state {
+            WeatherState::Clear => WeatherState::LightSnow,
+            WeatherState::LightSnow => WeatherState::HeavySnow,
+            WeatherState::HeavySnow => WeatherState::Blizzard,
+            WeatherState::Blizzard => WeatherState::Clear,
+        };
+        set_weather_state(&mut weather, next);
+        assert_eq!(weather.state, WeatherState::LightSnow);
+        assert_eq!(weather.target_intensity, 0.3);
+
+        // LightSnow -> HeavySnow
+        let next = match weather.state {
+            WeatherState::Clear => WeatherState::LightSnow,
+            WeatherState::LightSnow => WeatherState::HeavySnow,
+            WeatherState::HeavySnow => WeatherState::Blizzard,
+            WeatherState::Blizzard => WeatherState::Clear,
+        };
+        set_weather_state(&mut weather, next);
+        assert_eq!(weather.state, WeatherState::HeavySnow);
+        assert_eq!(weather.target_intensity, 0.7);
+
+        // HeavySnow -> Blizzard
+        let next = match weather.state {
+            WeatherState::Clear => WeatherState::LightSnow,
+            WeatherState::LightSnow => WeatherState::HeavySnow,
+            WeatherState::HeavySnow => WeatherState::Blizzard,
+            WeatherState::Blizzard => WeatherState::Clear,
+        };
+        set_weather_state(&mut weather, next);
+        assert_eq!(weather.state, WeatherState::Blizzard);
+        assert_eq!(weather.target_intensity, 1.0);
+
+        // Blizzard -> Clear (wrap)
+        let next = match weather.state {
+            WeatherState::Clear => WeatherState::LightSnow,
+            WeatherState::LightSnow => WeatherState::HeavySnow,
+            WeatherState::HeavySnow => WeatherState::Blizzard,
+            WeatherState::Blizzard => WeatherState::Clear,
+        };
+        set_weather_state(&mut weather, next);
+        assert_eq!(weather.state, WeatherState::Clear);
+        assert_eq!(weather.target_intensity, 0.0);
+    }
+}

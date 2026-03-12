@@ -146,3 +146,39 @@ impl Plugin for CharacterPlugin {
         info!("CharacterPlugin registered");
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_required_components_auto_inserted() {
+        // Verify Character Required Components auto-inserts ActionState, SpriteReq, AnimationState, Transform
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+
+        // Spawn with ONLY Character -- Required Components should auto-insert the rest
+        let entity = app.world_mut().spawn(Character).id();
+
+        // Required components are inserted via hooks, need an update to process
+        app.update();
+
+        let world = app.world();
+        assert!(
+            world.get::<ActionState>(entity).is_some(),
+            "ActionState should be auto-inserted"
+        );
+        assert!(
+            world.get::<SpriteReq>(entity).is_some(),
+            "SpriteReq should be auto-inserted"
+        );
+        assert!(
+            world.get::<AnimationState>(entity).is_some(),
+            "AnimationState should be auto-inserted"
+        );
+        assert!(
+            world.get::<Transform>(entity).is_some(),
+            "Transform should be auto-inserted"
+        );
+    }
+}
