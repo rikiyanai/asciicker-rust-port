@@ -30,3 +30,10 @@ artifacts/comparisons/
 artifacts/session_snapshots/
 artifacts/video_inspect/
 artifacts/worktrees/
+gh_2.67.0_linux_amd64/
+gh_2.67.0_linux_amd64.tar.gz
+venv
+venv/
+
+venv/
+venv*
