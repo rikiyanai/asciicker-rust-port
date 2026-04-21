@@ -41,7 +41,7 @@ behavior, not as the sole release gate.
 - [ ] Implement GPU-accelerated ASCII output as Bevy render plugin (Mage Core 4-texture approach: char index, fg, bg, font atlas)
 - [ ] Integrate Alex Harri 6D shape-vector k-d tree matching at RESOLVE stage (replaces auto_mat glyph selection; auto_mat still used for fg/bg color)
 - [ ] Perspective camera with Q/E rotation toggle (D004-D005: perspective REQUIRED)
-- [ ] Ship the canonical rendering demo workbench with model/source selection, center ASCII canvas, and right-panel sliders/toggles from `docs/CANONICAL_SPEC.md`
+- [ ] Ship the canonical render workbench with model/source selection, center ASCII canvas, and right-panel sliders/toggles from `docs/CANONICAL_SPEC.md`
 - [ ] Basic multiplayer networking (client-server model)
 - [ ] Audio system via bevy_kira_audio (16-track mixer)
 - [ ] Water rendering with reflective surface

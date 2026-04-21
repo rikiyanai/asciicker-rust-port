@@ -115,11 +115,13 @@ The only tracked "three modes" code found in this checkout is networking mode se
 
 That is unrelated to rendering.
 
-## Rendering Demo Mode
+## Render Workbench
 
 Status: planned, not implemented on `main`.
 
-The rendering demo mode is the canonical target for interactive visual inspection of ASCII rendering behavior. It should be a tool-like workbench, not a landing page or explanatory demo screen.
+The render workbench is the canonical target for interactive visual inspection
+of ASCII rendering behavior. It should be a tool-like workbench, not a landing
+page or explanatory demo screen.
 
 The original-engine baselines remain useful as reference evidence for culling,
 legibility, and glyph behavior, but they are not the product gate. The product
