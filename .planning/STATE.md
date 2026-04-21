@@ -4,19 +4,19 @@
 
 See: .planning/PROJECT.md (updated 2026-02-20)
 
-**Core value:** Build the canonical render workbench from `docs/CANONICAL_SPEC.md`: source selection on the left, ASCII canvas in the center, and live sliders/toggles on the right, using the original engine as reference evidence instead of the only product gate.
-**Current focus:** Replace the old parity-first narrative with the canonical render workbench target while keeping baseline captures available for culling, legibility, and regression checks.
+**Core value:** Build the canonical Render Tuning Workbench from `docs/CANONICAL_SPEC.md`: explicit tuning surface, canvas-first layout, real renderer controls, and visible current state, using the original engine as reference evidence instead of the only product gate.
+**Current focus:** Replan the rejected first UI attempt around actual engine controls before any more UI implementation, while keeping baseline captures available for culling, legibility, and regression checks.
 
 ## Current Position
 
 Phase: 5-7 re-verification / gap closure
-Plan: Render workbench implementation and doc/source-reference cleanup before new feature claims
-Status: PARTIAL. Phases 5-7 contain real rendering functionality, but the canonical render workbench is not yet implemented and the docs still carry pre-canon parity framing in several places.
+Plan: Render Tuning Workbench control-inventory replan and doc/source-reference cleanup before new feature claims
+Status: PARTIAL. Phases 5-7 contain real rendering functionality, but the canonical Render Tuning Workbench is not yet implemented and a first UI attempt (`59863c6`) was rejected for copying Figma structure without mapping to real renderer controls.
 Last activity: 2026-03-11 -- implemented the first semantic gate for shape-vector overrides, then verified it on both a 30-frame smoke replay and a full 120-frame replay (`artifacts/baselines/orbit-2026-03-11-semantic-gated-debug`): occupancy stayed effectively flat while override count dropped by `42.2` cells per frame on average versus the prior best pre-gate replay.
 
 Progress: [######----] 60%
 
-**Note:** The repo has substantial implemented functionality, but the canonical render workbench is still not done. Treat `3a621b8` + `artifacts/baselines/backup-3a621b8-run2` as diagnostic baseline material, not as the primary product definition.
+**Note:** The repo has substantial implemented functionality, but the canonical Render Tuning Workbench is still not done. Treat `3a621b8` + `artifacts/baselines/backup-3a621b8-run2` as diagnostic baseline material, not as the primary product definition.
 
 ## Performance Metrics
 
@@ -176,6 +176,7 @@ Recent decisions affecting current work:
 - [ ] Do a manual visual validation pass for the semantic-gated path
 - [ ] Continue porting the remaining original mixed reflection/non-reflection resolve branch in `engine-port/src/render/resolve.rs`
 - [ ] Reconcile `.planning/PROJECT.md` and any remaining older docs that still imply full Phase 7 completion
+- [ ] Replace the rejected `59863c6` overlay approach with a dedicated Render Tuning Workbench mode built from real controls
 
 ### Blockers/Concerns
 
@@ -231,7 +232,7 @@ Resume file: `artifacts/baselines/BASELINE_MANIFEST.md`
 
 ## Next Sequence
 
-1. Implement the canonical render workbench shell and replace the current render-demo framing with it.
-2. Wire the right-panel controls so resolution, scale, inversion, and culling state are visible and live.
+1. Execute the Render Tuning Workbench replan in `docs/worksheets/plans/2026-04-21-render-tuning-workbench-replan.md`.
+2. Replace the current overlay approach with an explicit tuning mode whose controls are derived from real renderer state.
 3. Keep replay/baseline captures available as diagnostics while reducing `threshold_skip_cells` and `colored_space_cells` without reintroducing noisy overrides.
 4. After the workbench is usable, continue the remaining original mixed-cell resolve/compositing port and revisit water-specific fixes.

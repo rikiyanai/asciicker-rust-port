@@ -118,7 +118,8 @@ Non-canonical worksheet inventory. Durable truths belong in [`docs/CANONICAL_SPE
 - [Research Testing Strategies](research/research-testing-strategies.md) - Testing strategy research
 - [Implementation Deep Dive](research-implementation-deep-dive.md) - Deep dive implementation research
 - [Strangler Fig Pattern](research-strangler-fig-pattern.md) - Strangler fig migration pattern research
-- [Figma 3D ASCII Model Viewer UI/UX Research](research/2026-04-21-figma-3d-ascii-model-viewer-ui-ux-research.md) - Live rendered workbench capture plus local page-shell snapshot
+- [Figma 3D ASCII Model Viewer UI/UX Research](research/2026-04-21-figma-3d-ascii-model-viewer-ui-ux-research.md) - Layout/tone reference only; not the canonical control vocabulary
+- [Render Tuning Workbench Control Map](research/2026-04-21-render-tuning-workbench-control-map.md) - Code-backed inventory of real renderer controls, defaults, effects, and Phase 1 inclusion
 
 ## Process Documents
 - [Failure Log](../FAILURE_LOG.md) - Issues and blockers
@@ -161,6 +162,7 @@ Non-canonical worksheet inventory. Durable truths belong in [`docs/CANONICAL_SPE
 - [Plan: 2026-03-11 Alex Harri vs Original Architecture Audit](plans/2026-03-11-alexharri-vs-original-architecture-audit.md)
 - [Audit: 2026-03-11 Render/Glyph/Lighting Deep-Dive vs C++](plans/2026-03-11-render-glyph-lighting-audit.md)
 - [Spec: 2026-03-11 Three-Mode Render Spec (Original/Harri/Combined)](plans/2026-03-11-three-mode-render-spec.md)
+- [Plan: 2026-04-21 Render Tuning Workbench Replan](plans/2026-04-21-render-tuning-workbench-replan.md) - Naming decision, control inventory, and phased replacement plan after rejected first UI attempt
 
 ### Audit Documents
 - [Audit: Assumptions Verified](audit-assumptions-verified.md)

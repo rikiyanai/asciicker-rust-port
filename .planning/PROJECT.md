@@ -6,10 +6,10 @@ A Rust/Bevy reimplementation of the Asciicker C++ game engine (~82K lines across
 
 ## Core Value
 
-The product target is an interactive ASCII rendering workbench that exposes
-scene selection plus live resolution, scale, preset, inversion, and culling
-controls while using the original C++ engine as reference evidence for render
-behavior, not as the sole release gate.
+The product target is an interactive ASCII Render Tuning Workbench that
+exposes real renderer controls, visible current state, and comparison tooling
+while using the original C++ engine as reference evidence for render behavior,
+not as the sole release gate.
 
 ## Requirements
 
@@ -41,7 +41,7 @@ behavior, not as the sole release gate.
 - [ ] Implement GPU-accelerated ASCII output as Bevy render plugin (Mage Core 4-texture approach: char index, fg, bg, font atlas)
 - [ ] Integrate Alex Harri 6D shape-vector k-d tree matching at RESOLVE stage (replaces auto_mat glyph selection; auto_mat still used for fg/bg color)
 - [ ] Perspective camera with Q/E rotation toggle (D004-D005: perspective REQUIRED)
-- [ ] Ship the canonical render workbench with model/source selection, center ASCII canvas, and right-panel sliders/toggles from `docs/CANONICAL_SPEC.md`
+- [ ] Ship the canonical Render Tuning Workbench with source/context navigation, center ASCII canvas, and real renderer sliders/toggles from `docs/CANONICAL_SPEC.md`
 - [ ] Basic multiplayer networking (client-server model)
 - [ ] Audio system via bevy_kira_audio (16-track mixer)
 - [ ] Water rendering with reflective surface
@@ -112,7 +112,7 @@ behavior, not as the sole release gate.
 ## Constraints
 
 - **Tech Stack**: Bevy 0.18+ (Rust 2021 edition) — D001 final, no custom engine
-- **Visual Fidelity**: Use the original C++ engine as render-behavior reference where useful, but optimize the shipped target around the render workbench UX in `docs/CANONICAL_SPEC.md`
+- **Visual Fidelity**: Use the original C++ engine as render-behavior reference where useful, but optimize the shipped target around the Render Tuning Workbench UX in `docs/CANONICAL_SPEC.md`
 - **Binary Compatibility**: Must load original .xp sprites and .a3d world files unchanged
 - **Performance**: Target 60 FPS at 1080p with full scene (terrain + world + sprites + effects)
 - **Architecture**: ECS where it adds value; plain Rust where it doesn't. Use ECS for spatial entities (characters, NPCs, projectiles, terrain patches). Use plain Rust for algorithms (pathfinding, collision math), data tables (equipment lookup, material tables), state machines (character FSM, game FSM).

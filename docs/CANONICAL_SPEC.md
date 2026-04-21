@@ -115,57 +115,79 @@ The only tracked "three modes" code found in this checkout is networking mode se
 
 That is unrelated to rendering.
 
-## Render Workbench
+## Render Tuning Workbench
 
-Status: planned, not implemented on `main`.
+Status: planned, not yet user-approved.
 
-The render workbench is the canonical target for interactive visual inspection
-of ASCII rendering behavior. It should be a tool-like workbench, not a landing
-page or explanatory demo screen.
+Canonical product name: `Render Tuning Workbench`
+
+Deprecated names:
+
+- `inspector`
+- `render demo`
+- `render adjustable window`
+- any literal Figma-derived label set that is not backed by engine state
+
+The Render Tuning Workbench is the canonical target for interactive inspection
+and tuning of ASCII rendering behavior. It is not a generic debug inspector,
+not a landing page, and not a literal clone of the Figma reference. The Figma
+artifact is useful as layout and tone inspiration only: full canvas first,
+lightweight left/right chrome, minimal copy.
 
 The original-engine baselines remain useful as reference evidence for culling,
 legibility, and glyph behavior, but they are not the product gate. The product
-gate is whether the workbench is usable for live inspection, comparison, and
-tuning.
+gate is whether the Render Tuning Workbench is usable for live inspection,
+comparison, and tuning with controls that correspond to real renderer state.
 
-Core layout:
+Purpose:
 
-- **Left fixture picker:** A narrow, persistent vertical source-selection rail for choosing what is being rendered. This is the "what" surface: model, scene, or fixture selection. It must stay visually separate from render-setting controls even when both surfaces float directly over the canvas.
-- **Canvas center:** The primary workspace is a full-bleed ASCII canvas that occupies the viewport rather than sitting inside a boxed card. The selected 3D model or scene renders directly in this field and updates live as parameters change.
-- **Right control stack:** The "how" surface for rendering settings is a compact floating stack on the right side of the canvas, not a heavy inspector sidebar. It contains presets, resolution, scale, toggles, reset, and secondary utility actions.
+- Replace opaque hotkey-only tuning with visible, inspectable state.
+- Make render variables discoverable without memorizing key chords or reading window-title text.
+- Separate "what is being rendered" from "how it is rendered".
+- Support repeatable visual debugging of culling, glyph selection, density, and pass behavior.
 
-Canvas requirements:
+Structural rules:
 
-- Render the model or scene using ASCII characters.
-- React in real time to all right-panel settings.
-- Support a rough 30-frame camera-rotation capture path for visual comparisons.
-- Support side-by-side or repeatable comparison of multiple rendering modes when mode comparison is active.
-- Provide enough visual stability that culling, density, scale, and glyph-set changes can be inspected without guessing from a single frame.
-- Present as a single uninterrupted field first; controls should read as overlays on the workspace, not as the main content.
+- The workbench must be a dedicated tuning surface or explicitly-entered mode. It must not be an always-on overlay that hijacks normal gameplay input.
+- The center canvas is primary. Controls support the canvas; they are not the main content.
+- Mouse interaction must work for every primary control.
+- Keyboard shortcuts may remain as secondary access paths, but the canonical state must be visible in UI.
 
-Right panel requirements:
+Layout model:
 
-- **Fixture/source buttons:** The left rail should support quick switching between a small set of named fixtures or models. The current inspired UI uses labels like `Logo`, `Computer`, `Plant`, `Shiba`, and `Crystal`.
-- **Presets:** Quick-toggle character sets. The current inspired UI uses compact button labels rather than verbose descriptions, for example:
-  - dense: `.:-=+*#%@`
-  - sparse-medium: `.-+*#`
-- **Resolution control:** Adjusts ASCII pixel density and updates the canvas immediately. It should expose a live numeric readout in the control stack, not just a hidden internal value.
-- **Scale control:** Adjusts model zoom/size and updates the canvas immediately. It should expose a live numeric readout in the control stack, not just a hidden internal value.
-- **Invert colors toggle:** Swaps light/dark mapping.
-- **Reset button:** Restores default preset, resolution, scale, color inversion, camera, and culling settings.
-- **Credits/link-out affordance:** A lightweight secondary action such as `Credits` may sit at the bottom of the right control stack without competing with the primary controls.
-- **Culling/debug controls:** Expose culling behavior clearly enough to reproduce and inspect render differences. Keyboard shortcuts may exist, but every critical state must also be visible in the UI.
+- **Left navigation rail:** context and source selection only when those selections are real. Examples: scene, replay trace, comparison mode, or fixture only if the app truly supports switching among them.
+- **Center canvas:** full-bleed ASCII render output with immediate visual response to tuning changes.
+- **Right control stack:** compact groups for live renderer controls and diagnostics, not a generic property inspector.
+
+Control model:
+
+- Every visible control must map to a real runtime setting or explicit comparison action.
+- No decorative controls are allowed.
+- No generic `preset` control is allowed unless it maps to a named, documented bundle of real renderer settings.
+- No copied Figma labels such as `Logo`, `Computer`, `Plant`, `Shiba`, or `Crystal` are canonical unless the app actually exposes those render targets.
+
+Canonical control groups:
+
+- **View:** resolution scale or explicit grid dimensions, camera zoom/scale, and any capture/orbit trigger used for comparison.
+- **Visibility and culling:** terrain visibility, world/mesh visibility, sprite visibility, shadow pass, reflection pass, terrain frustum culling, world/BSP culling, and back-face/double-sided controls only if they are truly runtime-backed.
+- **Glyph matching and resolve tuning:** shape-vector mode, alphabet, distance threshold, adaptive-threshold toggle, adaptive boost, structural fallback toggle, fallback threshold, sampling quality, global crunch toggle/exponent, and directional crunch toggle/exponent.
+- **Diagnostics and actions:** reset-to-defaults, capture/compare actions, and visible numeric/readout state for the currently active settings.
 
 UX requirements:
 
-- Sliders must provide immediate feedback; the user should see legibility and density changes as they drag.
-- Character-set presets are part of the product value, not decoration. They should make density and ASCII-art style differences obvious.
-- The interface must separate "what is being rendered" from "how it is rendered" to keep the workbench usable as controls grow, but this separation should be achieved through placement and grouping rather than heavy panel chrome.
-- The first viewport should be the usable workbench itself: full canvas visible immediately, fixture picker on the left, control stack on the right.
-- The visual language should stay minimal and tool-like: sparse labels, direct controls, no onboarding copy, no oversized hero framing.
-- Numeric control values should stay visible at rest so the current resolution and scale are inspectable without interaction.
-- The UI must avoid in-app instructional prose. Labels and state readouts are acceptable; tutorial copy is not.
-- Controls and text must remain legible and non-overlapping on desktop and mobile-width viewports.
+- Sliders must provide immediate feedback.
+- Current values must remain visible at rest.
+- Controls must be grouped by user task, not by resemblance to a mockup.
+- The interface must avoid tutorial prose and generic debug noise.
+- Controls and text must remain legible and clickable on desktop and narrow viewports.
+- The workbench must not take over the normal game screen unless the user explicitly enters the tuning surface.
+
+Non-canonical patterns:
+
+- Copying mockup labels without runtime meaning.
+- Showing UI state that does not affect the renderer.
+- Shipping a Bevy inspector/resource viewer and calling it the workbench.
+- Overlaying controls on gameplay in a way that blocks normal interaction without an explicit mode switch.
 
 ## Culling
 
