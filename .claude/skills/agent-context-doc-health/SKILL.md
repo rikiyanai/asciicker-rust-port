@@ -47,22 +47,23 @@ test -f Cargo.toml && cargo test 2>&1 | tail -10 || echo "No Cargo.toml — skip
 > **Note:** `.planning/` directory will be created by GSD initialization. Until then, `MASTER_ROADMAP.md` at project root serves as the status authority.
 
 1. `AGENTS.md` (repo-global operating rules)
-2. `docs/INDEX.md` (canonical doc hub)
-3. `docs/AGENT_PROTOCOL.md` (agent startup + evidence rules)
-4. `.planning/ROADMAP.md` (**canonical status ledger**) — or `MASTER_ROADMAP.md` (interim authority before GSD init)
-5. `.planning/PROJECT.md` (acceptance outcomes and active scope)
-6. Active roadmap/plan docs in `docs/plans/` (execution detail)
-7. `.planning/STATE.md` (session context only; non-authoritative for completion)
-8. `CLAUDE.md` (Claude memory/constraints)
-9. Active failure log in `docs/FAILURE_LOG.md` (**append-only failure record**)
-10. Live git evidence (commits/branches/stashes/worktrees)
+2. `docs/CANONICAL_SPEC.md` (durable architecture, decisions, and code/doc truth)
+3. `docs/FAILURE_LOG.md` (**append-only failure record**)
+4. `docs/worksheets/INDEX.md` (worksheet inventory)
+5. `docs/worksheets/AGENT_PROTOCOL.md` (agent startup + evidence rules)
+6. `.planning/ROADMAP.md` (**canonical status ledger**) — or `MASTER_ROADMAP.md` (interim authority before GSD init)
+7. `.planning/PROJECT.md` (acceptance outcomes and active scope)
+8. Active roadmap/plan docs in `docs/worksheets/plans/` (execution detail)
+9. `.planning/STATE.md` (session context only; non-authoritative for completion)
+10. `CLAUDE.md` (Claude memory/constraints)
+11. Live git evidence (commits/branches/stashes/worktrees)
 
 If any lower-priority source conflicts with a higher-priority one, fix the lower-priority source.
 
 ### Status Authority Rules
 
 - Completion status lives in `.planning/ROADMAP.md` (once GSD creates it). Before GSD initialization, `MASTER_ROADMAP.md` at project root is the interim status authority.
-- Plan docs (`docs/plans/*.md`) may define tasks/checklists but may not override roadmap status.
+- Plan docs (`docs/worksheets/plans/*.md`) may define tasks/checklists but may not override roadmap status.
 - `.planning/STATE.md` can summarize progress but cannot be used as evidence to mark completion.
 - If roadmap and plan differ, roadmap wins; update plan doc to align and include evidence.
 
@@ -74,10 +75,10 @@ If any lower-priority source conflicts with a higher-priority one, fix the lower
 
 ```bash
 # Phase references in code and plans
-rg -n "Phase [0-9]" docs/plans docs .planning
+rg -n "Phase [0-9]" docs/worksheets/plans docs .planning
 
 # Completion claims in docs
-rg -n "status:\s*(complete|completed|done|active|draft)" docs/plans .planning docs
+rg -n "status:\s*(complete|completed|done|active|draft)" docs/worksheets/plans .planning docs
 
 # Commit evidence for claimed work
 git log --oneline --decorate --graph --max-count=200 --grep='phase\|render\|terrain\|world\|physics\|game'
@@ -102,7 +103,8 @@ Build and check this matrix for each active initiative:
 Any blank field is a blocker for completion claims.
 
 Additionally enforce:
-- `docs/INDEX.md` active-plan labels must match `.planning/ROADMAP.md` status.
+- `docs/CANONICAL_SPEC.md` and `docs/FAILURE_LOG.md` must not contradict `.planning/ROADMAP.md` status or proof state.
+- `docs/worksheets/INDEX.md` entries must not present worksheet material as canonical.
 - Ship decisions in plan docs must match active blockers in roadmap/project (e.g., policy gates).
 
 ### C. Git hygiene and loss-risk audit
@@ -127,9 +129,10 @@ Rules:
 - Include concrete commit hashes when marking items complete.
 - Include explicit "NOT DONE" checklist entries for skipped acceptance criteria.
 - When renumbering/re-scoping phases, update all references in one pass.
-- Add newly authoritative docs to `docs/INDEX.md` immediately.
+- Add durable truths to `docs/CANONICAL_SPEC.md` or `docs/FAILURE_LOG.md` immediately.
+- Keep `docs/worksheets/INDEX.md` limited to worksheet inventory and discovery.
 - Mark superseded docs clearly as `legacy`/`superseded` to prevent accidental reuse.
-- If changing status in `docs/plans/*`, sync `.planning/ROADMAP.md` in the same commit.
+- If changing status in `docs/worksheets/plans/*`, sync `.planning/ROADMAP.md` in the same commit.
 
 ---
 
@@ -213,7 +216,8 @@ Context is healthy only when all are true:
 - No contradictory status across roadmap/plan/protocol docs.
 - Each "completed" claim maps to real commit evidence.
 - Stashes are zero, and worktree intent is explicit.
-- `docs/INDEX.md` points to all active high-signal docs.
+- `docs/CANONICAL_SPEC.md` and `docs/FAILURE_LOG.md` reflect current durable truth.
+- `docs/worksheets/INDEX.md` points to active worksheet material without claiming canonical authority.
 - Failure log `Open Failures` section matches current reality (no stale entries, no unlogged failures).
 - Incoming agent can resume from one handoff block without archaeology.
 

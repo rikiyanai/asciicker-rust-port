@@ -23,7 +23,7 @@ These rules override optimistic exploration behavior and prevent false "done" cl
    - Report failing tests, broken flows, and missing wiring explicitly.
    - Keep phase status aligned with test results and roadmap/state docs.
    - Treat `.planning/ROADMAP.md` as canonical status authority.
-   - Treat `docs/plan-*.md` as execution detail only; they cannot override roadmap status.
+   - Treat `docs/worksheets/plan-*.md` as execution detail only; they cannot override roadmap status.
    - Treat `.planning/STATE.md` as session context only (not completion evidence).
    - For multi-doc alignment, invoke the `agent-context-doc-health` skill.
 6. Verify plan currency before executing.
@@ -111,10 +111,10 @@ At logical task boundaries, run `/prepcompact` to save a structured snapshot:
 | Build failures | `build-error-resolver` agent - minimal surgical fixes |
 | Context getting large | `/prepcompact` - snapshot, then `/compact` |
 | Resuming previous work | `/pickup` - reload context snapshot |
-| Rendering system work | Read `docs/skills/engine-render.md` - traps, data contracts, callgraph |
-| World/terrain/BSP work | Read `docs/skills/world-loading.md` - .a3d format, BSP internals |
-| Physics work | Read `docs/skills/physics-system.md` - collision, forces, constants |
-| Game mechanics work | Read `docs/skills/game-mechanics.md` - character, AI, combat |
+| Rendering system work | Read `docs/worksheets/skills/engine-render.md` - traps, data contracts, callgraph |
+| World/terrain/BSP work | Read `docs/worksheets/skills/world-loading.md` - .a3d format, BSP internals |
+| Physics work | Read `docs/worksheets/skills/physics-system.md` - collision, forces, constants |
+| Game mechanics work | Read `docs/worksheets/skills/game-mechanics.md` - character, AI, combat |
 | Logging a regression/failure | Append to `docs/FAILURE_LOG.md` - append-only, use status vocab (OPEN/PARTIAL/MONITORING/RESOLVED) |
 | Doc/roadmap/plan edits | `/agent-context-doc-health` - drift audit, cross-doc alignment |
 | Session handoff or resume | `/agent-context-doc-health` - standardized handoff template |
@@ -166,12 +166,15 @@ src/
     mod.rs                     # Bevy audio integration
   network/                     # Networking (future)
     mod.rs
-docs/                          # Documentation hub
-  INDEX.md                     # Master doc index
-  skills/                      # Skill packs (C++ subsystem knowledge)
-  arch/                        # C++ architecture docs (reference)
-  research/                    # Research documents
-  plans/                       # Execution plans
+docs/                          # Canonical docs root
+  CANONICAL_SPEC.md            # Durable architecture and truth source
+  FAILURE_LOG.md               # Durable failure/proof log
+  worksheets/                  # Non-canonical working docs
+    INDEX.md                   # Worksheet index
+    skills/                    # Skill packs (C++ subsystem knowledge)
+    arch/                      # C++ architecture docs (reference)
+    research/                  # Research documents
+    plans/                     # Execution plans
 .planning/                     # GSD planning infrastructure
   ROADMAP.md                   # Canonical status ledger
   PROJECT.md                   # Acceptance outcomes and scope
@@ -184,12 +187,12 @@ docs/                          # Documentation hub
 
 | File | Purpose | Skill Pack |
 |------|---------|------------|
-| `src/render/mod.rs` | 6-stage ASCII rasterizer | [`engine-render`](docs/skills/engine-render.md) |
-| `src/sprite/xp_loader.rs` | .xp sprite loading | [`engine-render`](docs/skills/engine-render.md) |
-| `src/world/bsp.rs` | BSP tree, .a3d loader | [`world-loading`](docs/skills/world-loading.md) |
-| `src/terrain/mod.rs` | Quadtree heightmaps | [`world-loading`](docs/skills/world-loading.md) |
-| `src/physics/mod.rs` | Sphere collision | [`physics-system`](docs/skills/physics-system.md) |
-| `src/game/mod.rs` | Game loop, character systems | [`game-mechanics`](docs/skills/game-mechanics.md) |
+| `src/render/mod.rs` | 6-stage ASCII rasterizer | [`engine-render`](docs/worksheets/skills/engine-render.md) |
+| `src/sprite/xp_loader.rs` | .xp sprite loading | [`engine-render`](docs/worksheets/skills/engine-render.md) |
+| `src/world/bsp.rs` | BSP tree, .a3d loader | [`world-loading`](docs/worksheets/skills/world-loading.md) |
+| `src/terrain/mod.rs` | Quadtree heightmaps | [`world-loading`](docs/worksheets/skills/world-loading.md) |
+| `src/physics/mod.rs` | Sphere collision | [`physics-system`](docs/worksheets/skills/physics-system.md) |
+| `src/game/mod.rs` | Game loop, character systems | [`game-mechanics`](docs/worksheets/skills/game-mechanics.md) |
 
 ## Binary Formats (Shared with C++ Engine)
 
@@ -199,15 +202,15 @@ docs/                          # Documentation hub
 
 ## C++ Reference
 
-Original C++ codebase: `/Users/r/Downloads/asciicker-Y9-2/`
-Research documents: `/Users/r/Projects/asciicker rust port/docs/`
-Architecture docs: `/Users/r/Projects/asciicker rust port/docs/arch/`
+Original C++ codebase: `/Users/rikihernandez/Downloads/Aciicker-Y9-2/`
+Research documents: `/Users/r/Projects/asciicker rust port/docs/worksheets/`
+Architecture docs: `/Users/r/Projects/asciicker rust port/docs/worksheets/arch/`
 
 When porting a subsystem:
-1. Read the relevant skill pack (docs/skills/) for entrypoints, invariants, known traps
-2. Read the architecture doc (docs/arch/) for function-level detail
-3. Read the research doc (docs/research/) for analysis and decisions
-4. Cross-reference with C++ source in `/Users/r/Downloads/asciicker-Y9-2/`
+1. Read the relevant skill pack (docs/worksheets/skills/) for entrypoints, invariants, known traps
+2. Read the architecture doc (docs/worksheets/arch/) for function-level detail
+3. Read the research doc (docs/worksheets/research/) for analysis and decisions
+4. Cross-reference with C++ source in `/Users/rikihernandez/Downloads/Aciicker-Y9-2/`
 
 ## Bevy Engine Notes
 
@@ -241,11 +244,12 @@ Conventional Commits with scope: `feat(render):`, `fix(terrain):`, `test(physics
 | Doc | Location | Status |
 |-----|----------|--------|
 | Agent protocol | `AGENTS.md` | Canonical rules |
-| Doc index | `docs/INDEX.md` | Master hub |
-| Render skill | `docs/skills/engine-render.md` | C++ render subsystem reference |
-| World skill | `docs/skills/world-loading.md` | C++ world/terrain reference |
-| Physics skill | `docs/skills/physics-system.md` | C++ physics reference |
-| Game skill | `docs/skills/game-mechanics.md` | C++ game logic reference |
+| Canonical spec | `docs/CANONICAL_SPEC.md` | Durable architecture and truth source |
+| Worksheet index | `docs/worksheets/INDEX.md` | Non-canonical worksheet inventory |
+| Render skill | `docs/worksheets/skills/engine-render.md` | C++ render subsystem reference |
+| World skill | `docs/worksheets/skills/world-loading.md` | C++ world/terrain reference |
+| Physics skill | `docs/worksheets/skills/physics-system.md` | C++ physics reference |
+| Game skill | `docs/worksheets/skills/game-mechanics.md` | C++ game logic reference |
 | Doc health | `.claude/skills/agent-context-doc-health/SKILL.md` | Cross-doc alignment |
 | Port roadmap | `.claude/skills/ascii-port-roadmap/SKILL.md` | Migration planning |
 | Maintainer | `.claude/skills/maintainer-reliability/SKILL.md` | Claim guard, session hygiene |

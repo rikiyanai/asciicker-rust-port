@@ -616,10 +616,10 @@ Phase 7: Polish & Systems
 - [Bevy 0.17 to 0.18 Migration Guide](https://bevy.org/learn/migration-guides/0-17-to-0-18/) -- Breaking changes in recent version (LOW confidence, not fully read)
 - Mage Core source: `../reference/Mage-core/src/render.rs` -- 4-texture GPU approach with wgpu directly (HIGH confidence, read source code)
 - Mage Core shader: `../reference/Mage-core/src/shader.wgsl` -- WGSL fullscreen quad with font atlas compositing (HIGH confidence, read source code)
-- C++ render pipeline: `(ORIGINAL GAME)asciicker-Y9-2-main/docs/RENDER_PIPELINE_DETAILED.md` -- 6-stage CPU pipeline stages (HIGH confidence, project documentation)
-- C++ render pipeline map: `(ORIGINAL GAME)asciicker-Y9-2-main/docs/RENDER_PIPELINE_MAP.md` -- Data structures, fragile invariants (HIGH confidence, project documentation)
-- C++ engine render skill: `(ORIGINAL GAME)asciicker-Y9-2-main/docs/skills/engine-render.md` -- Sample/AnsiCell/Material structs, traps (HIGH confidence, project documentation)
-- C++ world loading skill: `(ORIGINAL GAME)asciicker-Y9-2-main/docs/skills/world-loading.md` -- .a3d format, BSP/quadtree APIs (HIGH confidence, project documentation)
+- C++ render pipeline: `(ORIGINAL GAME)asciicker-Y9-2-main/docs/worksheets/RENDER_PIPELINE_DETAILED.md` -- 6-stage CPU pipeline stages (HIGH confidence, project documentation)
+- C++ render pipeline map: `(ORIGINAL GAME)asciicker-Y9-2-main/docs/worksheets/RENDER_PIPELINE_MAP.md` -- Data structures, fragile invariants (HIGH confidence, project documentation)
+- C++ engine render skill: `(ORIGINAL GAME)asciicker-Y9-2-main/docs/worksheets/skills/engine-render.md` -- Sample/AnsiCell/Material structs, traps (HIGH confidence, project documentation)
+- C++ world loading skill: `(ORIGINAL GAME)asciicker-Y9-2-main/docs/worksheets/skills/world-loading.md` -- .a3d format, BSP/quadtree APIs (HIGH confidence, project documentation)
 
 ---
 *Architecture research for: Rust/Bevy ASCII game engine port of Asciicker C++ engine*

@@ -578,14 +578,14 @@ For the planner -- how each C++ subsystem maps to Rust:
 - [kiddo docs.rs](https://docs.rs/kiddo) -- Version 5.2.4; f32 support; const-generic dimensions; `nearest_one`
 - Alex Harri TypeScript reference: `KdTree.ts` (104 lines), `CharacterMatcher.ts` (52 lines), `effects.ts` (20 lines), `generateSamplingData.ts` (212 lines) -- local at `../reference/alexharri-ascii/website_repo/website-master/src/components/AsciiScene/`
 - Alphabet JSON files (six-samples.json, default.json) -- local at same path under `alphabets/`
-- C++ architecture docs: `batch_audio.md`, `network_cpp.md`, `mainmenu_cpp.md`, `weather_cpp.md` -- local at `docs/arch/`
-- Alex Harri integration research: `docs/research/alexharri-asciicker-integration.md` -- local research document
+- C++ architecture docs: `batch_audio.md`, `network_cpp.md`, `mainmenu_cpp.md`, `weather_cpp.md` -- local at `docs/worksheets/arch/`
+- Alex Harri integration research: `docs/worksheets/research/alexharri-asciicker-integration.md` -- local research document
 
 ### Secondary (MEDIUM confidence)
 - [lightyear releases](https://github.com/cBournhonesque/lightyear/releases) -- 0.26.0 = Bevy 0.18 (verified via GitHub release notes)
 - [noise crate docs.rs](https://docs.rs/noise) -- Perlin noise API, 2D/3D support
 - [simdnoise GitHub](https://github.com/verpeteren/rust-simd-noise) -- SIMD-accelerated alternative (not recommended for this use case)
-- C++ engine skill packs: `docs/skills/engine-render.md`, `docs/skills/game-mechanics.md`
+- C++ engine skill packs: `docs/worksheets/skills/engine-render.md`, `docs/worksheets/skills/game-mechanics.md`
 
 ### Tertiary (LOW confidence)
 - bevy_seedling as alternative audio plugin: found via Context7 with high benchmark score (91.5) but no direct Bevy 0.18 compatibility verification

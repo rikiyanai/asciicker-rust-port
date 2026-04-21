@@ -1,8 +1,10 @@
 # Agent Entry Point (Canonical)
 
 ## Master Memory
-- Canonical doc hub: `docs/INDEX.md` (add new high-signal docs there).
-- Agent protocol: `docs/AGENT_PROTOCOL.md`.
+- Canonical spec: `docs/CANONICAL_SPEC.md`.
+- Failure log: `docs/FAILURE_LOG.md`.
+- Worksheet index: `docs/worksheets/INDEX.md`.
+- Agent protocol: `docs/worksheets/AGENT_PROTOCOL.md`.
 - Claude-specific memory: `CLAUDE.md`.
 
 ---
@@ -14,9 +16,10 @@ This is a Rust/Bevy reimplementation of the Asciicker C++ game engine (~82K line
 
 ## Module Organization
 - Rust source will live in `src/` organized by subsystem (render, sprite, world, terrain, physics, game, audio, network). An early skeleton exists at `asciicker-rust/` (~385 LOC, Bevy 0.18.0, does NOT compile). GSD Phase 1 will establish the canonical project structure.
-- Documentation in `docs/` with skill packs in `docs/skills/`.
-- C++ architecture reference in `docs/arch/`.
-- Research documents in `docs/research/`.
+- Canonical docs live in `docs/` (`CANONICAL_SPEC.md` and `FAILURE_LOG.md`).
+- Non-canonical worksheet docs live in `docs/worksheets/` with skill packs in `docs/worksheets/skills/`.
+- C++ architecture reference in `docs/worksheets/arch/`.
+- Research documents in `docs/worksheets/research/`.
 - Planning artifacts in `.planning/` (planned — created by GSD initialization).
 - Agent/skill configs in `.claude/`.
 
@@ -55,16 +58,16 @@ This is a Rust/Bevy reimplementation of the Asciicker C++ game engine (~82K line
 
 ## Subsystem Skill Packs
 Before porting or modifying a C++ subsystem, read the relevant skill pack:
-- **Render/Sprite**: `docs/skills/engine-render.md` - render pipeline, sprites, palette quantization
-- **World/Terrain**: `docs/skills/world-loading.md` - BSP tree, terrain, .a3d format
-- **Physics**: `docs/skills/physics-system.md` - collision, forces, constants
-- **Game Mechanics**: `docs/skills/game-mechanics.md` - character, AI, combat, equipment
+- **Render/Sprite**: `docs/worksheets/skills/engine-render.md` - render pipeline, sprites, palette quantization
+- **World/Terrain**: `docs/worksheets/skills/world-loading.md` - BSP tree, terrain, .a3d format
+- **Physics**: `docs/worksheets/skills/physics-system.md` - collision, forces, constants
+- **Game Mechanics**: `docs/worksheets/skills/game-mechanics.md` - character, AI, combat, equipment
 
 ## Agent Context & Doc Health
 Before editing roadmaps, plans, or state docs, invoke the `agent-context-doc-health` skill:
 - **Skill path**: `.claude/skills/agent-context-doc-health/SKILL.md`
 - **Triggers**: Multi-agent doc edits, completion claims, branch switches, session handoffs
-- **Canonical source priority**: `AGENTS.md` > `docs/INDEX.md` > `docs/AGENT_PROTOCOL.md` > `.planning/ROADMAP.md` > `.planning/PROJECT.md` > `docs/plans/*` > `.planning/STATE.md` > `CLAUDE.md` > git evidence
+- **Canonical source priority**: `AGENTS.md` > `docs/CANONICAL_SPEC.md` > `docs/FAILURE_LOG.md` > `docs/worksheets/INDEX.md` > `docs/worksheets/AGENT_PROTOCOL.md` > `.planning/ROADMAP.md` > `.planning/PROJECT.md` > `docs/worksheets/plans/*` > `.planning/STATE.md` > `CLAUDE.md` > git evidence
 - For failure tracking: append to `docs/FAILURE_LOG.md` (status vocab: OPEN, PARTIAL, MONITORING, RESOLVED)
 
 <!-- codex-conductor:start -->

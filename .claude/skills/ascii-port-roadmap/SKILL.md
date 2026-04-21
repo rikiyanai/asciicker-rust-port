@@ -14,9 +14,9 @@ Turn research evidence into an executable roadmap across two tracks:
 > **Note:** `.planning/` directory will be created by GSD initialization. Until then, `MASTER_ROADMAP.md` at project root serves as the status authority.
 
 Required inputs:
-- Archived Mage Core research docs in `docs/archive/engine-port-magecore/` (original `*-inventory.md`, `*-capability-matrix.md`, etc. from the earlier Mage Core evaluation). New Bevy-aligned versions of these inventories will be created during GSD initialization.
-- Current roadmap + active plans in `docs/plans/`
-- Current repo constraints from `AGENTS.md`, `CLAUDE.md`, and `docs/AGENT_PROTOCOL.md`
+- Archived Mage Core research docs in `docs/worksheets/archive/engine-port-magecore/` (original `*-inventory.md`, `*-capability-matrix.md`, etc. from the earlier Mage Core evaluation). New Bevy-aligned versions of these inventories will be created during GSD initialization.
+- Current roadmap + active plans in `docs/worksheets/plans/`
+- Current repo constraints from `AGENTS.md`, `CLAUDE.md`, and `docs/worksheets/AGENT_PROTOCOL.md`
 
 ## Workflow
 
@@ -63,11 +63,11 @@ All roadmap items marked `complete` must include commit hash(es) and verificatio
 
 ## Output Path
 
-New planning artifacts go to `docs/plans/`.
+New planning artifacts go to `docs/worksheets/plans/`.
 
 ## Recommended Deliverables
 
-- `docs/plans/<date>-northstar-port-options.md`
-- `docs/plans/<date>-pipeline-closeout-plan.md`
-- `docs/plans/<date>-migration-gates-and-parity.md`
+- `docs/worksheets/plans/<date>-northstar-port-options.md`
+- `docs/worksheets/plans/<date>-pipeline-closeout-plan.md`
+- `docs/worksheets/plans/<date>-migration-gates-and-parity.md`
 

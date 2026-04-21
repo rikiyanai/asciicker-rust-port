@@ -8,7 +8,7 @@
 
 Phase 4 implements the core CPU rasterizer: the SampleBuffer with double-allocation fast clear, Bresenham line and barycentric triangle rasterization, the material/shade table system (auto_mat LUT), RGB555-to-xterm-256 color quantization, and the RESOLVE stage that downsamples 2x2 sample blocks into final AnsiCell output. This is pure algorithm work with no external dependencies beyond the existing Phase 1 foundation -- no world loading, no terrain queries, no sprite blitting (those are Phase 5).
 
-The C++ source (`render.cpp` ~4400 lines) is thoroughly documented in `docs/arch/render_cpp_part1.md` and `docs/arch/render_cpp_part2.md`, with the skill pack `docs/skills/engine-render.md` providing trap/invariant/callgraph context. The existing Rust codebase already has stub `SampleBuffer` and `RenderConfig` from Phase 1, but the Sample struct needs to be reworked to match C++ layout (the current Rust struct has wrong fields).
+The C++ source (`render.cpp` ~4400 lines) is thoroughly documented in `docs/worksheets/arch/render_cpp_part1.md` and `docs/worksheets/arch/render_cpp_part2.md`, with the skill pack `docs/worksheets/skills/engine-render.md` providing trap/invariant/callgraph context. The existing Rust codebase already has stub `SampleBuffer` and `RenderConfig` from Phase 1, but the Sample struct needs to be reworked to match C++ layout (the current Rust struct has wrong fields).
 
 **Primary recommendation:** Port algorithms bottom-up: Sample struct -> SampleBuffer (with double-allocation) -> quantize (auto_mat LUT) -> Bresenham -> barycentric Rasterize -> material system -> RESOLVE stage. Test each in isolation with golden files before composing. The pipeline stage orchestration (REND-04) is declared here as a skeleton but only fully wired in Phase 5.
 
@@ -574,13 +574,13 @@ fn bc_p(a: &[i32; 4], b: &[i32; 4], cx: i32, cy: i32) -> i32 {
 - C++ `render.cpp` lines 111-184 (Bresenham), 404-557 (Rasterize), 567-600 (Sample/SampleBuffer), 710-840 (create_auto_mat), 2838-2944 (Render/clear), 3412-3938 (RESOLVE)
 - C++ `render.h` lines 37-87 (AnsiCell, MatCell, Material structs)
 - C++ `sprite.cpp` lines 260-266 (RGB2PAL)
-- `docs/arch/render_cpp_part1.md` - function-level analysis
-- `docs/arch/render_cpp_part2.md` - Render() function, projection
-- `docs/skills/engine-render.md` - invariants, traps, callgraph
+- `docs/worksheets/arch/render_cpp_part1.md` - function-level analysis
+- `docs/worksheets/arch/render_cpp_part2.md` - Render() function, projection
+- `docs/worksheets/skills/engine-render.md` - invariants, traps, callgraph
 
 ### Secondary (MEDIUM confidence)
 - Existing Rust codebase: `engine-port/src/render/` (Phase 1 stubs, needs rework)
-- `docs/research/research-testing-strategies.md` (golden file patterns)
+- `docs/worksheets/research/research-testing-strategies.md` (golden file patterns)
 
 ### Tertiary (LOW confidence)
 - softrender crate (Rust software rasterizer patterns) - for reference only, not using

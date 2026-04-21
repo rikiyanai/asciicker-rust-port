@@ -28,13 +28,15 @@ git stash list
 > **Note:** `.planning/` directory will be created by GSD initialization. Until then, `MASTER_ROADMAP.md` at project root serves as the status authority.
 
 1. `AGENTS.md`
-2. `docs/INDEX.md`
-3. `docs/AGENT_PROTOCOL.md`
-4. `.planning/ROADMAP.md` (canonical status ledger) — or `MASTER_ROADMAP.md` (interim authority before GSD init)
-5. `.planning/PROJECT.md` (acceptance outcomes and active scope)
-6. Active roadmap/plan docs under `docs/plans/` (execution detail)
-7. `.planning/STATE.md` (session context only; non-authoritative for completion)
-8. Source-of-truth code and commit history
+2. `docs/CANONICAL_SPEC.md`
+3. `docs/FAILURE_LOG.md`
+4. `docs/worksheets/INDEX.md`
+5. `docs/worksheets/AGENT_PROTOCOL.md`
+6. `.planning/ROADMAP.md` (canonical status ledger) — or `MASTER_ROADMAP.md` (interim authority before GSD init)
+7. `.planning/PROJECT.md` (acceptance outcomes and active scope)
+8. Active roadmap/plan docs under `docs/worksheets/plans/` (execution detail)
+9. `.planning/STATE.md` (session context only; non-authoritative for completion)
+10. Source-of-truth code and commit history
 
 If conflicts exist, update lower-priority docs to match higher-priority sources.
 

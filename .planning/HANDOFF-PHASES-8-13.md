@@ -455,19 +455,19 @@ These files contain critical context. Read them ALL before writing any plans.
 
 ### C++ Source Reference (for porting accuracy):
 
-11. `/Users/r/Downloads/asciicker-Y9-2/game.cpp` — 14,226 LOC, the big one
-12. `/Users/r/Downloads/asciicker-Y9-2/inventory.h` — item type definitions
-13. `/Users/r/Downloads/asciicker-Y9-2/inventory.cpp` — inventory grid logic
-14. `/Users/r/Downloads/asciicker-Y9-2/enemygen.cpp` — NPC spawn system
-15. `/Users/r/Downloads/asciicker-Y9-2/mainmenu.cpp` — menu system
-16. `/Users/r/Downloads/asciicker-Y9-2/gamepad.cpp` — gamepad config
+11. `/Users/rikihernandez/Downloads/Aciicker-Y9-2/game.cpp` — 14,226 LOC, the big one
+12. `/Users/rikihernandez/Downloads/Aciicker-Y9-2/inventory.h` — item type definitions
+13. `/Users/rikihernandez/Downloads/Aciicker-Y9-2/inventory.cpp` — inventory grid logic
+14. `/Users/rikihernandez/Downloads/Aciicker-Y9-2/enemygen.cpp` — NPC spawn system
+15. `/Users/rikihernandez/Downloads/Aciicker-Y9-2/mainmenu.cpp` — menu system
+16. `/Users/rikihernandez/Downloads/Aciicker-Y9-2/gamepad.cpp` — gamepad config
 
 ### Skill Packs (condensed C++ subsystem knowledge):
 
-17. `docs/skills/game-mechanics.md` — character, combat, AI reference
-18. `docs/skills/physics-system.md` — collision, forces, constants
-19. `docs/skills/engine-render.md` — rendering pipeline reference
-20. `docs/skills/world-loading.md` — BSP, terrain, .a3d format
+17. `docs/worksheets/skills/game-mechanics.md` — character, combat, AI reference
+18. `docs/worksheets/skills/physics-system.md` — collision, forces, constants
+19. `docs/worksheets/skills/engine-render.md` — rendering pipeline reference
+20. `docs/worksheets/skills/world-loading.md` — BSP, terrain, .a3d format
 
 ---
 

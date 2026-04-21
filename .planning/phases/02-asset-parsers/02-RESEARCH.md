@@ -697,9 +697,9 @@ From `sprite_constants.h` (C++ source of truth):
 
 ### Secondary (MEDIUM confidence)
 - C++ source: `io_asciicker/mesh/export_akm.py` -- AKM export conventions (collision alpha, freestyle marks, triangulation)
-- `docs/codedoc-xp-terrain-format.md` -- Format documentation (verified against source)
-- `docs/skills/engine-render.md` -- Render pipeline skill pack (cross-referenced)
-- `docs/skills/world-loading.md` -- World/terrain skill pack (cross-referenced)
+- `docs/worksheets/codedoc-xp-terrain-format.md` -- Format documentation (verified against source)
+- `docs/worksheets/skills/engine-render.md` -- Render pipeline skill pack (cross-referenced)
+- `docs/worksheets/skills/world-loading.md` -- World/terrain skill pack (cross-referenced)
 - Context7: `/rust-lang/flate2-rs` -- GzDecoder usage
 
 ### Tertiary (LOW confidence)

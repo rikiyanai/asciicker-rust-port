@@ -303,7 +303,7 @@ The Mage Core reference implementation (v0.2.0) uses raw wgpu + winit, NOT Bevy.
 - [nom 8.0 docs.rs](https://docs.rs/crate/nom/latest) -- Binary parser combinators (HIGH confidence)
 - [rayon 1.11 docs.rs](https://docs.rs/crate/rayon/latest) -- Data parallelism (HIGH confidence)
 - [Mage Core source](../ascii%20research/Mage-core/) -- Reference 4-texture ASCII rendering implementation, MIT licensed (HIGH confidence, local reference)
-- [Bevy Profiling Guide](https://github.com/bevyengine/bevy/blob/main/docs/profiling.md) -- Tracy + puffin integration (HIGH confidence)
+- [Bevy Profiling Guide](https://github.com/bevyengine/bevy/blob/main/docs/worksheets/profiling.md) -- Tracy + puffin integration (HIGH confidence)
 
 ---
 *Stack research for: Asciicker Rust Port (ASCII game engine on Bevy 0.18)*

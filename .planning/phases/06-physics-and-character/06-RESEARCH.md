@@ -537,9 +537,9 @@ fn accumulate_player_input(
 - `(ORIGINAL GAME)asciicker-Y9-2-main/render.cpp` - Stage 5 Reflection (lines 3266-3374), Perlin water ripple (lines 3860-3903)
 - `(ORIGINAL GAME)asciicker-Y9-2-main/sprite.h` - Sprite/Frame/Anim structs (110 lines)
 - `(ORIGINAL GAME)asciicker-Y9-2-main/water.cpp` - Water design notes (planning only, no implementation)
-- `./docs/skills/physics-system.md` - Physics skill pack
-- `./docs/skills/game-mechanics.md` - Game mechanics skill pack
-- `./docs/skills/engine-render.md` - Render pipeline skill pack
+- `./docs/worksheets/skills/physics-system.md` - Physics skill pack
+- `./docs/worksheets/skills/game-mechanics.md` - Game mechanics skill pack
+- `./docs/worksheets/skills/engine-render.md` - Render pipeline skill pack
 
 ### Secondary (MEDIUM confidence)
 - [Bevy FixedUpdate documentation](https://bevy-cheatbook.github.io/fundamentals/fixed-timestep.html) - Default 64Hz, configurable via Time::<Fixed>

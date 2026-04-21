@@ -676,14 +676,14 @@ pub struct RuntimeWorld {
 ## Sources
 
 ### Primary (HIGH confidence)
-- `docs/skills/engine-render.md` - Rendering pipeline callgraph, data contracts, known traps
-- `docs/skills/world-loading.md` - BSP/terrain data contracts, quadtree structure, instance management
-- `docs/arch/render_cpp_part1.md` - Function-level render.cpp analysis (Rasterize, RenderFace, RenderPatch, RenderSprite)
-- `docs/arch/render_cpp_part2.md` - Render() main function analysis, camera setup, projection/unprojection
-- `docs/arch/terrain_cpp_part1.md` - Quadtree CRUD, height bounds propagation, frustum query
-- `docs/arch/terrain_cpp_part2.md` - QueryTerrain frustum culling, UpdateTerrainDark, raycasting
-- `docs/arch/world_cpp_part1.md` - BSP construction (SplitBSP), instance lifecycle, QueryWorld
-- `docs/arch/world_cpp_part2.md` - HitWorld raycast dispatch, QueryWorld implementation
+- `docs/worksheets/skills/engine-render.md` - Rendering pipeline callgraph, data contracts, known traps
+- `docs/worksheets/skills/world-loading.md` - BSP/terrain data contracts, quadtree structure, instance management
+- `docs/worksheets/arch/render_cpp_part1.md` - Function-level render.cpp analysis (Rasterize, RenderFace, RenderPatch, RenderSprite)
+- `docs/worksheets/arch/render_cpp_part2.md` - Render() main function analysis, camera setup, projection/unprojection
+- `docs/worksheets/arch/terrain_cpp_part1.md` - Quadtree CRUD, height bounds propagation, frustum query
+- `docs/worksheets/arch/terrain_cpp_part2.md` - QueryTerrain frustum culling, UpdateTerrainDark, raycasting
+- `docs/worksheets/arch/world_cpp_part1.md` - BSP construction (SplitBSP), instance lifecycle, QueryWorld
+- `docs/worksheets/arch/world_cpp_part2.md` - HitWorld raycast dispatch, QueryWorld implementation
 
 ### Secondary (HIGH confidence)
 - C++ source code cross-referenced: `render.cpp:2838-4412` (Render function), `terrain.cpp:1714-1765` (DarkUpdater), `world.cpp:3073-3192` (QueryWorld BSP traversal)

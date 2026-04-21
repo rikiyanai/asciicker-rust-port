@@ -24,7 +24,7 @@ Both gates must pass. Partial pass is not completion.
 
 > **Note:** `.planning/` directory will be created by GSD initialization. Until then, `MASTER_ROADMAP.md` at project root serves as the status authority.
 
-Collect and store evidence under `docs/verification/` (directory exists in the project):
+Collect and store evidence under `docs/worksheets/verification/` (directory exists in the project):
 - `<date>-xp-loading-verification.md`
 - `<date>-render-comparison.md`
 

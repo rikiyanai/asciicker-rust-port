@@ -6,7 +6,10 @@ A Rust/Bevy reimplementation of the Asciicker C++ game engine (~82K lines across
 
 ## Core Value
 
-The CPU rasterizer must produce visually identical output to the C++ engine — same glyphs, same colors, same depth ordering — so that existing Asciicker worlds render correctly in the Rust port.
+The product target is an interactive ASCII rendering workbench that exposes
+scene selection plus live resolution, scale, preset, inversion, and culling
+controls while using the original C++ engine as reference evidence for render
+behavior, not as the sole release gate.
 
 ## Requirements
 
@@ -38,6 +41,7 @@ The CPU rasterizer must produce visually identical output to the C++ engine — 
 - [ ] Implement GPU-accelerated ASCII output as Bevy render plugin (Mage Core 4-texture approach: char index, fg, bg, font atlas)
 - [ ] Integrate Alex Harri 6D shape-vector k-d tree matching at RESOLVE stage (replaces auto_mat glyph selection; auto_mat still used for fg/bg color)
 - [ ] Perspective camera with Q/E rotation toggle (D004-D005: perspective REQUIRED)
+- [ ] Ship the canonical rendering demo workbench with model/source selection, center ASCII canvas, and right-panel sliders/toggles from `docs/CANONICAL_SPEC.md`
 - [ ] Basic multiplayer networking (client-server model)
 - [ ] Audio system via bevy_kira_audio (16-track mixer)
 - [ ] Water rendering with reflective surface
@@ -57,12 +61,14 @@ The CPU rasterizer must produce visually identical output to the C++ engine — 
 - Custom engine from scratch — Bevy provides ECS, input, audio, windowing (Decision D001)
 - GPU rasterization — CPU rasterizer matches C++ fidelity (Decision D003); GPU only for final ASCII output
 - Full Alex Harri 6D vectors from day one — start with auto_mat, upgrade to 6D after performance validation (Decision D010)
+- Pixel-perfect original-engine parity as the primary ship gate — use it as reference evidence and regression tooling, not the sole product definition
 
 ## Context
 
 ### C++ Reference
-- Original codebase: `(ORIGINAL GAME)asciicker-Y9-2-main/` (~82K lines, 48 files)
-- Comprehensive architecture documentation in `docs/arch/` (30+ per-file analyses)
+- Original codebase in this environment: `/Users/rikihernandez/Downloads/Aciicker-Y9-2/` (~82K lines, 48 files)
+- Stable vendored editor reference: `reference/original-game/asciiid.cpp`
+- Comprehensive architecture documentation in `docs/worksheets/arch/` (30+ per-file analyses)
 - 4 skill packs documenting C++ subsystem internals (engine-render, world-loading, physics-system, game-mechanics)
 
 ### Technology Stack
@@ -106,7 +112,7 @@ The CPU rasterizer must produce visually identical output to the C++ engine — 
 ## Constraints
 
 - **Tech Stack**: Bevy 0.18+ (Rust 2021 edition) — D001 final, no custom engine
-- **Visual Fidelity**: CPU rasterizer output must match C++ engine pixel-for-pixel where possible
+- **Visual Fidelity**: Use the original C++ engine as render-behavior reference where useful, but optimize the shipped target around the render workbench UX in `docs/CANONICAL_SPEC.md`
 - **Binary Compatibility**: Must load original .xp sprites and .a3d world files unchanged
 - **Performance**: Target 60 FPS at 1080p with full scene (terrain + world + sprites + effects)
 - **Architecture**: ECS where it adds value; plain Rust where it doesn't. Use ECS for spatial entities (characters, NPCs, projectiles, terrain patches). Use plain Rust for algorithms (pathfinding, collision math), data tables (equipment lookup, material tables), state machines (character FSM, game FSM).

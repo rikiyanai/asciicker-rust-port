@@ -4,6 +4,11 @@
 
 This roadmap takes the Asciicker C++ game engine (82K lines, custom CPU software rasterizer rendering 3D worlds as ASCII art) and rebuilds it in Rust/Bevy across 15 phases. The journey moves from a compiling skeleton through isolated subsystems (asset parsers, GPU output, CPU rasterizer) to full pipeline integration, then layers physics, character gameplay, and finally game systems like audio/networking/weather. Phases 3 and 4 are independent and can execute in parallel -- the GPU output plugin uses synthetic test data while the CPU rasterizer is pure algorithm work. Phase 5 is the critical convergence where all prior work connects to render a real Asciicker world file.
 
+Current canonical UI target: the render workbench defined in
+`docs/CANONICAL_SPEC.md`. Original-engine parity and replay baselines remain
+important diagnostic tooling, but they are not the sole product gate for the
+active render demo direction.
+
 ## Phases
 
 **Phase Numbering:**
@@ -18,8 +23,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3.1: Audit Remediation** - Fix Critical/High severity code-level risks from Phases 1-3 audit before Phase 5 integration (INSERTED)
 - [x] **Phase 4: CPU Rasterizer Core** - SampleBuffer, triangle/line rasterization, materials, color quantization, and RESOLVE stage
 - [~] **Phase 5: Pipeline Integration** - Partial: real world rendering exists, but resolve/compositing still diverges from C++ and Stage 4/visibility remain incomplete
-- [~] **Phase 6: Physics and Character** - Partial: runtime is playable, but renderer parity and water-edge correctness remain incomplete
-- [~] **Phase 7: Game Systems** - Partial: audio/network/weather/menu paths exist, but visual occupancy/contrast tuning and final sign-off remain incomplete
+- [~] **Phase 6: Physics and Character** - Partial: runtime is playable, but water-edge correctness and render-workbench integration remain incomplete
+- [~] **Phase 7: Game Systems** - Partial: audio/network/weather/menu paths exist, but the canonical render workbench, occupancy/contrast tuning, and final sign-off remain incomplete
 - [ ] **Phase 7.1: Physics & Character Polish** - Critical fixes for camera sync, rotation, and actions (INSERTED)
 - [ ] **Phase 8: NPC AI and Combat** - Enemy spawning, target selection, stuck detection, and melee combat
 - [ ] **Phase 9: Inventory and Items** - Item catalog, grid-based inventory UI, pickup/drop interaction, and equipment lifecycle
@@ -122,16 +127,16 @@ Plans:
 **Depends on**: Phase 2, Phase 3, Phase 4
 **Requirements**: TERR-01, TERR-02, TERR-03, TERR-04, WRLD-01, WRLD-02, WRLD-03, WRLD-04, REND-08, REND-09, CAM-01, CAM-02, CAM-03, VIS-02
 **Success Criteria** (what must be TRUE):
-  1. Loading an original Asciicker .a3d world file renders terrain, mesh instances, and sprites in a Bevy window that is visually recognizable as the same scene rendered by the C++ engine
+  1. Loading an original Asciicker .a3d world file renders terrain, mesh instances, and sprites in a Bevy window and can feed the canonical render-workbench canvas
   2. The perspective camera responds to Q/E rotation toggle and scene shift (multiplied by 2 per TRAP-R06) with smooth navigation through the world
   3. Terrain quadtree with HEIGHT_CELLS=4 and VISUAL_CELLS=8 renders with frustum culling, and terrain shadows cast correctly via 64-bit bitmask per patch
   4. BSP tree traversal renders world geometry with frustum culling, all 4 node types functional (NODE, NODE_SHARE, LEAF, INST), and instance flags respected
-  5. Golden-file CI comparison of full-scene AnsiCell output against C++ reference shows <1% cell difference
+  5. The render pipeline can support repeatable workbench captures with visible camera/culling state and stable frame-to-frame playback for comparison
 **Current Status**: PARTIAL
 **Reality Check**:
   1. Real terrain/world rendering is present, but `engine-port/src/render/resolve.rs` still contains an explicitly simplified resolve path relative to original `render.cpp`.
-  2. `engine-port/src/render/pipeline.rs` still has an incomplete shadow/visibility story, so the advertised full 6-stage parity is not yet true.
-  3. Deterministic replay comparisons against the locked `3a621b8` baseline still show large render-side divergence (see `docs/FAILURE_LOG.md` entries `F244`-`F246`).
+  2. `engine-port/src/render/pipeline.rs` still has an incomplete shadow/visibility story, and the canonical render workbench UI is not yet implemented.
+  3. Deterministic replay comparisons against the locked `3a621b8` baseline still show large render-side divergence (see `docs/FAILURE_LOG.md` entries `F244`-`F246`), but those baselines are now diagnostic reference material rather than the sole product gate.
 **Plans**: 8 plans
 
 Plans:
@@ -157,8 +162,8 @@ Plans:
 **Current Status**: PARTIAL
 **Reality Check**:
   1. Water reflections exist, but the current water edge / surface behavior is still visually wrong and remains an open regression (`F244`-`F246`).
-  2. `engine-port/src/physics/geometry.rs` now uses AKM mesh triangles; Phase 6 remains partial because renderer/water parity is still open, not because of bbox proxy collision.
-  3. The canonical renderer regression baseline remains commit `3a621b8` captured at `artifacts/baselines/backup-3a621b8-run2` until manual sign-off.
+  2. `engine-port/src/physics/geometry.rs` now uses AKM mesh triangles; Phase 6 remains partial because the shipped render-workbench path and water behavior are still open, not because of bbox proxy collision.
+  3. The canonical renderer regression baseline remains commit `3a621b8` captured at `artifacts/baselines/backup-3a621b8-run2`, but it is now treated as reference evidence rather than the product definition.
 **Plans**: 3 plans
 
 Plans:
@@ -179,8 +184,8 @@ Plans:
 **Current Status**: PARTIAL
 **Reality Check**:
   1. The shape-vector path now uses the full default alphabet, runtime alphabet switching, and live tuning controls, but occupancy/contrast tuning is still open (`F248`).
-  2. Font1 is wired into menu/loading paths, but broader runtime/UI integration is still incomplete.
-  3. Visual-quality completion claims are blocked until the renderer improves against the locked baselines and the user signs off on an actual improvement.
+  2. Font1 is wired into menu/loading paths, but broader runtime/UI integration is still incomplete, including the canonical render workbench shell from `docs/CANONICAL_SPEC.md`.
+  3. Visual-quality completion claims are blocked until the render workbench is actually usable and the user signs off on it as an inspection/tuning surface.
   4. A 2026-03-11 architecture audit found that global final-stage shape-vector override likely conflicts with original `render.cpp` glyph semantics (`auto_mat`, silhouette, linecase, half-block splits). A first constrained integration pass is now implemented, blocking shape-vector on those semantic cell classes, but replay evidence against the orbit baseline is still needed before the issue can be considered closed (`F249`).
 **Plans**: 7 plans
 

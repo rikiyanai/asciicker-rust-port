@@ -4,19 +4,19 @@
 
 See: .planning/PROJECT.md (updated 2026-02-20)
 
-**Core value:** The CPU rasterizer must produce visually identical output to the C++ engine -- same glyphs, same colors, same depth ordering -- so that existing Asciicker worlds render correctly in the Rust port.
-**Current focus:** Renderer occupancy and edge-contrast recovery against the locked baselines. The first semantic gate for shape-vector is now implemented; immediate work is to replay it against the user-approved 2026-03-11 orbit capture and measure whether it reduces chaotic edges without giving back the occupancy gains.
+**Core value:** Build the canonical render workbench from `docs/CANONICAL_SPEC.md`: source selection on the left, ASCII canvas in the center, and live sliders/toggles on the right, using the original engine as reference evidence instead of the only product gate.
+**Current focus:** Replace the old parity-first narrative with the canonical render workbench target while keeping baseline captures available for culling, legibility, and regression checks.
 
 ## Current Position
 
 Phase: 5-7 re-verification / gap closure
-Plan: Renderer correctness closure before new feature claims
-Status: PARTIAL. The restored docs overstated completion; Phases 5-7 contain real functionality but are not complete against current visual-fidelity requirements.
+Plan: Render workbench implementation and doc/source-reference cleanup before new feature claims
+Status: PARTIAL. Phases 5-7 contain real rendering functionality, but the canonical render workbench is not yet implemented and the docs still carry pre-canon parity framing in several places.
 Last activity: 2026-03-11 -- implemented the first semantic gate for shape-vector overrides, then verified it on both a 30-frame smoke replay and a full 120-frame replay (`artifacts/baselines/orbit-2026-03-11-semantic-gated-debug`): occupancy stayed effectively flat while override count dropped by `42.2` cells per frame on average versus the prior best pre-gate replay.
 
 Progress: [######----] 60%
 
-**Note:** The repo has substantial implemented functionality, but the renderer still has open parity regressions (`F244`-`F246`) and the final visual path is not done. Treat `3a621b8` + `artifacts/baselines/backup-3a621b8-run2` as the baseline until manual user sign-off.
+**Note:** The repo has substantial implemented functionality, but the canonical render workbench is still not done. Treat `3a621b8` + `artifacts/baselines/backup-3a621b8-run2` as diagnostic baseline material, not as the primary product definition.
 
 ## Performance Metrics
 
@@ -231,7 +231,7 @@ Resume file: `artifacts/baselines/BASELINE_MANIFEST.md`
 
 ## Next Sequence
 
-1. Finish and inspect the first stitched three-mode replay artifact.
-2. Continue reducing `threshold_skip_cells` and `colored_space_cells` without reintroducing noisy overrides.
-3. Continue the remaining original mixed-cell resolve/compositing port in `engine-port/src/render/resolve.rs`.
-4. Only after resolve behavior and occupancy are both closer to target, revisit water-specific fixes.
+1. Implement the canonical render workbench shell and replace the current render-demo framing with it.
+2. Wire the right-panel controls so resolution, scale, inversion, and culling state are visible and live.
+3. Keep replay/baseline captures available as diagnostics while reducing `threshold_skip_cells` and `colored_space_cells` without reintroducing noisy overrides.
+4. After the workbench is usable, continue the remaining original mixed-cell resolve/compositing port and revisit water-specific fixes.
