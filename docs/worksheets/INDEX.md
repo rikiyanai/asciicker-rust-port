@@ -118,6 +118,7 @@ Non-canonical worksheet inventory. Durable truths belong in [`docs/CANONICAL_SPE
 - [Research Testing Strategies](research/research-testing-strategies.md) - Testing strategy research
 - [Implementation Deep Dive](research-implementation-deep-dive.md) - Deep dive implementation research
 - [Strangler Fig Pattern](research-strangler-fig-pattern.md) - Strangler fig migration pattern research
+- [Figma 3D ASCII Model Viewer UI/UX Research](research/2026-04-21-figma-3d-ascii-model-viewer-ui-ux-research.md) - Live rendered workbench capture plus local page-shell snapshot
 
 ## Process Documents
 - [Failure Log](../FAILURE_LOG.md) - Issues and blockers

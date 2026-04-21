@@ -130,9 +130,9 @@ tuning.
 
 Core layout:
 
-- **Model list / source selection:** A distinct area for choosing what is being rendered. This is the "what" surface: model, scene, or fixture selection. It must not be mixed into render-setting controls.
-- **Canvas center:** The primary workspace where the selected 3D model or scene is rendered as ASCII characters. The canvas must update live as parameters change.
-- **Right control panel:** The "how" surface for rendering settings. It contains presets, resolution, scale, and functional toggles.
+- **Left fixture picker:** A narrow, persistent vertical source-selection rail for choosing what is being rendered. This is the "what" surface: model, scene, or fixture selection. It must stay visually separate from render-setting controls even when both surfaces float directly over the canvas.
+- **Canvas center:** The primary workspace is a full-bleed ASCII canvas that occupies the viewport rather than sitting inside a boxed card. The selected 3D model or scene renders directly in this field and updates live as parameters change.
+- **Right control stack:** The "how" surface for rendering settings is a compact floating stack on the right side of the canvas, not a heavy inspector sidebar. It contains presets, resolution, scale, toggles, reset, and secondary utility actions.
 
 Canvas requirements:
 
@@ -141,25 +141,29 @@ Canvas requirements:
 - Support a rough 30-frame camera-rotation capture path for visual comparisons.
 - Support side-by-side or repeatable comparison of multiple rendering modes when mode comparison is active.
 - Provide enough visual stability that culling, density, scale, and glyph-set changes can be inspected without guessing from a single frame.
+- Present as a single uninterrupted field first; controls should read as overlays on the workspace, not as the main content.
 
 Right panel requirements:
 
-- **Presets:** Quick-toggle character sets. Examples:
-  - dense: `@%#*+=-:. `
-  - medium: `#*+=-:. `
-  - sparse: `.: `
-- **Resolution slider:** Adjusts ASCII pixel density and updates the canvas immediately.
-- **Scale slider:** Adjusts model zoom/size and updates the canvas immediately.
+- **Fixture/source buttons:** The left rail should support quick switching between a small set of named fixtures or models. The current inspired UI uses labels like `Logo`, `Computer`, `Plant`, `Shiba`, and `Crystal`.
+- **Presets:** Quick-toggle character sets. The current inspired UI uses compact button labels rather than verbose descriptions, for example:
+  - dense: `.:-=+*#%@`
+  - sparse-medium: `.-+*#`
+- **Resolution control:** Adjusts ASCII pixel density and updates the canvas immediately. It should expose a live numeric readout in the control stack, not just a hidden internal value.
+- **Scale control:** Adjusts model zoom/size and updates the canvas immediately. It should expose a live numeric readout in the control stack, not just a hidden internal value.
 - **Invert colors toggle:** Swaps light/dark mapping.
 - **Reset button:** Restores default preset, resolution, scale, color inversion, camera, and culling settings.
+- **Credits/link-out affordance:** A lightweight secondary action such as `Credits` may sit at the bottom of the right control stack without competing with the primary controls.
 - **Culling/debug controls:** Expose culling behavior clearly enough to reproduce and inspect render differences. Keyboard shortcuts may exist, but every critical state must also be visible in the UI.
 
 UX requirements:
 
 - Sliders must provide immediate feedback; the user should see legibility and density changes as they drag.
 - Character-set presets are part of the product value, not decoration. They should make density and ASCII-art style differences obvious.
-- The interface must separate "what is being rendered" from "how it is rendered" to keep the workbench usable as controls grow.
-- The first viewport should be the usable workbench itself.
+- The interface must separate "what is being rendered" from "how it is rendered" to keep the workbench usable as controls grow, but this separation should be achieved through placement and grouping rather than heavy panel chrome.
+- The first viewport should be the usable workbench itself: full canvas visible immediately, fixture picker on the left, control stack on the right.
+- The visual language should stay minimal and tool-like: sparse labels, direct controls, no onboarding copy, no oversized hero framing.
+- Numeric control values should stay visible at rest so the current resolution and scale are inspectable without interaction.
 - The UI must avoid in-app instructional prose. Labels and state readouts are acceptable; tutorial copy is not.
 - Controls and text must remain legible and non-overlapping on desktop and mobile-width viewports.
 
