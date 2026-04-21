@@ -17,6 +17,7 @@ pub mod sprite_blit;
 pub mod terrain_shader;
 pub mod types;
 pub mod water;
+pub mod workbench;
 
 use bevy::prelude::*;
 
@@ -32,6 +33,7 @@ use shape_vector::{
     shape_vector_tuning_input_system,
 };
 use sprite_blit::SpriteQueue;
+use workbench::RenderWorkbenchPlugin;
 
 use crate::system_sets::RenderSet;
 
@@ -97,6 +99,7 @@ impl Plugin for CpuRasterizerPlugin {
                 ripple_time: 0.0,
             })
             .insert_resource(ShapeVectorMatcher::new_default());
+        app.add_plugins(RenderWorkbenchPlugin);
 
         app.add_systems(Startup, (load_a3d_scene, verify_plugin_prerequisites));
 
@@ -131,16 +134,12 @@ impl Plugin for CpuRasterizerPlugin {
         // 1-frame display latency: PostUpdate (pipeline writes cell_grid) -> Render schedule
         // (GPU reads cell_grid). Standard Bevy behavior. Not a bug.
 
-        #[cfg(feature = "inspector")]
-        {
-            use bevy_inspector_egui::quick::ResourceInspectorPlugin;
-            app.add_plugins(ResourceInspectorPlugin::<PipelineTiming>::default());
-            app.add_plugins(ResourceInspectorPlugin::<RenderConfig>::default());
-        }
-
         info!("CpuRasterizerPlugin registered (with pipeline, assembly, sprites)");
         info!(
-            "Shape-vector tuning controls: F12 mode, F6 alphabet, [] threshold, 7/8 adaptive boost, 9/0 fallback threshold, ;' global crunch, ,./ directional crunch, -= sampling quality, F7 global toggle, F8 directional toggle, F10 structural fallback, F11 adaptive threshold, \\\\ reset"
+            "Render workbench registered: floating left fixture rail + right control stack; backquote toggles visibility"
+        );
+        info!(
+            "Shape-vector tuning hotkeys remain available: F12 mode, F6 alphabet, [] threshold, 7/8 adaptive boost, 9/0 fallback threshold, ;' global crunch, ,./ directional crunch, -= sampling quality, F7 global toggle, F8 directional toggle, F10 structural fallback, F11 adaptive threshold, \\\\ reset"
         );
     }
 }

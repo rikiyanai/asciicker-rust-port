@@ -9,6 +9,7 @@
 
 use std::time::Instant;
 
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 
 use crate::output::ascii_cell_grid::AsciiCellGrid;
@@ -30,12 +31,21 @@ use crate::render::shape_vector::{
 use crate::render::sprite_blit::{SpriteQueue, blit_sprite};
 use crate::render::types::AnsiCell;
 use crate::render::water;
+use crate::render::workbench::RenderWorkbenchState;
 use crate::terrain::RuntimeTerrain;
 use crate::world::RuntimeWorld;
+use crate::world::bsp::VisibleInstance;
+use crate::world::instance::{InstanceId, RuntimeInstance};
 
 // ---------------------------------------------------------------------------
 // PipelineTiming Resource
 // ---------------------------------------------------------------------------
+
+#[derive(SystemParam)]
+pub struct WorkbenchPipelineParams<'w> {
+    workbench: Option<Res<'w, RenderWorkbenchState>>,
+    debug_grid: ResMut<'w, RenderDebugGrid>,
+}
 
 /// Per-stage timing data for the rendering pipeline (microseconds).
 #[derive(Resource, Default, Debug, Clone)]
@@ -499,9 +509,15 @@ pub fn render_pipeline_system(
     shape_vector_alphabets: Res<ShapeVectorAlphabetRegistry>,
     shape_vec_matcher: Option<ResMut<ShapeVectorMatcher>>,
     mut shape_vector_stats: ResMut<ShapeVectorFrameStats>,
-    mut debug_grid: ResMut<RenderDebugGrid>,
+    mut workbench_params: WorkbenchPipelineParams,
 ) {
     let frame_start = Instant::now();
+    let workbench = workbench_params
+        .workbench
+        .as_deref()
+        .cloned()
+        .unwrap_or_default();
+    let debug_grid = &mut workbench_params.debug_grid;
 
     // STEP 1: Sync RenderConfig with AsciiCellGrid on window resize.
     // handle_window_resize (output/mod.rs) updates AsciiCellGrid but not RenderConfig.
@@ -601,8 +617,8 @@ pub fn render_pipeline_system(
         // Stage 2: TERRAIN (real rasterization with frustum culling)
         let t1 = Instant::now();
         let mut _terrain_patch_count = 0u32;
-        if terrain.root.is_some() {
-            terrain.query_visible(&camera.frustum_planes, |patch| {
+        if terrain.root.is_some() && workbench.show_terrain {
+            let mut render_patch = |patch: &crate::terrain::patch_runtime::RuntimePatch| {
                 _terrain_patch_count += 1;
                 let wz = if water_config.water_z > f32::NEG_INFINITY {
                     Some(water_config.water_z)
@@ -612,7 +628,12 @@ pub fn render_pipeline_system(
                 crate::render::terrain_shader::render_patch(
                     buf, buf_w, buf_h, patch, patch.x, patch.y, &camera, wz, true,
                 );
-            });
+            };
+            if workbench.terrain_culling {
+                terrain.query_visible(&camera.frustum_planes, &mut render_patch);
+            } else {
+                terrain.for_each_patch(&mut render_patch);
+            }
         }
         timing.terrain_us = t1.elapsed().as_micros() as u64;
 
@@ -620,17 +641,40 @@ pub fn render_pipeline_system(
         // Cleared by clear_sprite_queue_system in PreUpdate (Phase 6)
         let t2 = Instant::now();
 
-        let visible_instances = world_data.query_visible(
-            &camera.frustum_planes,
-            [
-                camera.pos[0] as f64,
-                camera.pos[1] as f64,
-                camera.pos[2] as f64,
-            ],
-        );
+        let visible_instances = if workbench.world_culling {
+            world_data.query_visible(
+                &camera.frustum_planes,
+                [
+                    camera.pos[0] as f64,
+                    camera.pos[1] as f64,
+                    camera.pos[2] as f64,
+                ],
+            )
+        } else {
+            world_data
+                .instances
+                .iter()
+                .enumerate()
+                .filter_map(|(index, instance)| {
+                    if !instance.is_visible() {
+                        return None;
+                    }
+                    let id = InstanceId(index);
+                    Some(match instance {
+                        RuntimeInstance::Mesh { .. } => VisibleInstance::Mesh(id),
+                        RuntimeInstance::Sprite { .. } | RuntimeInstance::Item { .. } => {
+                            VisibleInstance::Sprite(id)
+                        }
+                    })
+                })
+                .collect::<Vec<_>>()
+        };
         for visible in visible_instances {
             match visible {
                 crate::world::bsp::VisibleInstance::Mesh(id) => {
+                    if !workbench.show_meshes {
+                        continue;
+                    }
                     let Some(crate::world::instance::RuntimeInstance::Mesh { mesh_id, tm, .. }) =
                         world_data.instances.get(id.0)
                     else {
@@ -654,6 +698,9 @@ pub fn render_pipeline_system(
                     }
                 }
                 crate::world::bsp::VisibleInstance::Sprite(id) => {
+                    if !workbench.show_sprites {
+                        continue;
+                    }
                     let Some(inst) = world_data.instances.get(id.0) else {
                         continue;
                     };
@@ -710,7 +757,9 @@ pub fn render_pipeline_system(
 
         // Stage 4: SHADOW (player blob shadow, ported from C++ Stage 4)
         let t3 = Instant::now();
-        if let Some(mats) = materials.as_ref() {
+        if workbench.enable_shadows
+            && let Some(mats) = materials.as_ref()
+        {
             apply_player_shadow(buf, buf_w, buf_h, config.ascii_width, &camera, &mats.0);
         }
         timing.shadow_us = t3.elapsed().as_micros() as u64;
@@ -718,7 +767,7 @@ pub fn render_pipeline_system(
 
     // Stage 5: REFLECTION (water)
     let t4 = Instant::now();
-    if water_config.water_z > f32::NEG_INFINITY {
+    if workbench.enable_reflections && water_config.water_z > f32::NEG_INFINITY {
         water::render_water_reflections(
             &mut sample_buffer,
             &terrain,
@@ -1050,6 +1099,13 @@ pub fn render_pipeline_system(
     sprite_queue.sort_far_to_near();
     for entry in sprite_queue.drain() {
         blit_sprite(&mut cell_grid, &entry, &sample_buffer);
+    }
+    if workbench.invert_colors {
+        for index in 0..cell_grid.fg_colors.len() {
+            let fg = cell_grid.fg_colors[index];
+            cell_grid.fg_colors[index] = cell_grid.bg_colors[index];
+            cell_grid.bg_colors[index] = fg;
+        }
     }
     timing.sprite_us = t6.elapsed().as_micros() as u64;
     timing.total_us = frame_start.elapsed().as_micros() as u64;

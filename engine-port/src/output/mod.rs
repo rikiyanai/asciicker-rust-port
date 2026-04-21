@@ -7,7 +7,7 @@ pub mod test_pattern;
 
 use bevy::image::ImageLoaderSettings;
 use bevy::prelude::*;
-use bevy::window::{Window, WindowResized};
+use bevy::window::Window;
 
 use ascii_cell_grid::AsciiCellGrid;
 use capture::{VisualCaptureConfig, VisualCaptureState, visual_capture_system};
@@ -20,6 +20,7 @@ use replay::{
 
 use crate::game::weather::weather_composite_system;
 use crate::render::pipeline::render_pipeline_system;
+use crate::render::workbench::RenderWorkbenchState;
 
 /// Plugin that sets up the ASCII output pipeline.
 ///
@@ -33,7 +34,6 @@ pub struct AsciiOutputPlugin;
 
 impl Plugin for AsciiOutputPlugin {
     fn build(&self, app: &mut App) {
-        app.add_message::<WindowResized>();
         app.init_resource::<AsciiCellGrid>();
         app.init_resource::<VisualCaptureConfig>();
         app.init_resource::<VisualCaptureState>();
@@ -87,10 +87,10 @@ impl Plugin for AsciiOutputPlugin {
         #[cfg(feature = "test_pattern")]
         app.add_systems(
             Update,
-            (handle_window_resize, test_pattern::test_pattern_system).chain(),
+            (sync_grid_dimensions, test_pattern::test_pattern_system).chain(),
         );
         #[cfg(not(feature = "test_pattern"))]
-        app.add_systems(Update, handle_window_resize);
+        app.add_systems(Update, sync_grid_dimensions);
     }
 }
 
@@ -111,26 +111,16 @@ fn spawn_camera(mut commands: Commands) {
 /// displays the physical size is `logical * scale_factor`. Zero-dimension resizes
 /// (window minimized or tiny) are ignored. When dimensions change, all three cell
 /// arrays (char_indices, fg_colors, bg_colors) are reallocated at the new cell count.
-fn handle_window_resize(
-    resize_events: Option<MessageReader<WindowResized>>,
+fn sync_grid_dimensions(
     mut grid: ResMut<AsciiCellGrid>,
     config: Res<AsciiRenderConfig>,
     windows: Query<&Window>,
+    workbench: Option<Res<RenderWorkbenchState>>,
 ) {
-    let Some(mut resize_events) = resize_events else {
-        return;
-    };
-    // Drain all resize events; only act if at least one arrived this frame.
-    if resize_events.read().last().is_none() {
-        return;
-    }
-
-    // WindowResized reports logical pixels, but the shader samples in physical
-    // pixel space. Read physical dimensions directly from the Window component.
     let Some(window) = windows.iter().next() else {
         return;
     };
-    let Some((new_w, new_h)) = compute_grid_dimensions(
+    let Some((base_w, base_h)) = compute_grid_dimensions(
         window.physical_width() as f32,
         window.physical_height() as f32,
         config.font_width,
@@ -138,6 +128,12 @@ fn handle_window_resize(
     ) else {
         return;
     };
+    let resolution_scale = workbench
+        .as_deref()
+        .map(|state| state.resolution_scale.clamp(0.25, 1.0))
+        .unwrap_or(1.0);
+    let new_w = ((base_w as f32) * resolution_scale).round().max(1.0) as u32;
+    let new_h = ((base_h as f32) * resolution_scale).round().max(1.0) as u32;
 
     if new_w != grid.width || new_h != grid.height {
         let cell_count = (new_w * new_h) as usize;
