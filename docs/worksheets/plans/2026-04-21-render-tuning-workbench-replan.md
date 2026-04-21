@@ -1,9 +1,9 @@
 # 2026-04-21 Render Tuning Workbench Replan
 
-Status: active worksheet  
+Status: implementation complete, pending live feedback
 Canonical reference: `docs/CANONICAL_SPEC.md`  
 Related failure: `F250` in `docs/FAILURE_LOG.md`
-Current blocker: `F251` in `docs/FAILURE_LOG.md`
+Current monitored failures: `F251` and `F252` in `docs/FAILURE_LOG.md`
 ASCIIID audit: `docs/worksheets/research/2026-04-21-asciiid-font-palette-material-audit.md`
 
 ## Name Decision
@@ -389,10 +389,16 @@ Acceptance:
 
 Goal:
 
-- Replace fake presets with real glyph-candidate control.
+- Replace raw, confusing glyph controls with user-friendly matching presets
+  backed by real glyph-candidate and resolve settings.
 
 Required widgets:
 
+- preset cards inspired by the Figma page pattern, but backed by transparent
+  Asciicker renderer settings
+- each preset card must show a short purpose, sample preview, active glyph
+  family, matching mode, and changed thresholds
+- clone/edit/save actions for presets
 - shape-vector mode segmented control
 - alphabet dropdown or segmented control
 - CP437 16x16 glyph grid
@@ -408,20 +414,38 @@ Required widgets:
 - global crunch toggle and exponent slider
 - directional crunch toggle and exponent slider
 
+Required preset families:
+
+- `Original Material`: disables shape-vector replacement and shows original
+  material glyph behavior.
+- `Legible Terrain`: favors stable terrain glyphs and conservative overrides.
+- `Dense Detail`: allows richer glyph candidates for surface detail.
+- `Silhouette Safe`: preserves semantic/silhouette/linecase glyph ownership.
+- `Rain/Shadow Contrast`: biased toward glyphs/colors that make weather and
+  shadows readable.
+- `Water Stress`: emphasizes reflection/water boundary diagnosis.
+- `Custom`: user-owned bundle with explicit glyph list and resolve settings.
+
 Labeling requirement:
 
 - The UI must distinguish:
   - font atlas glyph
   - material glyph
   - shape-vector candidate glyph
+- Presets must not hide what they change. The advanced drawer for each preset
+  must show candidate glyphs, mode, alphabet, thresholds, fallback, adaptive
+  boost, sampling quality, and crunch toggles/exponents.
 
 Acceptance:
 
+- A non-expert can choose a useful glyph/matching preset without understanding
+  shape-vector internals.
 - Editing the active candidate set changes the actual shape-vector candidate
   list used by the renderer.
 - Current candidate glyphs are visible at rest.
-- Generic `Dense`/`Sparse` style buttons are absent unless reintroduced as
-  documented bundles of real values.
+- Preset changes are reversible and cloneable.
+- Generic `Dense`/`Sparse` style buttons are absent unless they are
+  reintroduced as documented, editable bundles of real values.
 
 ### Phase 6: Material, font, and palette render-path probe
 
@@ -450,11 +474,49 @@ Optional non-destructive preview controls:
 - active font selection
 - active palette selection
 - palettize/depalettize or palette mapping toggle
+- default multi-color palette themes inspired by mature editor/Vim theme
+  families, not monochrome filters
 - material ID probe override
 - MAT-elev probe override
 - diffuse/ramp override
 - material glyph override
 - foreground/background preview override
+
+Required palette themes:
+
+- `Asciicker Original`: unmodified resolved material/palette output.
+- `Solar Field`: warm/cool balanced palette for daylit terrain inspection.
+- `Gruvbox Earth`: earthy high-contrast terrain palette with readable greens,
+  yellows, browns, reds, and desaturated neutrals.
+- `Nord Ice`: cool blue/cyan palette for water, sky, and shadow contrast.
+- `Monokai Signal`: saturated contrast palette for silhouettes and material
+  boundaries.
+- `Dracula Night`: dark purple/blue base with bright accent ramps for
+  nighttime/weather stress.
+- `Accessibility High Contrast`: multi-color but high-separation ramp for
+  foreground/background legibility.
+
+Each palette theme must define at least:
+
+- sky/clear color
+- water/reflection ramp
+- terrain vegetation ramp
+- stone/neutral ramp
+- shadow/dark ramp
+- warning/accent ramp for overlays/probes
+- glyph foreground/background contrast policy
+
+Required material/elevation lane controls:
+
+- 4 elevation/ramp lanes corresponding to material `shade[4][16]`
+- 16 diffuse/shade stops per lane
+- lane enable/solo controls for inspection
+- lane weight/contrast sliders for preview
+- MAT-elev preview toggle showing how bit `0x8000` changes lane selection
+- diffuse-index scrubber showing movement across the 16 shade stops
+- per-lane swatches for material glyph, foreground RGB, and background RGB
+- read-only by default; any edits are preview-only unless editor persistence is
+  explicitly scoped later
 
 Boundary:
 
@@ -466,6 +528,10 @@ Acceptance:
 
 - The workbench can explain a selected final cell from MAT-id and MAT-elev
   through material glyph/color, font alpha, palette mapping, and final output.
+- Palette themes visibly differ as full color palettes, not grayscale/mono
+  recolors.
+- Elevation/material lanes make MAT-elev and diffuse/ramp behavior adjustable
+  and understandable without opening the full editor.
 
 ### Phase 7: Capture and comparison workflow
 
@@ -507,8 +573,14 @@ The Render Tuning Workbench is acceptable only if all are true:
 - shadows/weather/culling controls expose enough live diagnostics to tell
   whether the current scene has no affected cells or the control is broken
 - glyph matching supports a user-selected active glyph candidate set
+- glyph/matching presets are user-friendly, editable, and disclose their real
+  renderer settings instead of exposing only raw CP437 grid mechanics
 - material/palette diagnostics explain the final rendered cell path from
   MAT-id and MAT-elev through glyph/color/palette output
+- default palette themes are full multi-color palettes with named ramps, not
+  monochrome recolors
+- material/elevation lanes expose 4 elevation/ramp rows and 16 diffuse stops
+  for previewing MAT-elev and material ramp behavior
 - permanent material, palette, font, or world edits are not performed from the
   workbench unless explicitly scoped; render-path overrides are preview-only
   and visibly labeled as such
@@ -518,12 +590,12 @@ The Render Tuning Workbench is acceptable only if all are true:
 
 ## Immediate Next Step
 
-Start implementation with Phase 1 and Phase 2 before adding new render-path
-controls:
+Open the workbench and collect live feedback against the `F252` controls now in
+the working tree:
 
-- add/repair round-trip `Workbench -> Resume Scene -> Workbench` navigation
-- fix the right-panel scroll/numeric layout so values cannot clip
-- keep existing runtime-backed controls wired while removing fake fixture/preset
-  vocabulary
-- then add the `Spin` toggle/speed slider and pass-proof readouts for shadows,
-  weather, and culling
+- named glyph/matching preset buttons for original, legible, dense,
+  silhouette-safe, rain/shadow, water, and custom bundles
+- real multi-color palette previews inspired by editor themes
+- material/elevation lane controls for enable, solo, tint, weight, contrast, and
+  diffuse-stop previewing
+- advanced raw glyph grid and threshold sliders kept below the preset layer

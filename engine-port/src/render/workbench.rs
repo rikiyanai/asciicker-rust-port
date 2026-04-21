@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use bevy::prelude::*;
 use bevy_egui::{EguiContexts, EguiPlugin, EguiPrimaryContextPass, egui};
 
@@ -19,6 +21,8 @@ use super::shape_vector::{
 #[derive(Resource, Debug, Clone)]
 pub struct RenderWorkbenchState {
     pub resolution_scale: f32,
+    pub palette_preview: WorkbenchPalettePreview,
+    pub matching_preset: WorkbenchMatchingPreset,
     pub invert_colors: bool,
     pub show_terrain: bool,
     pub show_meshes: bool,
@@ -30,12 +34,20 @@ pub struct RenderWorkbenchState {
     pub show_help: bool,
     pub spin_enabled: bool,
     pub spin_speed_deg_per_sec: f32,
+    pub lane_enabled: [bool; 4],
+    pub lane_solo: [bool; 4],
+    pub lane_weight: [f32; 4],
+    pub lane_contrast: [f32; 4],
+    pub diffuse_preview_index: u8,
+    pub mat_elev_preview: bool,
 }
 
 impl Default for RenderWorkbenchState {
     fn default() -> Self {
         Self {
             resolution_scale: 1.0,
+            palette_preview: WorkbenchPalettePreview::AsciickerOriginal,
+            matching_preset: WorkbenchMatchingPreset::LegibleTerrain,
             invert_colors: false,
             show_terrain: true,
             show_meshes: true,
@@ -47,15 +59,386 @@ impl Default for RenderWorkbenchState {
             show_help: false,
             spin_enabled: false,
             spin_speed_deg_per_sec: 18.0,
+            lane_enabled: [true; 4],
+            lane_solo: [false; 4],
+            lane_weight: [1.0; 4],
+            lane_contrast: [1.0; 4],
+            diffuse_preview_index: 8,
+            mat_elev_preview: false,
         }
     }
 }
 
 impl RenderWorkbenchState {
-    pub fn reset(&mut self, camera: &mut GameCamera, shape: &mut ShapeVectorConfig) {
+    pub fn reset(
+        &mut self,
+        camera: &mut GameCamera,
+        shape: &mut ShapeVectorConfig,
+        glyph_candidates: &mut ShapeVectorGlyphCandidates,
+    ) {
         *self = Self::default();
         *camera = GameCamera::default();
         *shape = ShapeVectorConfig::default();
+        apply_matching_preset(self.matching_preset, shape, glyph_candidates);
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorkbenchPalettePreview {
+    AsciickerOriginal,
+    SolarField,
+    GruvboxEarth,
+    NordIce,
+    MonokaiSignal,
+    DraculaNight,
+    AccessibilityHighContrast,
+}
+
+impl WorkbenchPalettePreview {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::AsciickerOriginal => "Asciicker Original",
+            Self::SolarField => "Solar Field",
+            Self::GruvboxEarth => "Gruvbox Earth",
+            Self::NordIce => "Nord Ice",
+            Self::MonokaiSignal => "Monokai Signal",
+            Self::DraculaNight => "Dracula Night",
+            Self::AccessibilityHighContrast => "Accessibility High Contrast",
+        }
+    }
+
+    pub fn map_rgb(self, rgb: [u8; 4]) -> [u8; 4] {
+        let [r, g, b, a] = rgb;
+        if self == Self::AsciickerOriginal {
+            return rgb;
+        }
+
+        let luma = luma_u8(r, g, b);
+        let category = PaletteCategory::classify(r, g, b);
+        let [r, g, b] = sample_theme_ramp(self, category, luma);
+        [r, g, b, a]
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorkbenchMatchingPreset {
+    OriginalMaterial,
+    LegibleTerrain,
+    DenseDetail,
+    SilhouetteSafe,
+    RainShadowContrast,
+    WaterStress,
+    Custom,
+}
+
+impl WorkbenchMatchingPreset {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::OriginalMaterial => "Original Material",
+            Self::LegibleTerrain => "Legible Terrain",
+            Self::DenseDetail => "Dense Detail",
+            Self::SilhouetteSafe => "Silhouette Safe",
+            Self::RainShadowContrast => "Rain/Shadow Contrast",
+            Self::WaterStress => "Water Stress",
+            Self::Custom => "Custom",
+        }
+    }
+
+    pub fn purpose(self) -> &'static str {
+        match self {
+            Self::OriginalMaterial => "Use original material glyphs only.",
+            Self::LegibleTerrain => "Stable terrain readability.",
+            Self::DenseDetail => "More texture and density.",
+            Self::SilhouetteSafe => "Protect semantic edges.",
+            Self::RainShadowContrast => "Weather and dark pass clarity.",
+            Self::WaterStress => "Inspect reflections and water edges.",
+            Self::Custom => "Your edited setting bundle.",
+        }
+    }
+}
+
+fn luma_u8(r: u8, g: u8, b: u8) -> u8 {
+    ((u16::from(r) * 54 + u16::from(g) * 183 + u16::from(b) * 19) / 256) as u8
+}
+
+#[derive(Debug, Clone, Copy)]
+enum PaletteCategory {
+    Sky,
+    Water,
+    Vegetation,
+    Stone,
+    Shadow,
+    Accent,
+}
+
+impl PaletteCategory {
+    fn classify(r: u8, g: u8, b: u8) -> Self {
+        let max = r.max(g).max(b);
+        let min = r.min(g).min(b);
+        let luma = luma_u8(r, g, b);
+        if luma < 44 {
+            Self::Shadow
+        } else if max.saturating_sub(min) < 24 {
+            Self::Stone
+        } else if b > r.saturating_add(18) && b >= g {
+            if luma > 150 { Self::Sky } else { Self::Water }
+        } else if g > r && g >= b {
+            Self::Vegetation
+        } else if r > g.saturating_add(18) {
+            Self::Accent
+        } else {
+            Self::Stone
+        }
+    }
+}
+
+fn sample_theme_ramp(
+    theme: WorkbenchPalettePreview,
+    category: PaletteCategory,
+    luma: u8,
+) -> [u8; 3] {
+    let ramp = match (theme, category) {
+        (WorkbenchPalettePreview::SolarField, PaletteCategory::Sky) => [
+            [38, 70, 83],
+            [42, 106, 122],
+            [91, 151, 159],
+            [181, 207, 199],
+        ],
+        (WorkbenchPalettePreview::SolarField, PaletteCategory::Water) => {
+            [[7, 54, 66], [38, 139, 150], [42, 161, 152], [147, 211, 203]]
+        }
+        (WorkbenchPalettePreview::SolarField, PaletteCategory::Vegetation) => {
+            [[48, 71, 46], [88, 110, 64], [133, 153, 0], [201, 196, 118]]
+        }
+        (WorkbenchPalettePreview::SolarField, PaletteCategory::Stone) => [
+            [58, 68, 70],
+            [101, 123, 131],
+            [147, 161, 161],
+            [238, 232, 213],
+        ],
+        (WorkbenchPalettePreview::SolarField, PaletteCategory::Shadow) => {
+            [[0, 24, 30], [7, 54, 66], [38, 70, 83], [88, 110, 117]]
+        }
+        (WorkbenchPalettePreview::SolarField, PaletteCategory::Accent) => {
+            [[91, 54, 34], [181, 86, 0], [203, 75, 22], [253, 246, 227]]
+        }
+        (WorkbenchPalettePreview::GruvboxEarth, PaletteCategory::Sky) => {
+            [[40, 40, 40], [69, 80, 83], [131, 165, 152], [168, 153, 132]]
+        }
+        (WorkbenchPalettePreview::GruvboxEarth, PaletteCategory::Water) => [
+            [29, 48, 52],
+            [69, 133, 136],
+            [131, 165, 152],
+            [213, 196, 161],
+        ],
+        (WorkbenchPalettePreview::GruvboxEarth, PaletteCategory::Vegetation) => {
+            [[50, 56, 36], [104, 119, 47], [152, 151, 26], [184, 187, 38]]
+        }
+        (WorkbenchPalettePreview::GruvboxEarth, PaletteCategory::Stone) => {
+            [[40, 40, 40], [80, 73, 69], [146, 131, 116], [235, 219, 178]]
+        }
+        (WorkbenchPalettePreview::GruvboxEarth, PaletteCategory::Shadow) => {
+            [[29, 32, 33], [40, 40, 40], [60, 56, 54], [80, 73, 69]]
+        }
+        (WorkbenchPalettePreview::GruvboxEarth, PaletteCategory::Accent) => {
+            [[85, 48, 36], [204, 36, 29], [214, 93, 14], [251, 241, 199]]
+        }
+        (WorkbenchPalettePreview::NordIce, PaletteCategory::Sky) => {
+            [[46, 52, 64], [67, 76, 94], [129, 161, 193], [216, 222, 233]]
+        }
+        (WorkbenchPalettePreview::NordIce, PaletteCategory::Water) => [
+            [35, 56, 70],
+            [94, 129, 172],
+            [136, 192, 208],
+            [229, 233, 240],
+        ],
+        (WorkbenchPalettePreview::NordIce, PaletteCategory::Vegetation) => [
+            [45, 66, 58],
+            [86, 120, 105],
+            [163, 190, 140],
+            [220, 233, 202],
+        ],
+        (WorkbenchPalettePreview::NordIce, PaletteCategory::Stone) => [
+            [46, 52, 64],
+            [76, 86, 106],
+            [143, 155, 179],
+            [236, 239, 244],
+        ],
+        (WorkbenchPalettePreview::NordIce, PaletteCategory::Shadow) => {
+            [[20, 24, 31], [36, 42, 54], [46, 52, 64], [67, 76, 94]]
+        }
+        (WorkbenchPalettePreview::NordIce, PaletteCategory::Accent) => [
+            [75, 46, 57],
+            [191, 97, 106],
+            [208, 135, 112],
+            [236, 239, 244],
+        ],
+        (WorkbenchPalettePreview::MonokaiSignal, PaletteCategory::Sky) => {
+            [[39, 40, 34], [73, 72, 62], [102, 217, 239], [248, 248, 242]]
+        }
+        (WorkbenchPalettePreview::MonokaiSignal, PaletteCategory::Water) => [
+            [25, 45, 50],
+            [102, 217, 239],
+            [166, 226, 244],
+            [248, 248, 242],
+        ],
+        (WorkbenchPalettePreview::MonokaiSignal, PaletteCategory::Vegetation) => [
+            [42, 55, 26],
+            [117, 160, 44],
+            [166, 226, 46],
+            [232, 255, 166],
+        ],
+        (WorkbenchPalettePreview::MonokaiSignal, PaletteCategory::Stone) => {
+            [[39, 40, 34], [85, 85, 78], [174, 174, 164], [248, 248, 242]]
+        }
+        (WorkbenchPalettePreview::MonokaiSignal, PaletteCategory::Shadow) => {
+            [[20, 20, 18], [39, 40, 34], [73, 72, 62], [117, 113, 94]]
+        }
+        (WorkbenchPalettePreview::MonokaiSignal, PaletteCategory::Accent) => [
+            [80, 35, 60],
+            [249, 38, 114],
+            [253, 151, 31],
+            [255, 255, 180],
+        ],
+        (WorkbenchPalettePreview::DraculaNight, PaletteCategory::Sky) => {
+            [[40, 42, 54], [68, 71, 90], [98, 114, 164], [248, 248, 242]]
+        }
+        (WorkbenchPalettePreview::DraculaNight, PaletteCategory::Water) => [
+            [31, 45, 62],
+            [68, 71, 120],
+            [139, 233, 253],
+            [241, 250, 255],
+        ],
+        (WorkbenchPalettePreview::DraculaNight, PaletteCategory::Vegetation) => [
+            [42, 55, 55],
+            [70, 120, 100],
+            [80, 250, 123],
+            [210, 255, 220],
+        ],
+        (WorkbenchPalettePreview::DraculaNight, PaletteCategory::Stone) => {
+            [[40, 42, 54], [68, 71, 90], [189, 147, 249], [248, 248, 242]]
+        }
+        (WorkbenchPalettePreview::DraculaNight, PaletteCategory::Shadow) => {
+            [[20, 22, 30], [32, 34, 45], [40, 42, 54], [68, 71, 90]]
+        }
+        (WorkbenchPalettePreview::DraculaNight, PaletteCategory::Accent) => [
+            [80, 45, 85],
+            [255, 85, 85],
+            [255, 121, 198],
+            [255, 184, 108],
+        ],
+        (WorkbenchPalettePreview::AccessibilityHighContrast, PaletteCategory::Sky) => {
+            [[0, 35, 80], [0, 95, 150], [80, 190, 255], [245, 250, 255]]
+        }
+        (WorkbenchPalettePreview::AccessibilityHighContrast, PaletteCategory::Water) => {
+            [[0, 20, 70], [0, 100, 220], [0, 210, 255], [230, 255, 255]]
+        }
+        (WorkbenchPalettePreview::AccessibilityHighContrast, PaletteCategory::Vegetation) => {
+            [[0, 45, 0], [0, 130, 20], [120, 255, 0], [240, 255, 180]]
+        }
+        (WorkbenchPalettePreview::AccessibilityHighContrast, PaletteCategory::Stone) => {
+            [[0, 0, 0], [65, 65, 65], [180, 180, 180], [255, 255, 255]]
+        }
+        (WorkbenchPalettePreview::AccessibilityHighContrast, PaletteCategory::Shadow) => {
+            [[0, 0, 0], [20, 20, 20], [70, 70, 70], [135, 135, 135]]
+        }
+        (WorkbenchPalettePreview::AccessibilityHighContrast, PaletteCategory::Accent) => {
+            [[90, 0, 0], [255, 0, 0], [255, 210, 0], [255, 255, 255]]
+        }
+        _ => [[0, 0, 0], [85, 85, 85], [170, 170, 170], [255, 255, 255]],
+    };
+    sample_ramp(ramp, luma)
+}
+
+fn sample_ramp(ramp: [[u8; 3]; 4], luma: u8) -> [u8; 3] {
+    let t = luma as f32 / 255.0 * 3.0;
+    let idx = t.floor().min(2.0) as usize;
+    let frac = t - idx as f32;
+    lerp_rgb(ramp[idx], ramp[idx + 1], frac)
+}
+
+fn lerp_rgb(a: [u8; 3], b: [u8; 3], t: f32) -> [u8; 3] {
+    [
+        (a[0] as f32 + (b[0] as f32 - a[0] as f32) * t).round() as u8,
+        (a[1] as f32 + (b[1] as f32 - a[1] as f32) * t).round() as u8,
+        (a[2] as f32 + (b[2] as f32 - a[2] as f32) * t).round() as u8,
+    ]
+}
+
+pub fn apply_palette_preview(rgb: [u8; 4], palette: WorkbenchPalettePreview) -> [u8; 4] {
+    palette.map_rgb(rgb)
+}
+
+pub fn material_lane_preview_active(workbench: &RenderWorkbenchState) -> bool {
+    workbench.mat_elev_preview
+        || workbench.lane_solo.iter().any(|value| *value)
+        || workbench.lane_enabled.iter().any(|value| !*value)
+        || workbench
+            .lane_weight
+            .iter()
+            .any(|value| (*value - 1.0).abs() > f32::EPSILON)
+        || workbench
+            .lane_contrast
+            .iter()
+            .any(|value| (*value - 1.0).abs() > f32::EPSILON)
+}
+
+pub fn apply_material_lane_preview(
+    rgb: [u8; 4],
+    material_lane: u8,
+    diffuse_index: u8,
+    workbench: &RenderWorkbenchState,
+) -> [u8; 4] {
+    if !material_lane_preview_active(workbench) {
+        return rgb;
+    }
+
+    let lane = (material_lane as usize).min(3);
+    let solo_active = workbench.lane_solo.iter().any(|value| *value);
+    let mut color = [rgb[0] as f32, rgb[1] as f32, rgb[2] as f32];
+
+    if !workbench.lane_enabled[lane] || (solo_active && !workbench.lane_solo[lane]) {
+        let luma = luma_u8(rgb[0], rgb[1], rgb[2]) as f32;
+        let dim = if workbench.lane_enabled[lane] {
+            0.34
+        } else {
+            0.22
+        };
+        for channel in &mut color {
+            *channel = (*channel * 0.25 + luma * 0.75) * dim;
+        }
+    } else {
+        let contrast = workbench.lane_contrast[lane].clamp(0.25, 2.5);
+        let weight = workbench.lane_weight[lane].clamp(0.0, 2.0);
+        for channel in &mut color {
+            *channel = ((*channel - 128.0) * contrast + 128.0) * weight;
+        }
+        if workbench.mat_elev_preview {
+            let tint = lane_tint(lane);
+            let mix = (0.22 + (weight - 1.0).max(0.0) * 0.16).clamp(0.0, 0.44);
+            let diffuse_delta = diffuse_index.abs_diff(workbench.diffuse_preview_index) as f32;
+            let diffuse_focus = 1.0 - (diffuse_delta / 15.0).clamp(0.0, 1.0) * 0.28;
+            for index in 0..3 {
+                color[index] = color[index] * (1.0 - mix) + tint[index] as f32 * mix;
+                color[index] *= diffuse_focus;
+            }
+        }
+    }
+
+    [
+        color[0].round().clamp(0.0, 255.0) as u8,
+        color[1].round().clamp(0.0, 255.0) as u8,
+        color[2].round().clamp(0.0, 255.0) as u8,
+        rgb[3],
+    ]
+}
+
+fn lane_tint(lane: usize) -> [u8; 3] {
+    match lane {
+        0 => [120, 255, 140],
+        1 => [255, 220, 72],
+        2 => [80, 210, 255],
+        _ => [255, 112, 206],
     }
 }
 
@@ -250,7 +633,11 @@ fn render_workbench_ui_system(
                                     .on_hover_text("Restore renderer, camera, and glyph-matching settings to their documented defaults.")
                                     .clicked()
                                 {
-                                    workbench.reset(&mut camera, &mut shape_config);
+                                    workbench.reset(
+                                        &mut camera,
+                                        &mut shape_config,
+                                        &mut glyph_candidates,
+                                    );
                                 }
                             });
                             if workbench.show_help {
@@ -359,6 +746,65 @@ fn render_workbench_ui_system(
                             });
 
                             ui.add_space(14.0);
+                            section_label(ui, "Palette Preview");
+                            enum_row(ui, "Default palettes", |ui| {
+                                palette_button(
+                                    ui,
+                                    "Original",
+                                    &mut workbench.palette_preview,
+                                    WorkbenchPalettePreview::AsciickerOriginal,
+                                    "Use the renderer's resolved colors without preview remapping.",
+                                );
+                                palette_button(
+                                    ui,
+                                    "Solar",
+                                    &mut workbench.palette_preview,
+                                    WorkbenchPalettePreview::SolarField,
+                                    "Preview a Solarized-inspired field palette with distinct terrain, water, stone, and accent ramps.",
+                                );
+                                palette_button(
+                                    ui,
+                                    "Gruvbox",
+                                    &mut workbench.palette_preview,
+                                    WorkbenchPalettePreview::GruvboxEarth,
+                                    "Preview a warm editor-inspired earth palette with separate greens, blues, neutrals, and accents.",
+                                );
+                                palette_button(
+                                    ui,
+                                    "Nord",
+                                    &mut workbench.palette_preview,
+                                    WorkbenchPalettePreview::NordIce,
+                                    "Preview a cool high-readability palette inspired by Nord.",
+                                );
+                                palette_button(
+                                    ui,
+                                    "Monokai",
+                                    &mut workbench.palette_preview,
+                                    WorkbenchPalettePreview::MonokaiSignal,
+                                    "Preview a saturated editor palette for testing signal separation.",
+                                );
+                                palette_button(
+                                    ui,
+                                    "Dracula",
+                                    &mut workbench.palette_preview,
+                                    WorkbenchPalettePreview::DraculaNight,
+                                    "Preview a dark high-saturation palette for nighttime contrast checks.",
+                                );
+                                palette_button(
+                                    ui,
+                                    "A11y",
+                                    &mut workbench.palette_preview,
+                                    WorkbenchPalettePreview::AccessibilityHighContrast,
+                                    "Preview a multi-color high-contrast palette for accessibility stress testing.",
+                                );
+                            });
+                            metric_row(
+                                ui,
+                                "Palette",
+                                workbench.palette_preview.label().to_string(),
+                            );
+
+                            ui.add_space(14.0);
                             section_label(ui, "Culling");
                             ui.horizontal_wrapped(|ui| {
                                 toggle_button(
@@ -426,6 +872,76 @@ fn render_workbench_ui_system(
 
                             ui.add_space(14.0);
                             section_label(ui, "Glyph Matching");
+                            enum_row(ui, "Presets", |ui| {
+                                matching_preset_button(
+                                    ui,
+                                    "Original",
+                                    WorkbenchMatchingPreset::OriginalMaterial,
+                                    &mut workbench.matching_preset,
+                                    &mut shape_config,
+                                    &mut glyph_candidates,
+                                );
+                                matching_preset_button(
+                                    ui,
+                                    "Legible",
+                                    WorkbenchMatchingPreset::LegibleTerrain,
+                                    &mut workbench.matching_preset,
+                                    &mut shape_config,
+                                    &mut glyph_candidates,
+                                );
+                                matching_preset_button(
+                                    ui,
+                                    "Dense",
+                                    WorkbenchMatchingPreset::DenseDetail,
+                                    &mut workbench.matching_preset,
+                                    &mut shape_config,
+                                    &mut glyph_candidates,
+                                );
+                                matching_preset_button(
+                                    ui,
+                                    "Silhouette",
+                                    WorkbenchMatchingPreset::SilhouetteSafe,
+                                    &mut workbench.matching_preset,
+                                    &mut shape_config,
+                                    &mut glyph_candidates,
+                                );
+                                matching_preset_button(
+                                    ui,
+                                    "Rain/Shadow",
+                                    WorkbenchMatchingPreset::RainShadowContrast,
+                                    &mut workbench.matching_preset,
+                                    &mut shape_config,
+                                    &mut glyph_candidates,
+                                );
+                                matching_preset_button(
+                                    ui,
+                                    "Water",
+                                    WorkbenchMatchingPreset::WaterStress,
+                                    &mut workbench.matching_preset,
+                                    &mut shape_config,
+                                    &mut glyph_candidates,
+                                );
+                                matching_preset_button(
+                                    ui,
+                                    "Custom",
+                                    WorkbenchMatchingPreset::Custom,
+                                    &mut workbench.matching_preset,
+                                    &mut shape_config,
+                                    &mut glyph_candidates,
+                                );
+                            });
+                            metric_row(
+                                ui,
+                                "Preset",
+                                workbench.matching_preset.label().to_string(),
+                            );
+                            ui.label(
+                                egui::RichText::new(workbench.matching_preset.purpose())
+                                    .size(11.0)
+                                    .color(egui::Color32::from_rgb(92, 88, 82)),
+                            );
+                            ui.add_space(8.0);
+                            section_label(ui, "Advanced Glyph Controls");
                             enum_row(ui, "Mode", |ui| {
                                 enum_button(
                                     ui,
@@ -608,6 +1124,10 @@ fn render_workbench_ui_system(
                             material_probe_panel(ui, ctx, &cell_grid, &debug_grid, &camera);
 
                             ui.add_space(14.0);
+                            section_label(ui, "Material Lanes");
+                            material_lane_panel(ui, &mut workbench);
+
+                            ui.add_space(14.0);
                             section_label(ui, "Diagnostics");
                             metric_row(ui, "Mode", shape_mode_label(shape_config.mode).to_string());
                             metric_row(
@@ -705,6 +1225,98 @@ fn render_return_chip(
                     }
                 });
         });
+}
+
+fn apply_matching_preset(
+    preset: WorkbenchMatchingPreset,
+    shape_config: &mut ShapeVectorConfig,
+    candidates: &mut ShapeVectorGlyphCandidates,
+) {
+    match preset {
+        WorkbenchMatchingPreset::OriginalMaterial => {
+            shape_config.mode = ShapeVectorMode::OriginalOnly;
+            shape_config.alphabet = ShapeVectorAlphabetId::Default;
+            shape_config.distance_threshold = 0.08;
+            shape_config.enable_contrast_adaptive_threshold = false;
+            shape_config.enable_structural_fallback = true;
+            candidates.enabled = false;
+        }
+        WorkbenchMatchingPreset::LegibleTerrain => {
+            shape_config.mode = ShapeVectorMode::Combined;
+            shape_config.alphabet = ShapeVectorAlphabetId::Minimal;
+            shape_config.distance_threshold = 0.075;
+            shape_config.contrast_adaptive_threshold_boost = 0.25;
+            shape_config.structural_fallback_distance_threshold = 0.20;
+            shape_config.sampling_quality = 16;
+            shape_config.enable_global_crunch = true;
+            shape_config.enable_directional_crunch = true;
+            shape_config.enable_contrast_adaptive_threshold = false;
+            shape_config.enable_structural_fallback = true;
+            candidates.enabled = true;
+            candidates.glyphs = glyph_set(b" .:-=+*#%@");
+        }
+        WorkbenchMatchingPreset::DenseDetail => {
+            shape_config.mode = ShapeVectorMode::HarriPriority;
+            shape_config.alphabet = ShapeVectorAlphabetId::Default;
+            shape_config.distance_threshold = 0.12;
+            shape_config.contrast_adaptive_threshold_boost = 0.45;
+            shape_config.structural_fallback_distance_threshold = 0.28;
+            shape_config.sampling_quality = 24;
+            shape_config.enable_global_crunch = true;
+            shape_config.enable_directional_crunch = true;
+            shape_config.enable_contrast_adaptive_threshold = true;
+            shape_config.enable_structural_fallback = true;
+            candidates.enabled = true;
+            candidates.glyphs = glyph_set(b" .,:;irsXA253hMHGS#9B&@");
+        }
+        WorkbenchMatchingPreset::SilhouetteSafe => {
+            shape_config.mode = ShapeVectorMode::Combined;
+            shape_config.alphabet = ShapeVectorAlphabetId::Minimal;
+            shape_config.distance_threshold = 0.055;
+            shape_config.contrast_adaptive_threshold_boost = 0.15;
+            shape_config.structural_fallback_distance_threshold = 0.16;
+            shape_config.sampling_quality = 18;
+            shape_config.enable_global_crunch = true;
+            shape_config.enable_directional_crunch = true;
+            shape_config.enable_contrast_adaptive_threshold = false;
+            shape_config.enable_structural_fallback = true;
+            candidates.enabled = true;
+            candidates.glyphs = glyph_set(b" .:-=+*#%@/\\|_[]()");
+        }
+        WorkbenchMatchingPreset::RainShadowContrast => {
+            shape_config.mode = ShapeVectorMode::Combined;
+            shape_config.alphabet = ShapeVectorAlphabetId::Default;
+            shape_config.distance_threshold = 0.095;
+            shape_config.contrast_adaptive_threshold_boost = 0.60;
+            shape_config.structural_fallback_distance_threshold = 0.24;
+            shape_config.sampling_quality = 20;
+            shape_config.enable_global_crunch = true;
+            shape_config.enable_directional_crunch = true;
+            shape_config.enable_contrast_adaptive_threshold = true;
+            shape_config.enable_structural_fallback = true;
+            candidates.enabled = true;
+            candidates.glyphs = glyph_set(b" .,:;|/\\'`*+xX#%@");
+        }
+        WorkbenchMatchingPreset::WaterStress => {
+            shape_config.mode = ShapeVectorMode::Combined;
+            shape_config.alphabet = ShapeVectorAlphabetId::Default;
+            shape_config.distance_threshold = 0.10;
+            shape_config.contrast_adaptive_threshold_boost = 0.50;
+            shape_config.structural_fallback_distance_threshold = 0.26;
+            shape_config.sampling_quality = 22;
+            shape_config.enable_global_crunch = true;
+            shape_config.enable_directional_crunch = true;
+            shape_config.enable_contrast_adaptive_threshold = true;
+            shape_config.enable_structural_fallback = true;
+            candidates.enabled = true;
+            candidates.glyphs = glyph_set(b" ~_-=:;,.\\/|+*#%M");
+        }
+        WorkbenchMatchingPreset::Custom => {}
+    }
+}
+
+fn glyph_set(bytes: &[u8]) -> BTreeSet<u8> {
+    bytes.iter().copied().collect()
 }
 
 fn glyph_candidate_panel(ui: &mut egui::Ui, candidates: &mut ShapeVectorGlyphCandidates) {
@@ -852,6 +1464,11 @@ fn material_probe_panel(
     );
     metric_row(
         ui,
+        "Lane / diffuse",
+        format!("{} / {}", debug.material_lane, debug.diffuse_index),
+    );
+    metric_row(
+        ui,
         "Height",
         height.map_or("clear".to_string(), |h| format!("{h:.1}")),
     );
@@ -941,6 +1558,11 @@ fn help_panel(ui: &mut egui::Ui) {
             );
             help_row(
                 ui,
+                "Palette Preview",
+                "Remaps final cell colors through multi-color editor-inspired palettes without editing material or palette assets.",
+            );
+            help_row(
+                ui,
                 "Culling",
                 "Switches between frustum/BSP culling and full traversal for terrain/world diagnostics.",
             );
@@ -951,13 +1573,13 @@ fn help_panel(ui: &mut egui::Ui) {
             );
             help_row(
                 ui,
-                "Glyph mode/alphabet",
-                "Controls original/combined/Harri glyph selection and alphabet choice. Keyboard parity: F12 and F6.",
+                "Matching presets",
+                "Applies bundled glyph mode, alphabet, threshold, fallback, and custom candidate settings.",
             );
             help_row(
                 ui,
-                "Custom glyphs",
-                "Uses the CP437 grid selection as the actual shape-vector candidate list.",
+                "Advanced glyph controls",
+                "Controls original/combined/Harri glyph selection, alphabets, custom CP437 candidates, thresholds, and fallback tuning.",
             );
             help_row(
                 ui,
@@ -968,6 +1590,11 @@ fn help_panel(ui: &mut egui::Ui) {
                 ui,
                 "Binary glyph toggles",
                 "Enable adaptive threshold, structural fallback, global crunch, and directional crunch. Keyboard parity: F11, F10, F7, and F8.",
+            );
+            help_row(
+                ui,
+                "Material lanes",
+                "Shows and adjusts the four material/elevation shade lanes with tint, solo, enable, weight, contrast, and diffuse preview controls.",
             );
             help_row(
                 ui,
@@ -1133,6 +1760,113 @@ where
     }
 }
 
+fn matching_preset_button(
+    ui: &mut egui::Ui,
+    label: &str,
+    value: WorkbenchMatchingPreset,
+    current: &mut WorkbenchMatchingPreset,
+    shape_config: &mut ShapeVectorConfig,
+    candidates: &mut ShapeVectorGlyphCandidates,
+) {
+    let selected = *current == value;
+    if ui
+        .add_sized([104.0, 30.0], egui::Button::new(label).selected(selected))
+        .on_hover_text(value.purpose())
+        .clicked()
+    {
+        *current = value;
+        apply_matching_preset(value, shape_config, candidates);
+    }
+}
+
+fn palette_button(
+    ui: &mut egui::Ui,
+    label: &str,
+    current: &mut WorkbenchPalettePreview,
+    value: WorkbenchPalettePreview,
+    help: &str,
+) {
+    let selected = *current == value;
+    if ui
+        .add_sized([96.0, 28.0], egui::Button::new(label).selected(selected))
+        .on_hover_text(help)
+        .clicked()
+    {
+        *current = value;
+    }
+}
+
+fn material_lane_panel(ui: &mut egui::Ui, workbench: &mut RenderWorkbenchState) {
+    ui.horizontal_wrapped(|ui| {
+        toggle_button(
+            ui,
+            "MAT-elev tint",
+            &mut workbench.mat_elev_preview,
+            "Tints resolved colors by material lane so elevation-ramp routing is visible.",
+        );
+        if ui
+            .add_sized([136.0, 28.0], egui::Button::new("Reset lanes"))
+            .on_hover_text("Restore all material lanes to enabled, unsoloed, neutral weight, and neutral contrast.")
+            .clicked()
+        {
+            workbench.lane_enabled = [true; 4];
+            workbench.lane_solo = [false; 4];
+            workbench.lane_weight = [1.0; 4];
+            workbench.lane_contrast = [1.0; 4];
+            workbench.mat_elev_preview = false;
+        }
+    });
+    let mut diffuse = u32::from(workbench.diffuse_preview_index);
+    int_slider_row(
+        ui,
+        "Diffuse preview",
+        &mut diffuse,
+        0..=15,
+        "Scrubs the documented material shade column for lane comparison and probe readback.",
+    );
+    workbench.diffuse_preview_index = diffuse.min(15) as u8;
+
+    for lane in 0..4 {
+        ui.add_space(6.0);
+        ui.horizontal(|ui| {
+            let color = lane_tint(lane);
+            let swatch = egui::RichText::new("  ")
+                .background_color(egui::Color32::from_rgb(color[0], color[1], color[2]));
+            ui.add_sized([20.0, 18.0], egui::Label::new(swatch))
+                .on_hover_text(format!("Lane {lane} tint"));
+            ui.add_sized([60.0, 18.0], egui::Label::new(format!("Lane {lane}")));
+            compact_toggle_button(
+                ui,
+                "On",
+                &mut workbench.lane_enabled[lane],
+                "Enables this material/elevation lane in the preview.",
+            );
+            compact_toggle_button(
+                ui,
+                "Solo",
+                &mut workbench.lane_solo[lane],
+                "Dims every other lane so this one can be inspected by itself.",
+            );
+        });
+        slider_row(
+            ui,
+            "Lane weight",
+            &mut workbench.lane_weight[lane],
+            0.0..=2.0,
+            0.05,
+            "Brightness weight for this material/elevation lane preview.",
+        );
+        slider_row(
+            ui,
+            "Lane contrast",
+            &mut workbench.lane_contrast[lane],
+            0.25..=2.5,
+            0.05,
+            "Contrast multiplier for this material/elevation lane preview.",
+        );
+    }
+}
+
 fn weather_button(ui: &mut egui::Ui, label: &str, weather: &mut Weather, value: WeatherState) {
     let selected = weather.state == value;
     if ui
@@ -1147,6 +1881,16 @@ fn weather_button(ui: &mut egui::Ui, label: &str, weather: &mut Weather, value: 
 fn toggle_button(ui: &mut egui::Ui, label: &str, value: &mut bool, help: &str) {
     if ui
         .add_sized([136.0, 28.0], egui::Button::new(label).selected(*value))
+        .on_hover_text(help)
+        .clicked()
+    {
+        *value = !*value;
+    }
+}
+
+fn compact_toggle_button(ui: &mut egui::Ui, label: &str, value: &mut bool, help: &str) {
+    if ui
+        .add_sized([58.0, 24.0], egui::Button::new(label).selected(*value))
         .on_hover_text(help)
         .clicked()
     {

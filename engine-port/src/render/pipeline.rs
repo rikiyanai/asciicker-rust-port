@@ -31,7 +31,10 @@ use crate::render::shape_vector::{
 use crate::render::sprite_blit::{SpriteQueue, blit_sprite};
 use crate::render::types::AnsiCell;
 use crate::render::water;
-use crate::render::workbench::{RenderWorkbenchFrameStats, RenderWorkbenchState};
+use crate::render::workbench::{
+    RenderWorkbenchFrameStats, RenderWorkbenchState, apply_material_lane_preview,
+    apply_palette_preview, material_lane_preview_active,
+};
 use crate::terrain::RuntimeTerrain;
 use crate::world::RuntimeWorld;
 use crate::world::bsp::VisibleInstance;
@@ -1173,6 +1176,35 @@ pub fn render_pipeline_system(
     sprite_queue.sort_far_to_near();
     for entry in sprite_queue.drain() {
         blit_sprite(&mut cell_grid, &entry, &sample_buffer);
+    }
+    if workbench.palette_preview
+        != crate::render::workbench::WorkbenchPalettePreview::AsciickerOriginal
+    {
+        for index in 0..cell_grid.fg_colors.len() {
+            cell_grid.fg_colors[index] =
+                apply_palette_preview(cell_grid.fg_colors[index], workbench.palette_preview);
+            cell_grid.bg_colors[index] =
+                apply_palette_preview(cell_grid.bg_colors[index], workbench.palette_preview);
+        }
+    }
+    if material_lane_preview_active(&workbench) {
+        for index in 0..cell_grid.fg_colors.len() {
+            let Some(debug_cell) = workbench_params.debug_grid.cells.get(index) else {
+                continue;
+            };
+            cell_grid.fg_colors[index] = apply_material_lane_preview(
+                cell_grid.fg_colors[index],
+                debug_cell.material_lane,
+                debug_cell.diffuse_index,
+                &workbench,
+            );
+            cell_grid.bg_colors[index] = apply_material_lane_preview(
+                cell_grid.bg_colors[index],
+                debug_cell.material_lane,
+                debug_cell.diffuse_index,
+                &workbench,
+            );
+        }
     }
     if workbench.invert_colors {
         for index in 0..cell_grid.fg_colors.len() {

@@ -117,8 +117,9 @@ That is unrelated to rendering.
 
 ## Render Tuning Workbench
 
-Status: active, not yet user-approved. Current implementation remains blocked
-by failure `F251`.
+Status: active, not yet user-approved. Current implementation includes the
+`F251` return/pass-proof controls and the `F252` preset/palette/lane pass, and
+is pending live user feedback.
 
 Canonical product name: `Render Tuning Workbench`
 
@@ -196,6 +197,12 @@ Canonical control groups:
   non-destructive preview overrides for render inspection, but those overrides
   must be visibly labeled as preview state and must not write world/editor asset
   data unless that scope is explicitly added later.
+- **Preset and theme controls:** user-facing presets are canonical when they
+  are transparent bundles of real renderer settings. Presets must be editable,
+  cloneable, and inspectable. Figma-like preset affordances are allowed, but the
+  labels and bundles must describe Asciicker render intent: e.g. legibility,
+  dense terrain, silhouette, rainy contrast, water/reflection stress, material
+  ramp inspection, or elevation-lane inspection.
 - **Weather and pass diagnostics:** weather state/type/intensity and visible
   particle or affected-cell counts; shadow/reflection/culling controls must
   report enough runtime data to distinguish "enabled but no effect in this
@@ -239,14 +246,20 @@ Required workbench UX/control plan:
      unculled traversal counts for the current frame or last sampled frame.
 
 4. **Glyph candidate picker**
-   - The shape-vector candidate set must be user-editable from the UI. Required
-     widgets: CP437 16x16 glyph grid, active glyph chips/list, add/remove
-     actions, clear action, and restore-default action.
+   - The user-facing design must start with task-oriented glyph/matching
+     presets, not a raw CP437 grid alone. Presets must expose their included
+     glyphs, matching mode, thresholds, fallback policy, and crunch settings.
+   - The shape-vector candidate set must remain user-editable from the UI.
+     Required advanced widgets: CP437 16x16 glyph grid, active glyph chips/list,
+     add/remove actions, clear action, and restore-default action.
    - The UI must clearly separate three glyph layers: font atlas glyph,
      material glyph, and shape-vector candidate glyph.
-   - Named glyph sets are allowed only when they are persisted as explicit
-     candidate lists. Generic presets that silently mutate thresholds or modes
-     are not canonical.
+   - Named glyph sets and matching presets are allowed only when they are
+     persisted as explicit setting bundles. Generic presets that silently mutate
+     thresholds or modes are not canonical.
+   - A preset card must include a concise purpose, a preview swatch/sample, and
+     an "advanced" disclosure that shows exactly which glyph and resolve
+     controls it changes.
 
 5. **Material, font, and palette probe**
    - Hover/probe readouts must show the final terrain render path for the
@@ -260,7 +273,16 @@ Required workbench UX/control plan:
      glyph override, and foreground/background override. These are inspection
      controls unless explicitly promoted to editor persistence.
    - Palette controls must be labeled as color mapping/quantization controls,
-     not as glyph or shape-vector controls.
+     not as glyph or shape-vector controls. Default palette previews must be
+     actual multi-color palettes, not monochrome filters. Vim/editor themes are
+     acceptable inspiration: examples include solarized-style warm/cool ramps,
+     gruvbox-style earthy high-contrast ramps, nord-style cool ramps,
+     monokai-style saturated contrast, and dracula-style dark neon contrast.
+   - Elevation/material lane controls are canonical for inspection. The
+     workbench must expose 4 material/elevation lanes and 16 diffuse/shade
+     stops as lanes, strips, or compact matrices. Users must be able to preview
+     lane selection, MAT-elev behavior, and diffuse/ramp movement without
+     persisting edits to world or material assets.
 
 6. **Right-panel layout**
    - Numeric readouts must remain visible at rest, use stable widths, and never

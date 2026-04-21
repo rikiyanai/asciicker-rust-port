@@ -6,6 +6,8 @@ pub struct RenderDebugCell {
     pub sample_spares: [u8; 4],
     pub sample_heights: [f32; 4],
     pub dominant_visual: u16,
+    pub material_lane: u8,
+    pub diffuse_index: u8,
     pub shape_distance: f32,
     pub resolve_glyph: u16,
     pub final_glyph: u16,
