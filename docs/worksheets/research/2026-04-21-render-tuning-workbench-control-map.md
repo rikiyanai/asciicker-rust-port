@@ -4,6 +4,8 @@ Status: active worksheet
 Canonical reference: `docs/CANONICAL_SPEC.md`  
 Plan reference: `docs/worksheets/plans/2026-04-21-render-tuning-workbench-replan.md`  
 Related failure: `F250` in `docs/FAILURE_LOG.md`
+Current blocker: `F251` in `docs/FAILURE_LOG.md`
+ASCIIID audit: `docs/worksheets/research/2026-04-21-asciiid-font-palette-material-audit.md`
 
 ## Purpose
 
@@ -61,6 +63,13 @@ trustworthy workbench surface.
 | `RenderWorkbenchState.reset(...)` | `engine-port/src/render/workbench.rs` | n/a | Resets workbench state, `GameCamera`, and `ShapeVectorConfig` back to defaults | Button | Yes | Canonical `Reset to defaults` action |
 | `PipelineTiming.total_us` / `resolve_us` / pass timings | `engine-port/src/render/pipeline.rs` | `0` until frames run | Read-only frame cost diagnostics for total, terrain, world, shadow, reflection, resolve, and sprite stages | Metric readouts | Yes | Keep visible at rest; no hover-only diagnostics |
 | `ShapeVectorFrameStats` | `engine-port/src/render/shape_vector.rs` | `0` until a frame runs | Read-only glyph resolve diagnostics such as override rate, fallback rate, threshold skips, and colored blanks | Metric readouts | Yes | Keep the most decision-relevant counters visible, not the full struct dump |
+| Workbench return path | `engine-port/src/game/state.rs`; `engine-port/src/game/menu.rs`; `engine-port/src/render/workbench.rs` | missing | Lets the user re-enter the workbench after resuming the scene | Visible button/menu action and keyboard shortcut | Yes | Required by `F251`; `Resume Scene` cannot be one-way |
+| ASCIIID-style spin | `reference/original-game/asciiid.cpp:7726`; `reference/original-game/asciiid.cpp:9355`; Rust target `GameCamera.yaw` | missing | Automatically increments yaw over time for orbit inspection | Toggle plus speed slider/readout | Yes | User explicitly requested "Spin"; do not bury as capture-only orbit |
+| Weather visibility proof | `engine-port/src/game/weather.rs`; `engine-port/src/render/workbench.rs` | weather clear | Shows whether weather state has live/visible particles and whether rain/snow is actually affecting the frame | Toggle/selector plus particle/visible-cell counters | Yes | Current "Rain" appears to do nothing; needs proof, not just state |
+| Shadow effect proof | `engine-port/src/render/pipeline.rs`; `engine-port/src/render/workbench.rs` | shadows on | Shows whether shadow pass affected cells/samples this frame | Toggle plus affected-cell/sample count | Yes | Current Shadows button appears inert to user |
+| Culling effect proof | `engine-port/src/render/pipeline.rs`; `engine-port/src/terrain`; `engine-port/src/world` | culling on | Shows culled/full traversal counts so terrain/world culling effect is auditable | Toggles plus patch/instance counts | Yes | Required because "IDK if it's working" is a UI proof failure |
+| Custom shape-vector glyph set | `engine-port/src/render/shape_vector.rs`; ASCIIID font/glyph model in `reference/original-game/asciiid.cpp:8779` | missing | Restricts or expands candidate glyphs used by shape-vector matching | CP437 glyph picker + active glyph chips/list | Yes | Stronger and more honest replacement for fake Figma-style presets |
+| Numeric readout layout | `engine-port/src/render/workbench.rs` | partial | Keeps current values visible at rest without clipping | Layout requirement, not a resource | Yes | Right-side numbers are currently hidden/clipped in live use |
 
 ## Real Runtime State, But Not Phase 1
 
@@ -73,6 +82,22 @@ workbench delivery.
 | `GameCamera.scene_shift` | `engine-port/src/render/camera.rs` | `[0, 0]` | Offsets the scene in sample/cell space | Advanced readout or stepper | No | Useful for shake/offset debugging, but not a primary workbench control |
 | `GameCamera.light_dir` | `engine-port/src/render/camera.rs` | normalized `[1, 1, 1]` | Changes lighting direction inputs used by the renderer | Advanced control | No | Real render state, but outside the agreed immediate workbench scope |
 | `GameCamera.light_ambient` | `engine-port/src/render/camera.rs` | `1.0` | Changes ambient light contribution | Slider | No | Real render state, but outside the agreed immediate workbench scope |
+| Material/palette editor controls | `reference/original-game/asciiid.cpp:8913`; `reference/original-game/asciiid.cpp:8969` | editor-owned | Edits palette swatches and material ramp glyph/fg/bg data | Advanced/editor scope | No | Workbench should start with read-only probes; editing is larger map/editor scope |
+| Font pixel editing | `reference/original-game/asciiid.cpp:8875` | editor-owned | Mutates alpha texels in the CP437 font atlas | Advanced/editor scope | No | Candidate glyph picking belongs in workbench; font pixel editing does not block it |
+
+## ASCIIID-Derived Control/Readout Additions
+
+The ASCIIID audit adds one important distinction: there are three different
+"glyph" layers that must not be conflated.
+
+| Layer | Source concept | What it changes | Workbench requirement |
+|---|---|---|---|
+| Font glyph atlas | ASCIIID `FONT` window | Pixel shape of CP437 glyphs used by material/font sampling | Show/select glyph IDs; defer pixel editing |
+| Material glyph | ASCIIID `SKIN` -> `Materials` 4x16 ramps | Original renderer terrain glyph chosen by material ID, MAT-elev/ramp, and diffuse shade | Add read-only material probe before editing |
+| Shape-vector candidate glyph | Rust `ShapeVectorConfig`/matcher | Which glyphs the post-resolve candidate selector may choose | Add custom active glyph set picker |
+
+The next implementation pass must label these layers explicitly. Calling all of
+them "glyph matching" is misleading.
 
 ## Existing Comparison / Capture Infrastructure
 
@@ -110,6 +135,13 @@ the user is not actively dragging a control:
 - current shape-vector mode and alphabet
 - current threshold / fallback / crunch values
 - current pass and culling toggles
+- current spin toggle/speed and yaw
+- current custom glyph candidate set contents
+- hovered-cell material ID, MAT-elev bit, resolved material glyph, fg/bg RGB,
+  and palette/quantization result
+- terrain patch count and world instance count under current culling setting
+- weather live particle count and visible particle/cell count
+- shadow affected-cell/sample count
 - frame timing summary
 - shape-vector override / fallback summary
 
@@ -120,7 +152,10 @@ the user is not actively dragging a control:
 2. Preserve and reuse the real runtime-backed controls already in code:
    resolution scale, zoom, pass visibility toggles, culling toggles, and the
    full `ShapeVectorConfig` surface selected above.
-3. Remove non-canonical `fixture` and `glyph_preset` vocabulary from the next
+3. Add `F251` repairs before polishing: return path, spin toggle/speed,
+   custom glyph candidate set, shadow/weather/culling proof diagnostics, and
+   unclipped numeric layout.
+4. Remove non-canonical `fixture` and `glyph_preset` vocabulary from the next
    iteration unless they are rebuilt as documented bundles of real engine state.
-4. Add comparison actions only after the base control surface is trustworthy,
+5. Add comparison actions only after the base control surface is trustworthy,
    using the existing capture / replay infrastructure in `engine-port/src/output/`.

@@ -3,6 +3,8 @@
 Status: active worksheet  
 Canonical reference: `docs/CANONICAL_SPEC.md`  
 Related failure: `F250` in `docs/FAILURE_LOG.md`
+Current blocker: `F251` in `docs/FAILURE_LOG.md`
+ASCIIID audit: `docs/worksheets/research/2026-04-21-asciiid-font-palette-material-audit.md`
 
 ## Name Decision
 
@@ -39,6 +41,31 @@ Observed failure:
 - The UI did not answer the core question: which real renderer variables should be visible and adjustable?
 
 Therefore, the next implementation must be control-inventory-first.
+
+## 2026-04-21 Live Rejection Addendum
+
+The explicit workbench implementation after `93f4b37` fixed the worst
+overlay/click/scroll direction but was still rejected during live use. This is
+tracked as `F251`.
+
+New observed failures:
+
+- `Resume Scene` is a one-way exit; the user cannot get back to the workbench.
+- Rain/weather controls do not produce an evident visible rain result.
+- Terrain/world culling toggles have unclear effect; the UI does not prove what
+  changed.
+- The workbench lacks the ASCIIID `Spin` view toggle.
+- Right-side numeric readouts can be hidden or clipped.
+- Glyph matching needs user-customizable glyph choices, not only fixed
+  alphabet buttons.
+- The Shadows button appears to do nothing.
+
+Implication:
+
+- The next implementation pass must be ASCIIID-audit-backed, not just
+  hotkey-parity-backed. It must add pass-effect proof, round-trip navigation,
+  spin/orbit behavior, custom glyph candidate selection, and material/palette
+  diagnostics before it can be considered user-acceptable.
 
 ## Product Goal
 
@@ -97,6 +124,10 @@ These are valid workbench controls, but they should be represented as deliberate
 - invert colors on/off
 - capture / compare trigger
 - reset to defaults
+- workbench return action from gameplay or paused gameplay
+- ASCIIID-style spin/orbit toggle plus spin speed
+- visible pass-effect counters/deltas for culling, shadows, weather, and
+  reflections
 
 ### Controls that are not canonical unless backed by real behavior
 
@@ -110,6 +141,13 @@ If presets are added later, they must be named bundles of actual renderer values
 - `Dense Legibility`
 - `Sparse Silhouette`
 - `Threshold Stress`
+
+The stronger replacement for generic presets is a user-editable glyph set:
+
+- display a CP437 glyph grid
+- allow adding/removing glyphs from the active shape-vector candidate set
+- persist named glyph sets only if they map to actual candidate lists
+- show which glyphs are active at rest
 
 ## Layout Replan
 
@@ -154,6 +192,8 @@ Suggested groups:
 - `View`
   - resolution scale or exact grid size
   - zoom
+  - yaw
+  - spin toggle and speed
 - `Visibility`
   - terrain
   - meshes
@@ -163,10 +203,12 @@ Suggested groups:
 - `Culling`
   - terrain culling
   - world culling
+  - visible patch/instance counts for culled vs unculled paths
   - any future back-face control if runtime-backed
 - `Glyph Matching`
   - mode
   - alphabet
+  - custom active glyph set / glyph picker
   - threshold
   - adaptive threshold toggle/boost
   - structural fallback toggle/threshold
@@ -179,14 +221,20 @@ Suggested groups:
   - current matching mode/alphabet
   - capture/compare action
   - reset
+  - material probe: MAT-id, MAT-elev, diffuse/ramp, resolved glyph,
+    foreground/background colors, palette/quantization result
+  - pass-effect proof: weather particles visible/active, shadow affected cells,
+    terrain patches drawn, world instances drawn
 
 ## Interaction Rules
 
 - The workbench must be explicitly entered.
+- Leaving the workbench must not strand the user; a return path is mandatory.
 - It must not silently take over the gameplay screen.
 - Mouse input must work for every primary control.
 - Keyboard hotkeys may remain, but only as secondary paths.
 - Current state must remain visible without hovering or reading logs.
+- Numeric values must not be clipped by right-aligned layout.
 
 ## Implementation Plan
 
@@ -224,6 +272,13 @@ The Render Tuning Workbench is acceptable only if all are true:
 - the UI does not impersonate Figma labels that do not exist in the app
 - the surface is explicitly entered and does not accidentally hijack normal gameplay
 - the workbench is better than the hotkey path because it is visible, inspectable, and repeatable
+- the user can resume and return to the workbench without restarting the app
+- spin/orbit can be toggled from the UI and visibly changes yaw over time
+- shadows/weather/culling controls expose enough live diagnostics to tell
+  whether the current scene has no affected cells or the control is broken
+- glyph matching supports a user-selected active glyph candidate set
+- material/palette diagnostics explain the final rendered cell path from
+  MAT-id and MAT-elev through glyph/color/palette output
 
 ## Immediate Next Step
 

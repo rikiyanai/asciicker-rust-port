@@ -120,6 +120,7 @@ Non-canonical worksheet inventory. Durable truths belong in [`docs/CANONICAL_SPE
 - [Strangler Fig Pattern](research-strangler-fig-pattern.md) - Strangler fig migration pattern research
 - [Figma 3D ASCII Model Viewer UI/UX Research](research/2026-04-21-figma-3d-ascii-model-viewer-ui-ux-research.md) - Layout/tone reference only; not the canonical control vocabulary
 - [Render Tuning Workbench Control Map](research/2026-04-21-render-tuning-workbench-control-map.md) - Code-backed inventory of real renderer controls, defaults, effects, and Phase 1 inclusion
+- [ASCIIID Font/Palette/Material Audit](research/2026-04-21-asciiid-font-palette-material-audit.md) - Source-backed audit of ASCIIID font, palette, MAT-id, MAT-elev, spin, and final render translation for workbench parity
 
 ## Process Documents
 - [Failure Log](../FAILURE_LOG.md) - Issues and blockers

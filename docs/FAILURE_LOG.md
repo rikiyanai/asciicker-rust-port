@@ -333,6 +333,7 @@
 | F248 | Shape-vector occupancy is still too sparse on the active orbit comparison run. User-approved capture `artifacts/baselines/orbit-2026-03-11-current/frame_000001.json` showed `2704` threshold skips, `2504` fallback-space cells, and `2611` final colored blank cells. Root cause split in two: (1) accepted shape-vector matches were erasing real resolve glyphs by selecting `space`, and (2) many high-contrast terrain cells still resolve to `space` after threshold rejection. Two follow-up fixes improved occupancy materially: first preserving non-space resolve glyphs against accepted `space` overrides, then recovering dominant-material glyphs for high-contrast threshold-rejected terrain cells. The second replay `artifacts/baselines/orbit-2026-03-11-postfallback2-debug/frame_000001.json` reduced `fallback_space_cells` to `2259` and `colored_space_cells` to `2259`; across the full 120-frame run, `colored_space_cells` dropped by an average of `582.9` per frame. A third adaptive-threshold experiment reduced threshold rejects strongly but only improved blank cells by `2.8` per frame on average while increasing overrides by `430.9` per frame, so it remains available as a manual tuning control but is disabled by default. A fourth stabilization pass preserved the occupancy gains while reducing structural glyph overrides by `296.2` per frame on average versus `postfallback2`, and is now the best default comparison result. The threshold policy itself still rejects too many cells, so the issue is improved but not closed. | High | PARTIAL | See `docs/worksheets/plans/2026-03-11-shape-vector-occupancy-tuning.md`. Next step is further threshold tuning against the orbit baseline before returning to water. |
 | F249 | The current Alex Harri integration is likely architecturally misapplied. Direct comparison of Alex Harri’s article (`https://alexharri.com/blog/ascii-rendering`, 2026-01-17), the original C++ `render.cpp`, and the current Rust pipeline shows a real mismatch: Harri’s method is an image-space glyph picker meant to sharpen sampled image boundaries, while original Asciicker already uses glyph selection as part of material / auto-mat / silhouette / linecase / water resolve semantics. The current Rust path runs shape-vector after resolve and water, making it a broad final-stage override that can overwrite semantically meaningful original glyph choices. This explains why the result can look sharper in spots while still feeling chaotic or only marginally better overall. A first architecture fix is now in place: shape-vector is gated off for silhouette cells, linecase/grid overlay cells, half-block split cells, and mixed auto-mat reflection-boundary cells, with explicit `shape_gated_semantic` debug metadata. A 30-frame smoke replay at `/tmp/asciicker-semantic-gate-smoke` kept occupancy flat while reducing frame-1 `selector_override_cells` from `267` to `222` versus the previous best pre-gate replay, and the full 120-frame replay `artifacts/baselines/orbit-2026-03-11-semantic-gated-debug` reduced `selector_override_cells` by `42.2` per frame on average with no meaningful occupancy regression. | High | PARTIAL | See `docs/worksheets/plans/2026-03-11-alexharri-vs-original-architecture-audit.md` and `docs/worksheets/plans/2026-03-11-shape-vector-occupancy-tuning.md`. Next step is manual visual validation of the semantic-gated path, then continue remaining original render gaps. |
 | F250 | The first headed implementation of the new render UI (`59863c6`, 2026-04-21) was rejected by the user. Evidence: the user reported that it was "terrible", not clickable/controllable, did not expose the actual settings that matter, and copied Figma labels such as `preset` instead of contextualizing real Asciicker renderer controls. The implementation also took over the live game screen as an overlay rather than behaving like an explicit tuning surface. | Critical | OPEN | Root cause: the UI was designed from mockup surface structure instead of a control inventory derived from real engine state (`RenderConfig`, `GameCamera`, `ShapeVectorConfig`, and explicit pass/culling state). The canonical target is now renamed `Render Tuning Workbench`; see `docs/CANONICAL_SPEC.md` and `docs/worksheets/plans/2026-04-21-render-tuning-workbench-replan.md`. |
+| F251 | The second explicit Render Tuning Workbench implementation (`93f4b37` + working tree, 2026-04-21) remains not user-acceptable after live launch. Evidence: user reported that after `Resume Scene` there is no path back to the workbench, rain has no visible effect, terrain/world culling observability is unclear, the workbench lacks an ASCIIID-style spin toggle, right-side numeric readouts get hidden, glyph matching lacks user-selectable/custom glyph sets, and the Shadows button appears to do nothing. | Critical | OPEN | Root cause: the workbench fixed entry/click/scroll mechanics but still lacks ASCIIID-derived viewport controls, control-effect proof/readouts, custom glyph selection, visible pass deltas, and round-trip navigation. Canon/worksheets updated; implementation still open. See `docs/worksheets/research/2026-04-21-asciiid-font-palette-material-audit.md`. |
 
 ---
 
@@ -496,3 +497,45 @@
 - Status: FIXED (working tree, pending commit) by normalizing the local source
   root to `/Users/rikihernandez/Downloads/Aciicker-Y9-2/` and vendoring
   `asciiid.cpp` into `reference/original-game/`.
+
+## 2026-04-21 Render Workbench UI Regression
+
+- Date/HEAD: 2026-04-21, `93f4b37` on `planning-audit-normalization`
+- What failed: the explicit render tuning workbench UI did not reliably accept
+  pointer interaction/scroll input, and the workbench did not provide complete
+  visible UI parity/documentation for all runtime keyboard-adjustable controls.
+- Evidence:
+  - user report: "controls dont seem to be responding at all, cant click on
+    anyuthing i think, need scrolling on the menu over lay itself"
+  - user requirement: "EVERYTHING THAT IS CURRENTLY ADJUSTABLE USING
+    KEYBINDINGS NEEDS UI PARITY CONTROLS: A SLIDER FOR ANY ADJUSTABLE DEGREE
+    CONTROL AND ON OFF FOR ANY BINARY TOGGLE"
+  - code audit found `render_workbench_ui_system` registered in `Update`, while
+    local `bevy_egui 0.39.1` docs require UI systems to run in
+    `EguiPrimaryContextPass` for primary-context input.
+- Root cause: partial workbench implementation used the wrong egui schedule and
+  exposed live controls without a complete control reference/help surface or
+  parity for movement/weather debug controls.
+- Status: FIXED (working tree, pending commit); verified with `cargo build` and
+  `cargo test` in `engine-port`.
+
+## 2026-04-21 Render Workbench ASCIIID Parity Regression
+
+- Date/HEAD: 2026-04-21, `93f4b37` on `planning-audit-normalization`
+- What failed: the explicit workbench still does not satisfy live tuning
+  requirements after launch because several controls either have unclear/no
+  visible effect or lack parity with original ASCIIID editor concepts.
+- Evidence:
+  - user report: "ONCE I RESUME THE SCENE I CANT MAKE IT BACK"
+  - user report: "NO RAIN EXISTS"
+  - user report: "TERRAIN/WORLD CULLING IDK IF ITS WORKING"
+  - user report: "THERE SHOULD BE A SPIN TOGGLE BUTTON (SEE ASCIIID)"
+  - user report: "THE NUMBERS ON THE RIGHT SIDE OF THE MENU GET HIDDEN"
+  - user report: "GLYPH MATCHING NEEDS CUSTOMIZABLE GLYPHS"
+  - user report: "SHADOWS BUTTON DONT DO ANYTHING"
+- Root cause: the workbench exposed several renderer resources but did not
+  yet implement ASCIIID-derived viewport behavior, round-trip mode navigation,
+  custom glyph selection, pass/culling proof diagnostics, or visible
+  weather/shadow effect validation.
+- Status: OPEN; canon, worksheet, and ASCIIID audit updates completed in
+  working tree. Implementation fixes remain pending.

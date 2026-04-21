@@ -117,7 +117,8 @@ That is unrelated to rendering.
 
 ## Render Tuning Workbench
 
-Status: planned, not yet user-approved.
+Status: active, not yet user-approved. Current implementation remains blocked
+by failure `F251`.
 
 Canonical product name: `Render Tuning Workbench`
 
@@ -145,13 +146,22 @@ Purpose:
 - Make render variables discoverable without memorizing key chords or reading window-title text.
 - Separate "what is being rendered" from "how it is rendered".
 - Support repeatable visual debugging of culling, glyph selection, density, and pass behavior.
+- Preserve the original ASCIIID editor concepts that matter to render
+  inspection: spin/orbit, font/glyph selection, palette mapping, material ID,
+  material elevation, material ramps, and final-render diagnostics.
 
 Structural rules:
 
 - The workbench must be a dedicated tuning surface or explicitly-entered mode. It must not be an always-on overlay that hijacks normal gameplay input.
+- Entering the workbench must be reversible. If the user resumes gameplay,
+  there must be a visible and keyboard-accessible path back to the workbench.
 - The center canvas is primary. Controls support the canvas; they are not the main content.
 - Mouse interaction must work for every primary control.
 - Keyboard shortcuts may remain as secondary access paths, but the canonical state must be visible in UI.
+- Any control that appears to toggle a render pass must also expose proof that
+  the pass changed, or did not change, the current frame. Examples: visible
+  affected-cell counts, visible rendered-object/patch counts, or before/after
+  deltas.
 
 Layout model:
 
@@ -168,19 +178,55 @@ Control model:
 
 Canonical control groups:
 
-- **View:** resolution scale or explicit grid dimensions, camera zoom/scale, and any capture/orbit trigger used for comparison.
+- **View:** resolution scale or explicit grid dimensions, camera zoom/scale,
+  camera yaw, ASCIIID-style spin/orbit toggle and speed, and any capture/orbit
+  trigger used for comparison.
 - **Visibility and culling:** terrain visibility, world/mesh visibility, sprite visibility, shadow pass, reflection pass, terrain frustum culling, world/BSP culling, and back-face/double-sided controls only if they are truly runtime-backed.
-- **Glyph matching and resolve tuning:** shape-vector mode, alphabet, distance threshold, adaptive-threshold toggle, adaptive boost, structural fallback toggle, fallback threshold, sampling quality, global crunch toggle/exponent, and directional crunch toggle/exponent.
+- **Glyph matching and resolve tuning:** shape-vector mode, alphabet, custom
+  user-selectable glyph candidate sets, distance threshold,
+  adaptive-threshold toggle, adaptive boost, structural fallback toggle,
+  fallback threshold, sampling quality, global crunch toggle/exponent, and
+  directional crunch toggle/exponent.
+- **Material and palette diagnostics:** read-only hovered-cell material ID,
+  MAT-elev bit, chosen material ramp/shade, resolved glyph, foreground and
+  background RGB, and palette/quantization outcome. Editing material IDs,
+  material ramps, font pixels, or palette swatches is editor-adjacent and must
+  not be added without explicit scope.
+- **Weather and pass diagnostics:** weather state/type/intensity and visible
+  particle or affected-cell counts; shadow/reflection/culling controls must
+  report enough runtime data to distinguish "enabled but no effect in this
+  scene" from "button is not wired".
 - **Diagnostics and actions:** reset-to-defaults, capture/compare actions, and visible numeric/readout state for the currently active settings.
 
 UX requirements:
 
 - Sliders must provide immediate feedback.
 - Current values must remain visible at rest.
+- Numeric readouts must not be clipped or hidden by right-aligned layout inside
+  the control panel.
 - Controls must be grouped by user task, not by resemblance to a mockup.
 - The interface must avoid tutorial prose and generic debug noise.
 - Controls and text must remain legible and clickable on desktop and narrow viewports.
 - The workbench must not take over the normal game screen unless the user explicitly enters the tuning surface.
+
+ASCIIID-derived render facts:
+
+- The original editor's `FONT` window selects a CP437 font atlas and active
+  glyph; it can edit glyph texels. For the Rust workbench, custom glyph
+  candidate selection is canonical, while full font-pixel editing is
+  editor-adjacent.
+- The original editor's `SKIN` window edits both palettes and material ramps.
+  Palettes affect final color mapping after material glyph/color composition.
+  Material ramps are `shade[4][16]` tables containing foreground RGB,
+  background RGB, and glyph code.
+- `MAT-id` is the low 8 bits of a terrain visual cell and selects one of 256
+  material definitions.
+- `MAT-elev` is the `0x8000` terrain visual bit used by material ramp/elevation
+  logic. Workbench labels must explain this as a render/material flag, not a
+  generic world-height value.
+- The final terrain screen path is material ID + MAT-elev/ramp + diffuse shade
+  -> material glyph/foreground/background -> font alpha blend -> palette/color
+  mapping -> grid/probe/pass overlays.
 
 Non-canonical patterns:
 
@@ -188,6 +234,8 @@ Non-canonical patterns:
 - Showing UI state that does not affect the renderer.
 - Shipping a Bevy inspector/resource viewer and calling it the workbench.
 - Overlaying controls on gameplay in a way that blocks normal interaction without an explicit mode switch.
+- Buttons whose effects cannot be observed or diagnosed from the workbench
+  itself, such as a shadow/culling/weather toggle with no visible state delta.
 
 ## Culling
 
