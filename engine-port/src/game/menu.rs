@@ -5,7 +5,7 @@
 
 use bevy::prelude::*;
 
-use crate::game::state::GameState;
+use crate::game::state::{GameLaunchConfig, GameState};
 use crate::output::ascii_cell_grid::AsciiCellGrid;
 use crate::render::font::{Font1, FontSkin};
 
@@ -18,6 +18,8 @@ use crate::render::font::{Font1, FontSkin};
 pub enum MenuAction {
     /// Start a new game: transitions to Loading state.
     StartGame,
+    /// Open the dedicated render-tuning surface.
+    OpenRenderWorkbench,
     /// Exit the application.
     Quit,
 }
@@ -49,6 +51,10 @@ impl Default for MainMenu {
                 MenuItem {
                     label: "Start Game".to_string(),
                     action: MenuAction::StartGame,
+                },
+                MenuItem {
+                    label: "Render Tuning Workbench".to_string(),
+                    action: MenuAction::OpenRenderWorkbench,
                 },
                 MenuItem {
                     label: "Quit".to_string(),
@@ -90,6 +96,7 @@ pub fn menu_navigation(keys: Res<ButtonInput<KeyCode>>, mut menu: ResMut<MainMen
 pub fn menu_activate(
     keys: Res<ButtonInput<KeyCode>>,
     menu: Res<MainMenu>,
+    mut launch_config: ResMut<GameLaunchConfig>,
     mut next_state: ResMut<NextState<GameState>>,
     mut app_exit: MessageWriter<AppExit>,
 ) {
@@ -100,8 +107,14 @@ pub fn menu_activate(
     if let Some(item) = menu.items.get(menu.selected_index) {
         match item.action {
             MenuAction::StartGame => {
+                launch_config.load_target = GameState::Playing;
                 next_state.set(GameState::Loading);
                 info!("Menu: Start Game -> Loading");
+            }
+            MenuAction::OpenRenderWorkbench => {
+                launch_config.load_target = GameState::Workbench;
+                next_state.set(GameState::Loading);
+                info!("Menu: Render Tuning Workbench -> Loading");
             }
             MenuAction::Quit => {
                 // AppExit requires MessageWriter<AppExit> in Bevy 0.18 -- NOT EventWriter<AppExit>.
@@ -175,12 +188,14 @@ mod tests {
     #[test]
     fn test_main_menu_default() {
         let menu = MainMenu::default();
-        assert_eq!(menu.items.len(), 2);
+        assert_eq!(menu.items.len(), 3);
         assert_eq!(menu.selected_index, 0);
         assert_eq!(menu.items[0].label, "Start Game");
         assert_eq!(menu.items[0].action, MenuAction::StartGame);
-        assert_eq!(menu.items[1].label, "Quit");
-        assert_eq!(menu.items[1].action, MenuAction::Quit);
+        assert_eq!(menu.items[1].label, "Render Tuning Workbench");
+        assert_eq!(menu.items[1].action, MenuAction::OpenRenderWorkbench);
+        assert_eq!(menu.items[2].label, "Quit");
+        assert_eq!(menu.items[2].action, MenuAction::Quit);
     }
 
     #[test]
@@ -191,6 +206,8 @@ mod tests {
         // Move down past last item -> wraps to 0
         menu.selected_index = (menu.selected_index + 1) % menu.items.len();
         assert_eq!(menu.selected_index, 1);
+        menu.selected_index = (menu.selected_index + 1) % menu.items.len();
+        assert_eq!(menu.selected_index, 2);
         menu.selected_index = (menu.selected_index + 1) % menu.items.len();
         assert_eq!(menu.selected_index, 0); // wrapped
     }
@@ -207,7 +224,7 @@ mod tests {
         } else {
             menu.selected_index - 1
         };
-        assert_eq!(menu.selected_index, 1); // wrapped to last
+        assert_eq!(menu.selected_index, 2); // wrapped to last
     }
 
     #[test]
@@ -215,8 +232,8 @@ mod tests {
         let mut grid = AsciiCellGrid::new(80, 24);
         let mut menu = MainMenu::default();
 
-        // Select item 1 (Quit)
-        menu.selected_index = 1;
+        // Select item 2 (Quit)
+        menu.selected_index = 2;
 
         let w = grid.width as usize;
         let h = grid.height as usize;
@@ -263,8 +280,8 @@ mod tests {
             "Unselected item should be white"
         );
 
-        // Verify item 1 (Quit, selected) uses gold and has '>' prefix
-        let row1 = items_start_row + 2;
+        // Verify item 2 (Quit, selected) uses gold and has '>' prefix
+        let row1 = items_start_row + 4;
         let display1 = "> Quit";
         let col1 = w.saturating_sub(display1.len()) / 2;
         let idx1 = row1 * w + col1;

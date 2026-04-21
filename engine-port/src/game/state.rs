@@ -29,10 +29,46 @@ pub enum GameState {
     MainMenu,
     /// Asset loading in progress (terrain assembly, mesh registry).
     Loading,
+    /// Dedicated render-tuning surface with live renderer controls and diagnostics.
+    Workbench,
     /// Active gameplay: all systems running.
     Playing,
     /// Gameplay paused: physics/character frozen, render still active.
     Paused,
+}
+
+/// Startup and loading destination configuration for the current session.
+#[derive(Resource, Debug, Clone, Copy)]
+pub struct GameLaunchConfig {
+    /// State to enter after Loading completes.
+    pub load_target: GameState,
+    /// Whether startup should auto-enter Loading instead of waiting in MainMenu.
+    pub auto_enter_loading: bool,
+}
+
+impl Default for GameLaunchConfig {
+    fn default() -> Self {
+        match std::env::var("ASCIICKER_START_MODE")
+            .ok()
+            .map(|value| value.trim().to_ascii_lowercase())
+            .as_deref()
+        {
+            Some("play") | Some("playing") | Some("game") => Self {
+                load_target: GameState::Playing,
+                auto_enter_loading: true,
+            },
+            Some("workbench") | Some("render_workbench") | Some("render-tuning-workbench") => {
+                Self {
+                    load_target: GameState::Workbench,
+                    auto_enter_loading: true,
+                }
+            }
+            _ => Self {
+                load_target: GameState::Playing,
+                auto_enter_loading: false,
+            },
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -84,6 +120,11 @@ pub fn on_exit_loading(mut commands: Commands) {
     info!("Exiting Loading state: LoadingProgress removed");
 }
 
+/// Log entering the dedicated render-tuning surface.
+pub fn on_enter_workbench() {
+    info!("Entering Render Tuning Workbench mode");
+}
+
 /// Bridge between Phase 5 assembly and Phase 7 loading FSM.
 ///
 /// Reads AssemblyState.assembled (set by Plan 05-05's a3d_assembly_system)
@@ -108,17 +149,40 @@ pub fn advance_loading_progress_system(
     }
 }
 
-/// Transition to Playing when loading is complete (stage == 0).
+/// Transition to the configured target state when loading is complete (stage == 0).
 pub fn check_loading_complete(
     progress: Option<Res<LoadingProgress>>,
+    launch_config: Res<GameLaunchConfig>,
     mut next_state: ResMut<NextState<GameState>>,
 ) {
     if let Some(progress) = progress
         && progress.stage == 0
     {
-        next_state.set(GameState::Playing);
-        info!("Loading complete (stage=0): transitioning to Playing");
+        next_state.set(launch_config.load_target);
+        info!(
+            "Loading complete (stage=0): transitioning to {:?}",
+            launch_config.load_target
+        );
     }
+}
+
+/// Optional startup fast path for launching directly into a configured scene mode.
+pub fn auto_enter_configured_mode(
+    state: Res<State<GameState>>,
+    launch_config: Res<GameLaunchConfig>,
+    mut next_state: ResMut<NextState<GameState>>,
+    mut armed: Local<bool>,
+) {
+    if *armed || !launch_config.auto_enter_loading || *state.get() != GameState::MainMenu {
+        return;
+    }
+
+    *armed = true;
+    next_state.set(GameState::Loading);
+    info!(
+        "Auto-entering Loading from MainMenu with target {:?}",
+        launch_config.load_target
+    );
 }
 
 /// Log entering gameplay state.
@@ -145,6 +209,10 @@ pub fn toggle_pause(
             GameState::Paused => {
                 next_state.set(GameState::Playing);
                 info!("Resuming game");
+            }
+            GameState::Workbench => {
+                next_state.set(GameState::MainMenu);
+                info!("Leaving Render Tuning Workbench -> MainMenu");
             }
             // R19-005: Allow escape to return to MainMenu from any other state
             // (prevents being stuck — e.g., after death before respawn is implemented)
@@ -238,10 +306,11 @@ mod tests {
 
     #[test]
     fn test_game_state_variants() {
-        // Verify all 4 states are distinct
+        // Verify all states are distinct
         let states = [
             GameState::MainMenu,
             GameState::Loading,
+            GameState::Workbench,
             GameState::Playing,
             GameState::Paused,
         ];

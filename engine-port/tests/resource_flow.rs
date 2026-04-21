@@ -8,11 +8,19 @@ use asciicker_engine::render::sample_buffer::SampleBuffer;
 use asciicker_engine::terrain::TerrainPlugin;
 use asciicker_engine::world::WorldPlugin;
 
+fn headless_default_plugins() -> bevy::app::PluginGroupBuilder {
+    DefaultPlugins
+        .build()
+        .disable::<bevy::log::LogPlugin>()
+        .disable::<bevy::window::WindowPlugin>()
+        .disable::<bevy::winit::WinitPlugin>()
+}
+
 /// Helper: build an app with all required plugins in correct order.
 /// Does NOT call app.update() — the pipeline systems need a real asset server.
 fn build_app() -> App {
     let mut app = App::new();
-    app.add_plugins(MinimalPlugins);
+    app.add_plugins(headless_default_plugins());
     app.add_plugins((
         WorldPlugin,
         TerrainPlugin,
@@ -46,7 +54,7 @@ fn sample_buffer_and_grid_coexist() {
 #[test]
 fn render_config_controls_dimensions() {
     let mut app = App::new();
-    app.add_plugins(MinimalPlugins);
+    app.add_plugins(headless_default_plugins());
     // Insert custom config before plugins -- dimensions are always 2*ascii+4
     app.insert_resource(RenderConfig {
         ascii_width: 80,

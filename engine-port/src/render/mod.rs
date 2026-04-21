@@ -136,7 +136,7 @@ impl Plugin for CpuRasterizerPlugin {
 
         info!("CpuRasterizerPlugin registered (with pipeline, assembly, sprites)");
         info!(
-            "Render workbench registered: floating left fixture rail + right control stack; backquote toggles visibility"
+            "Render Tuning Workbench registered: explicit mode renders runtime-backed controls when GameState::Workbench is active"
         );
         info!(
             "Shape-vector tuning hotkeys remain available: F12 mode, F6 alphabet, [] threshold, 7/8 adaptive boost, 9/0 fallback threshold, ;' global crunch, ,./ directional crunch, -= sampling quality, F7 global toggle, F8 directional toggle, F10 structural fallback, F11 adaptive threshold, \\\\ reset"

@@ -10,6 +10,14 @@ use asciicker_engine::output::ascii_cell_grid::AsciiCellGrid;
 use asciicker_engine::render::CpuRasterizerPlugin;
 use asciicker_engine::render::config::RenderConfig;
 
+fn headless_default_plugins() -> bevy::app::PluginGroupBuilder {
+    DefaultPlugins
+        .build()
+        .disable::<bevy::log::LogPlugin>()
+        .disable::<bevy::window::WindowPlugin>()
+        .disable::<bevy::winit::WinitPlugin>()
+}
+
 /// Test that plugins in correct order produce the expected resources after build.
 /// CpuRasterizerPlugin requires TerrainPlugin, WorldPlugin before it,
 /// and AsciiOutputPlugin after (needs RenderConfig for AsciiCellGrid::from_world).
@@ -23,7 +31,7 @@ fn correct_plugin_order_succeeds() {
     use asciicker_engine::world::WorldPlugin;
 
     let mut app = App::new();
-    app.add_plugins(MinimalPlugins);
+    app.add_plugins(headless_default_plugins());
     app.add_plugins((
         WorldPlugin,
         TerrainPlugin,
@@ -63,12 +71,7 @@ fn all_plugins_init_in_main_order() {
     use asciicker_engine::world::WorldPlugin;
 
     let mut app = App::new();
-    app.add_plugins((
-        MinimalPlugins,
-        AssetPlugin::default(),
-        bevy::image::ImagePlugin::default(),
-        bevy::state::app::StatesPlugin,
-    ));
+    app.add_plugins(headless_default_plugins());
     app.add_plugins((
         AssetLoaderPlugin,
         WorldPlugin,

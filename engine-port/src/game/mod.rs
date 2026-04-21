@@ -29,7 +29,7 @@ pub mod spatial_grid;
 
 use menu::MainMenu;
 use spatial_grid::{SpatialGrid, cleanup_spatial_grid, sync_spatial_grid};
-use state::GameState;
+use state::{GameLaunchConfig, GameState};
 
 // ---------------------------------------------------------------------------
 // Resources
@@ -207,6 +207,7 @@ impl Plugin for GamePlugin {
         // ---------------------------------------------------------------
         app.init_state::<GameState>();
         app.init_resource::<MainMenu>();
+        app.init_resource::<GameLaunchConfig>();
 
         // OnEnter/OnExit for Loading state
         app.add_systems(OnEnter(GameState::Loading), state::on_enter_loading);
@@ -214,6 +215,7 @@ impl Plugin for GamePlugin {
 
         // OnEnter for Playing state
         app.add_systems(OnEnter(GameState::Playing), state::on_enter_playing);
+        app.add_systems(OnEnter(GameState::Workbench), state::on_enter_workbench);
 
         // Loading state systems: advance progress + check completion + render loading screen
         app.add_systems(
@@ -225,6 +227,11 @@ impl Plugin for GamePlugin {
             )
                 .chain()
                 .run_if(in_state(GameState::Loading)),
+        );
+
+        app.add_systems(
+            Update,
+            state::auto_enter_configured_mode.run_if(in_state(GameState::MainMenu)),
         );
 
         // MainMenu state systems: navigation, activation, rendering
@@ -255,14 +262,17 @@ impl Plugin for GamePlugin {
         // ---------------------------------------------------------------
         app.configure_sets(
             PostUpdate,
-            RenderSet::Pipeline.run_if(in_state(GameState::Playing)),
+            RenderSet::Pipeline
+                .run_if(in_state(GameState::Playing).or(in_state(GameState::Workbench))),
         );
 
         // R8-XP-002 FIX: Gate advance_water_time_system on Playing state.
-        // Prevents unnecessary ripple_time advancement during MainMenu/Loading.
+        // Prevents unnecessary ripple_time advancement during MainMenu/Loading while
+        // still allowing the workbench to inspect animated water/reflection behavior.
         app.configure_sets(
             Update,
-            RenderSet::WaterTime.run_if(in_state(GameState::Playing)),
+            RenderSet::WaterTime
+                .run_if(in_state(GameState::Playing).or(in_state(GameState::Workbench))),
         );
 
         // ---------------------------------------------------------------
@@ -296,17 +306,20 @@ impl Plugin for GamePlugin {
                 .run_if(in_state(GameState::Playing)),
         );
 
-        // Update: torque -> camera yaw, water -> render config, terrain teleport
-        // All gated on Playing state.
+        // Update: torque -> camera yaw and terrain teleport remain gameplay-only.
         app.add_systems(
             Update,
-            (
-                teleport_to_terrain_system,
-                apply_torque_to_camera,
-                sync_water_to_render,
-            )
+            (teleport_to_terrain_system, apply_torque_to_camera)
                 .chain()
                 .run_if(in_state(GameState::Playing)),
+        );
+
+        // Keep water/render sync active in both gameplay and workbench modes so
+        // reflections and waterline behavior are visible in the tuning surface.
+        app.add_systems(
+            Update,
+            sync_water_to_render
+                .run_if(in_state(GameState::Playing).or(in_state(GameState::Workbench))),
         );
 
         // ---------------------------------------------------------------
@@ -321,7 +334,7 @@ impl Plugin for GamePlugin {
                 weather::weather_update_system,
             )
                 .chain()
-                .run_if(in_state(GameState::Playing)),
+                .run_if(in_state(GameState::Playing).or(in_state(GameState::Workbench))),
         );
 
         // AUTHORITATIVE SCHEDULE DECISION (M6-AUDIT-FIX):
@@ -333,7 +346,7 @@ impl Plugin for GamePlugin {
             PostUpdate,
             weather::weather_composite_system
                 .after(render_pipeline_system)
-                .run_if(in_state(GameState::Playing)),
+                .run_if(in_state(GameState::Playing).or(in_state(GameState::Workbench))),
         );
 
         // PostUpdate: cross-plugin ordering for render pipeline
@@ -501,11 +514,12 @@ mod tests {
     }
 
     #[test]
-    fn test_game_state_all_four_variants_exist() {
-        // Verify all 4 GameState variants compile and are distinct
+    fn test_game_state_all_variants_exist() {
+        // Verify all GameState variants compile and are distinct
         let states = [
             GameState::MainMenu,
             GameState::Loading,
+            GameState::Workbench,
             GameState::Playing,
             GameState::Paused,
         ];
@@ -517,9 +531,9 @@ mod tests {
     }
 
     #[test]
-    fn test_main_menu_default_has_two_items() {
+    fn test_main_menu_default_has_three_items() {
         let menu = MainMenu::default();
-        assert_eq!(menu.items.len(), 2);
+        assert_eq!(menu.items.len(), 3);
         assert_eq!(menu.selected_index, 0);
     }
 }
