@@ -99,6 +99,47 @@ The only tracked "three modes" code found in this checkout is networking mode se
 
 That is unrelated to rendering.
 
+## Rendering Demo Mode
+
+Status: planned, not implemented on `main`.
+
+The rendering demo mode is the canonical target for interactive visual inspection of ASCII rendering behavior. It should be a tool-like workbench, not a landing page or explanatory demo screen.
+
+Core layout:
+
+- **Model list / source selection:** A distinct area for choosing what is being rendered. This is the "what" surface: model, scene, or fixture selection. It must not be mixed into render-setting controls.
+- **Canvas center:** The primary workspace where the selected 3D model or scene is rendered as ASCII characters. The canvas must update live as parameters change.
+- **Right control panel:** The "how" surface for rendering settings. It contains presets, resolution, scale, and functional toggles.
+
+Canvas requirements:
+
+- Render the model or scene using ASCII characters.
+- React in real time to all right-panel settings.
+- Support a rough 30-frame camera-rotation capture path for visual comparisons.
+- Support side-by-side or repeatable comparison of multiple rendering modes when mode comparison is active.
+- Provide enough visual stability that culling, density, scale, and glyph-set changes can be inspected without guessing from a single frame.
+
+Right panel requirements:
+
+- **Presets:** Quick-toggle character sets. Examples:
+  - dense: `@%#*+=-:. `
+  - medium: `#*+=-:. `
+  - sparse: `.: `
+- **Resolution slider:** Adjusts ASCII pixel density and updates the canvas immediately.
+- **Scale slider:** Adjusts model zoom/size and updates the canvas immediately.
+- **Invert colors toggle:** Swaps light/dark mapping.
+- **Reset button:** Restores default preset, resolution, scale, color inversion, camera, and culling settings.
+- **Culling/debug controls:** Expose culling behavior clearly enough to reproduce and inspect render differences. Keyboard shortcuts may exist, but every critical state must also be visible in the UI.
+
+UX requirements:
+
+- Sliders must provide immediate feedback; the user should see legibility and density changes as they drag.
+- Character-set presets are part of the product value, not decoration. They should make density and ASCII-art style differences obvious.
+- The interface must separate "what is being rendered" from "how it is rendered" to keep the workbench usable as controls grow.
+- The first viewport should be the usable workbench itself.
+- The UI must avoid in-app instructional prose. Labels and state readouts are acceptable; tutorial copy is not.
+- Controls and text must remain legible and non-overlapping on desktop and mobile-width viewports.
+
 ## Culling
 
 Terrain culling in main:
