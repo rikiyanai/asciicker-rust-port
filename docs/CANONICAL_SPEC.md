@@ -179,24 +179,96 @@ Control model:
 Canonical control groups:
 
 - **View:** resolution scale or explicit grid dimensions, camera zoom/scale,
-  camera yaw, ASCIIID-style spin/orbit toggle and speed, and any capture/orbit
-  trigger used for comparison.
+  camera yaw, camera pitch if runtime-backed, grid overlay alpha if
+  runtime-backed, ASCIIID-style spin/orbit toggle and speed, and any
+  capture/orbit trigger used for comparison.
 - **Visibility and culling:** terrain visibility, world/mesh visibility, sprite visibility, shadow pass, reflection pass, terrain frustum culling, world/BSP culling, and back-face/double-sided controls only if they are truly runtime-backed.
 - **Glyph matching and resolve tuning:** shape-vector mode, alphabet, custom
   user-selectable glyph candidate sets, distance threshold,
   adaptive-threshold toggle, adaptive boost, structural fallback toggle,
   fallback threshold, sampling quality, global crunch toggle/exponent, and
   directional crunch toggle/exponent.
-- **Material and palette diagnostics:** read-only hovered-cell material ID,
-  MAT-elev bit, chosen material ramp/shade, resolved glyph, foreground and
-  background RGB, and palette/quantization outcome. Editing material IDs,
-  material ramps, font pixels, or palette swatches is editor-adjacent and must
-  not be added without explicit scope.
+- **Material and palette diagnostics:** hovered-cell material ID, MAT-elev bit,
+  chosen material ramp/shade, resolved material glyph, foreground and
+  background RGB, active font glyph, palette/quantization outcome, and final
+  resolved cell output. Permanent editing of material IDs, material ramps, font
+  pixels, or palette swatches is editor-adjacent. The workbench may provide
+  non-destructive preview overrides for render inspection, but those overrides
+  must be visibly labeled as preview state and must not write world/editor asset
+  data unless that scope is explicitly added later.
 - **Weather and pass diagnostics:** weather state/type/intensity and visible
   particle or affected-cell counts; shadow/reflection/culling controls must
   report enough runtime data to distinguish "enabled but no effect in this
   scene" from "button is not wired".
 - **Diagnostics and actions:** reset-to-defaults, capture/compare actions, and visible numeric/readout state for the currently active settings.
+
+Required workbench UX/control plan:
+
+1. **Mode and navigation shell**
+   - Primary actions: `Resume Scene`, `Return to Workbench`, `Reset Render
+     Defaults`, `Capture Frame`, and later `Compare Capture`.
+   - `Resume Scene` must never be a one-way exit. A visible `Workbench` action
+     must exist from gameplay/pause/menu state, and the keyboard shortcut must
+     be shown in a compact shortcut/readout area.
+   - The workbench state is distinct from normal gameplay state. UI input,
+     gameplay input, and hotkey tuning must not compete for the same pointer
+     focus.
+
+2. **Viewport and canvas controls**
+   - Use sliders for continuous values: resolution scale, zoom, yaw, pitch if
+     supported, spin speed, grid alpha, and any future light/time controls.
+   - Use steppers or numeric inputs for exact grid width/height only if the
+     value can be applied safely without fighting window-derived grid sync.
+   - Use toggles for binary behavior: spin, grid overlay, invert colors,
+     terrain/world/sprite visibility, shadows, reflections, weather, terrain
+     culling, world culling, adaptive threshold, structural fallback, global
+     crunch, and directional crunch.
+   - Spin must visibly change yaw over time, expose current yaw and speed, and
+     pause cleanly.
+
+3. **Pass-effect proof**
+   - Every pass toggle must have an adjacent live proof readout. Required
+     readouts include terrain patches considered/drawn/culled, world instances
+     considered/drawn/culled, sprite count, shadow affected samples/cells,
+     reflection affected samples/cells, weather active particles and visible
+     cells, and shape-vector accepted/rejected/fallback/override counts.
+   - If a toggle is enabled but produces no visible change, the workbench must
+     say so through counts such as `0 affected cells`; it must not appear inert
+     or unwired.
+   - Culling controls must support an auditable comparison between culled and
+     unculled traversal counts for the current frame or last sampled frame.
+
+4. **Glyph candidate picker**
+   - The shape-vector candidate set must be user-editable from the UI. Required
+     widgets: CP437 16x16 glyph grid, active glyph chips/list, add/remove
+     actions, clear action, and restore-default action.
+   - The UI must clearly separate three glyph layers: font atlas glyph,
+     material glyph, and shape-vector candidate glyph.
+   - Named glyph sets are allowed only when they are persisted as explicit
+     candidate lists. Generic presets that silently mutate thresholds or modes
+     are not canonical.
+
+5. **Material, font, and palette probe**
+   - Hover/probe readouts must show the final terrain render path for the
+     selected cell: screen cell, sample/world coordinate if available, MAT-id,
+     MAT-elev, diffuse/shade index, material ramp row, material glyph code,
+     font glyph/alpha source, foreground RGB, background RGB, palette index or
+     mapped RGB, and final `AnsiCell` foreground/background/glyph.
+   - Render-path preview controls may include active font selection, active
+     palette or palettize/depalettize mode, palette mapping toggle, material ID
+     probe override, MAT-elev probe override, diffuse/ramp override, material
+     glyph override, and foreground/background override. These are inspection
+     controls unless explicitly promoted to editor persistence.
+   - Palette controls must be labeled as color mapping/quantization controls,
+     not as glyph or shape-vector controls.
+
+6. **Right-panel layout**
+   - Numeric readouts must remain visible at rest, use stable widths, and never
+     be right-aligned into clipped space.
+   - The right control stack must be independently scrollable when it exceeds
+     viewport height, while the center canvas remains usable.
+   - Controls should be grouped by task: View, Visibility, Culling, Glyph
+     Matching, Material/Palette Probe, Pass Proof, Capture/Compare.
 
 UX requirements:
 

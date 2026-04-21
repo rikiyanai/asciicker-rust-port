@@ -236,31 +236,261 @@ Suggested groups:
 - Current state must remain visible without hovering or reading logs.
 - Numeric values must not be clipped by right-aligned layout.
 
-## Implementation Plan
+## Comprehensive Implementation Plan
 
-### Phase 1: Remove ambiguity
+This plan replaces the rejected overlay/preset direction with a render
+inspection workbench that exposes every important final-render-path layer:
+camera/view, source/material, resolve/glyph, color/palette, pass/visibility,
+and comparison evidence.
 
-- Deprecate `inspector` naming in canon/planning docs.
-- Remove or replace any UI labels copied from the Figma without engine meaning.
-- Treat commit `59863c6` as rejected reference, not as a baseline to polish.
+### Phase 0: Naming and removal guardrail
 
-### Phase 2: Establish workbench mode
+Goal:
 
-- Add an explicit `RenderTuningWorkbench` mode/state instead of an always-on overlay.
-- Define clear entry/exit behavior so gameplay input and tuning input do not fight.
-- Keep the canvas full-bleed and the control chrome lightweight.
+- Prevent another mockup-shaped UI pass before coding new controls.
 
-### Phase 3: Ship the real control surface
+Tasks:
 
-- Wire only controls backed by actual runtime state.
-- Start with View, Visibility, Culling, and Glyph Matching groups.
-- Keep current values visible.
-- Ensure reset restores documented defaults.
+- Keep `Render Tuning Workbench` as the only product name in new code and docs.
+- Remove in-product Figma credit/link UI and any copied Figma fixture labels
+  unless they map to real scene/source switching.
+- Remove or quarantine `fixture` and undocumented `glyph_preset` vocabulary
+  from the next implementation pass.
+- Treat `59863c6` and the rejected `93f4b37` behavior as failure evidence, not
+  as a baseline to polish.
 
-### Phase 4: Add comparison workflow
+Acceptance:
 
-- Add capture/replay/compare actions only after the base tuning controls are solid.
-- Reuse existing replay and baseline artifacts as diagnostics, not as the only UI story.
+- No visible control appears unless it maps to a runtime setting, runtime
+  readout, or explicit action.
+
+### Phase 1: Mode shell and round-trip navigation
+
+Goal:
+
+- Make workbench entry, exit, and return reliable before adding more sliders.
+
+Required UX:
+
+- Top-level actions:
+  - `Resume Scene`
+  - `Return to Workbench` / `Workbench` from gameplay, pause, or menu state
+  - `Reset Render Defaults`
+  - `Capture Frame`
+  - disabled or deferred `Compare Capture` if comparison is not ready
+- Keyboard access remains secondary, but the same state must be visible in UI.
+- `Resume Scene` must preserve a visible and keyboard-accessible return path.
+
+Likely code areas:
+
+- `engine-port/src/game/state.rs`
+- `engine-port/src/game/menu.rs`
+- `engine-port/src/render/workbench.rs`
+- `engine-port/src/render/mod.rs`
+
+Acceptance:
+
+- Starting in workbench, resuming the scene, and returning to the workbench can
+  be completed without restarting.
+- UI input and gameplay input do not fight for pointer focus.
+
+### Phase 2: Stable canvas and right-panel layout
+
+Goal:
+
+- Fix the live usability issues before adding new diagnostic complexity.
+
+Required UX:
+
+- Center ASCII canvas remains primary and unobscured.
+- Right control stack is independently scrollable.
+- Numeric values use stable widths and remain visible at rest.
+- Long labels and values do not clip on desktop or narrow windows.
+
+Required controls/readouts:
+
+- grid width and height
+- sample buffer width and height
+- frame timing summary
+- current camera position, yaw, zoom, and spin state
+
+Acceptance:
+
+- No right-side numbers are hidden or clipped.
+- Dragging a slider or toggling a control does not resize or shift unrelated
+  controls.
+
+### Phase 3: View and viewport controls
+
+Goal:
+
+- Expose the ASCIIID-derived inspection controls needed to inspect the scene
+  while it moves.
+
+Required widgets:
+
+- resolution scale slider with numeric readout
+- exact grid width/height readouts, with steppers only if they are safe against
+  window-derived grid synchronization
+- zoom slider
+- yaw slider or stepper plus current yaw readout
+- pitch slider only if the current camera path is actually runtime-backed
+- `Spin` toggle
+- spin speed slider
+- grid overlay alpha slider if runtime-backed
+- center/reset-view button
+- optional orbit/capture trigger if backed by existing capture infrastructure
+
+Acceptance:
+
+- Enabling `Spin` visibly changes yaw over time.
+- Disabling `Spin` stops yaw drift immediately.
+- Resolution and zoom controls produce immediate visible canvas changes and
+  show current values without relying on logs.
+
+### Phase 4: Visibility, weather, shadow, reflection, and culling proof
+
+Goal:
+
+- Make every pass toggle auditable so the user can tell whether it affected
+  the current frame.
+
+Required widgets:
+
+- toggles: terrain, world/meshes, sprites, shadows, reflections, weather,
+  terrain culling, world/BSP culling, invert colors if retained
+- weather selector or weather state toggle with intensity only if the runtime
+  supports it
+- pass-proof readouts beside the toggles
+
+Required readouts:
+
+- terrain patches considered / drawn / culled
+- world instances considered / drawn / culled
+- sprite count
+- shadow affected samples/cells
+- reflection affected samples/cells
+- weather active particles and visible particles/cells
+- shape-vector accepted / rejected / fallback / override counts
+
+Implementation requirement:
+
+- A toggle that changes no cells in the current scene must report `0 affected`
+  or an equivalent explicit reason. It must not look inert.
+- Culling must expose enough data to compare culled and unculled traversal for
+  the current frame or last sampled frame.
+
+Acceptance:
+
+- The user can answer "did Shadows, Rain, Terrain Culling, or World Culling do
+  anything?" from the workbench without reading logs.
+
+### Phase 5: Glyph matching and custom candidate sets
+
+Goal:
+
+- Replace fake presets with real glyph-candidate control.
+
+Required widgets:
+
+- shape-vector mode segmented control
+- alphabet dropdown or segmented control
+- CP437 16x16 glyph grid
+- active candidate glyph chips/list
+- add/remove glyph actions
+- clear set action
+- restore default set action
+- optional named glyph sets only if they persist explicit candidate lists
+- distance threshold slider
+- adaptive threshold toggle and boost slider
+- structural fallback toggle and threshold slider
+- sampling quality slider or stepper
+- global crunch toggle and exponent slider
+- directional crunch toggle and exponent slider
+
+Labeling requirement:
+
+- The UI must distinguish:
+  - font atlas glyph
+  - material glyph
+  - shape-vector candidate glyph
+
+Acceptance:
+
+- Editing the active candidate set changes the actual shape-vector candidate
+  list used by the renderer.
+- Current candidate glyphs are visible at rest.
+- Generic `Dense`/`Sparse` style buttons are absent unless reintroduced as
+  documented bundles of real values.
+
+### Phase 6: Material, font, and palette render-path probe
+
+Goal:
+
+- Let the user inspect and temporarily adjust final terrain render-path inputs
+  without pretending to ship a full editor.
+
+Required probe readouts:
+
+- hovered screen cell
+- sample coordinate and world coordinate when available
+- MAT-id
+- MAT-elev bit
+- diffuse/shade index
+- material ramp row
+- material glyph code
+- active font glyph source
+- foreground RGB
+- background RGB
+- palette index or mapped RGB
+- final `AnsiCell` glyph, foreground, and background
+
+Optional non-destructive preview controls:
+
+- active font selection
+- active palette selection
+- palettize/depalettize or palette mapping toggle
+- material ID probe override
+- MAT-elev probe override
+- diffuse/ramp override
+- material glyph override
+- foreground/background preview override
+
+Boundary:
+
+- These controls are inspection/preview state. They must not persist world,
+  palette, material, or font edits unless a later editor-scope task explicitly
+  adds persistence.
+
+Acceptance:
+
+- The workbench can explain a selected final cell from MAT-id and MAT-elev
+  through material glyph/color, font alpha, palette mapping, and final output.
+
+### Phase 7: Capture and comparison workflow
+
+Goal:
+
+- Add repeatable evidence only after the base workbench is trustworthy.
+
+Required UX:
+
+- capture current frame
+- capture orbit / spin sample if backed by existing replay infrastructure
+- compare current settings against a captured/reference settings snapshot
+- show current camera/culling/glyph settings in capture metadata
+
+Likely reusable code:
+
+- `VisualCaptureConfig`
+- `ReplayHarnessConfig`
+- `OrbitCaptureConfig`
+- `VariantReplayConfig`
+
+Acceptance:
+
+- Captures include enough visible/readable settings to reproduce the frame.
+- Compare mode never replaces live pass-proof diagnostics; it complements them.
 
 ## Acceptance Criteria
 
@@ -279,14 +509,21 @@ The Render Tuning Workbench is acceptable only if all are true:
 - glyph matching supports a user-selected active glyph candidate set
 - material/palette diagnostics explain the final rendered cell path from
   MAT-id and MAT-elev through glyph/color/palette output
+- permanent material, palette, font, or world edits are not performed from the
+  workbench unless explicitly scoped; render-path overrides are preview-only
+  and visibly labeled as such
+- every slider/toggle has a visible current value or proof readout at rest
+- the right control stack remains usable when scrolled and does not block the
+  center canvas
 
 ## Immediate Next Step
 
-Before implementing more UI, produce a code-backed control map listing:
+Start implementation with Phase 1 and Phase 2 before adding new render-path
+controls:
 
-- state/resource name
-- current source file
-- current default
-- visual effect
-- desired control type
-- whether it belongs in Phase 1 of the workbench
+- add/repair round-trip `Workbench -> Resume Scene -> Workbench` navigation
+- fix the right-panel scroll/numeric layout so values cannot clip
+- keep existing runtime-backed controls wired while removing fake fixture/preset
+  vocabulary
+- then add the `Spin` toggle/speed slider and pass-proof readouts for shadows,
+  weather, and culling

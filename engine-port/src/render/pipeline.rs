@@ -25,13 +25,13 @@ use crate::render::resolve_bridge::{AutoMatGlyphSelector, GlyphSelector, XTERM_2
 use crate::render::sample_buffer::SampleBuffer;
 use crate::render::shape_vector::{
     ShapeVectorAlphabetRegistry, ShapeVectorConfig, ShapeVectorDecision, ShapeVectorFrameStats,
-    ShapeVectorGlyphSelector, ShapeVectorMatcher, ShapeVectorMode, ShapeVectorSkipReason,
-    optimize_glyph_colors,
+    ShapeVectorGlyphCandidates, ShapeVectorGlyphSelector, ShapeVectorMatcher, ShapeVectorMode,
+    ShapeVectorSkipReason, alphabet_signature, optimize_glyph_colors,
 };
 use crate::render::sprite_blit::{SpriteQueue, blit_sprite};
 use crate::render::types::AnsiCell;
 use crate::render::water;
-use crate::render::workbench::RenderWorkbenchState;
+use crate::render::workbench::{RenderWorkbenchFrameStats, RenderWorkbenchState};
 use crate::terrain::RuntimeTerrain;
 use crate::world::RuntimeWorld;
 use crate::world::bsp::VisibleInstance;
@@ -45,6 +45,16 @@ use crate::world::instance::{InstanceId, RuntimeInstance};
 pub struct WorkbenchPipelineParams<'w> {
     workbench: Option<Res<'w, RenderWorkbenchState>>,
     debug_grid: ResMut<'w, RenderDebugGrid>,
+    stats: ResMut<'w, RenderWorkbenchFrameStats>,
+}
+
+#[derive(SystemParam)]
+pub struct ShapeVectorPipelineParams<'w> {
+    config: Res<'w, ShapeVectorConfig>,
+    candidates: Res<'w, ShapeVectorGlyphCandidates>,
+    alphabets: Res<'w, ShapeVectorAlphabetRegistry>,
+    matcher: Option<ResMut<'w, ShapeVectorMatcher>>,
+    stats: ResMut<'w, ShapeVectorFrameStats>,
 }
 
 /// Per-stage timing data for the rendering pipeline (microseconds).
@@ -187,6 +197,18 @@ fn structural_fallback_elevation(sample_buffer: &SampleBuffer, sx: u32, sy: u32)
     }
 }
 
+fn count_reflection_samples(sample_buffer: &SampleBuffer) -> u32 {
+    sample_buffer
+        .samples
+        .iter()
+        .filter(|sample| {
+            sample.height != crate::render::sample_buffer::Sample::CLEAR_HEIGHT
+                && sample.spare & crate::render::sample_buffer::spare_bits::PARITY_MASK
+                    == crate::render::sample_buffer::spare_bits::REFLECTION
+        })
+        .count() as u32
+}
+
 fn should_preserve_resolve_glyph(
     decision: &ShapeVectorDecision,
     resolve_glyph: u8,
@@ -315,12 +337,13 @@ fn apply_player_shadow(
     ascii_width: u32,
     camera: &GameCamera,
     materials: &[crate::render::material::Material],
-) {
+) -> u32 {
     let shadow_center_x = ascii_width as i32 + 1 + camera.scene_shift[0] * 2;
     let left = (shadow_center_x - 5).max(0);
     let right = (shadow_center_x + 5).min(dw - 1);
     let player_z = camera.pos[2];
     let hc = crate::asset_loader::constants::HEIGHT_CELLS as f64;
+    let mut affected = 0u32;
 
     for y in 0..dh {
         for x in left..=right {
@@ -351,6 +374,7 @@ fn apply_player_shadow(
 
             if sample.spare & crate::render::sample_buffer::spare_bits::MESH_FLAG != 0 {
                 sample.diffuse = ((sample.diffuse as u16 * dz as u16) / 255) as u8;
+                affected += 1;
                 continue;
             }
 
@@ -364,8 +388,10 @@ fn apply_player_shadow(
             sample.spare &= !(crate::render::sample_buffer::spare_bits::GRID
                 | crate::render::sample_buffer::spare_bits::WIREFRAME);
             sample.diffuse = dz as u8;
+            affected += 1;
         }
     }
+    affected
 }
 
 /// Project a world-space position to screen-space ASCII cell coordinates.
@@ -505,10 +531,7 @@ pub fn render_pipeline_system(
     mut sprite_queue: ResMut<SpriteQueue>,
     mut timing: ResMut<PipelineTiming>,
     water_config: Res<WaterConfig>,
-    shape_vector_config: Res<ShapeVectorConfig>,
-    shape_vector_alphabets: Res<ShapeVectorAlphabetRegistry>,
-    shape_vec_matcher: Option<ResMut<ShapeVectorMatcher>>,
-    mut shape_vector_stats: ResMut<ShapeVectorFrameStats>,
+    mut shape_vector: ShapeVectorPipelineParams,
     mut workbench_params: WorkbenchPipelineParams,
 ) {
     let frame_start = Instant::now();
@@ -517,7 +540,7 @@ pub fn render_pipeline_system(
         .as_deref()
         .cloned()
         .unwrap_or_default();
-    let debug_grid = &mut workbench_params.debug_grid;
+    workbench_params.stats.begin_frame();
 
     // STEP 1: Sync RenderConfig with AsciiCellGrid on window resize.
     // handle_window_resize (output/mod.rs) updates AsciiCellGrid but not RenderConfig.
@@ -617,6 +640,11 @@ pub fn render_pipeline_system(
         // Stage 2: TERRAIN (real rasterization with frustum culling)
         let t1 = Instant::now();
         let mut _terrain_patch_count = 0u32;
+        workbench_params.stats.terrain_considered = if workbench.show_terrain {
+            terrain.patch_count as u32
+        } else {
+            0
+        };
         if terrain.root.is_some() && workbench.show_terrain {
             let mut render_patch = |patch: &crate::terrain::patch_runtime::RuntimePatch| {
                 _terrain_patch_count += 1;
@@ -635,12 +663,22 @@ pub fn render_pipeline_system(
                 terrain.for_each_patch(&mut render_patch);
             }
         }
+        workbench_params.stats.terrain_drawn = _terrain_patch_count;
+        workbench_params.stats.terrain_culled = workbench_params
+            .stats
+            .terrain_considered
+            .saturating_sub(_terrain_patch_count);
         timing.terrain_us = t1.elapsed().as_micros() as u64;
 
         // Stage 3: WORLD (real rasterization for meshes, placeholder for sprites)
         // Cleared by clear_sprite_queue_system in PreUpdate (Phase 6)
         let t2 = Instant::now();
 
+        workbench_params.stats.world_considered = world_data
+            .instances
+            .iter()
+            .filter(|instance| instance.is_visible())
+            .count() as u32;
         let visible_instances = if workbench.world_culling {
             world_data.query_visible(
                 &camera.frustum_planes,
@@ -669,6 +707,11 @@ pub fn render_pipeline_system(
                 })
                 .collect::<Vec<_>>()
         };
+        workbench_params.stats.world_visible_after_culling = visible_instances.len() as u32;
+        workbench_params.stats.world_culled = workbench_params
+            .stats
+            .world_considered
+            .saturating_sub(workbench_params.stats.world_visible_after_culling);
         for visible in visible_instances {
             match visible {
                 crate::world::bsp::VisibleInstance::Mesh(id) => {
@@ -681,6 +724,7 @@ pub fn render_pipeline_system(
                         continue;
                     };
                     if let Some(mesh) = mesh_registry.loaded.get(mesh_id) {
+                        workbench_params.stats.world_rendered += 1;
                         render_mesh(
                             buf,
                             buf_w,
@@ -718,6 +762,8 @@ pub fn render_pipeline_system(
                             let dist = dx * camera.view_dir[0] + dy * camera.view_dir[1];
 
                             if let Some((sx, sy)) = project_world_to_screen(pos, &camera) {
+                                workbench_params.stats.world_rendered += 1;
+                                workbench_params.stats.sprites_queued += 1;
                                 sprite_queue.push(crate::render::sprite_blit::SpriteRenderEntry {
                                     dist,
                                     screen_x: sx,
@@ -736,6 +782,8 @@ pub fn render_pipeline_system(
                             let dist = dx * camera.view_dir[0] + dy * camera.view_dir[1];
 
                             if let Some((sx, sy)) = project_world_to_screen(pos, &camera) {
+                                workbench_params.stats.world_rendered += 1;
+                                workbench_params.stats.sprites_queued += 1;
                                 sprite_queue.push(crate::render::sprite_blit::SpriteRenderEntry {
                                     dist,
                                     screen_x: sx,
@@ -760,7 +808,8 @@ pub fn render_pipeline_system(
         if workbench.enable_shadows
             && let Some(mats) = materials.as_ref()
         {
-            apply_player_shadow(buf, buf_w, buf_h, config.ascii_width, &camera, &mats.0);
+            workbench_params.stats.shadow_affected_samples =
+                apply_player_shadow(buf, buf_w, buf_h, config.ascii_width, &camera, &mats.0);
         }
         timing.shadow_us = t3.elapsed().as_micros() as u64;
     } // mutable borrow of sample_buffer.samples ENDS here
@@ -776,6 +825,8 @@ pub fn render_pipeline_system(
             &camera,
             water_config.water_z,
         );
+        workbench_params.stats.reflection_affected_samples =
+            count_reflection_samples(&sample_buffer);
     }
     timing.reflection_us = t4.elapsed().as_micros() as u64;
 
@@ -819,8 +870,9 @@ pub fn render_pipeline_system(
         let dw = sample_buffer.width as i32;
         let dh = sample_buffer.height as i32;
         let mut resolve_buf = vec![AnsiCell::default(); ascii_w * ascii_h];
+        let debug_grid = &mut workbench_params.debug_grid;
         debug_grid.ensure_size(ascii_w as u32, ascii_h as u32);
-        shape_vector_stats.begin_frame(ascii_w * ascii_h);
+        shape_vector.stats.begin_frame(ascii_w * ascii_h);
 
         // Step 1: resolve() fills resolve_buf with xterm-256 palette AnsiCells
         resolve_with_debug(
@@ -854,27 +906,45 @@ pub fn render_pipeline_system(
         // R7-XP-005 FIX: &mut sample_buffer.samples borrow DROPPED before this block.
         // R20-F01: This is the inlined 3-step loop, NOT resolve_to_grid.
 
-        if let Some(mut matcher) = shape_vec_matcher {
-            if matcher.active_alphabet() != shape_vector_config.alphabet {
-                matcher.rebuild_from_alphabet(
-                    shape_vector_config.alphabet,
-                    shape_vector_alphabets.get(shape_vector_config.alphabet),
-                );
+        let base_alphabet = shape_vector.alphabets.get(shape_vector.config.alphabet);
+        let custom_alphabet = shape_vector.candidates.build_alphabet(base_alphabet);
+        let active_alphabet = custom_alphabet.as_ref().unwrap_or(base_alphabet);
+        let active_signature = if shape_vector.candidates.is_active() {
+            shape_vector.candidates.signature()
+        } else {
+            alphabet_signature(shape_vector.config.alphabet)
+        };
+
+        if let Some(mut matcher) = shape_vector.matcher {
+            if matcher.active_alphabet() != shape_vector.config.alphabet
+                || matcher.active_signature() != active_signature
+            {
+                if custom_alphabet.is_some() {
+                    matcher.rebuild_from_custom_alphabet(
+                        shape_vector.config.alphabet,
+                        active_signature,
+                        active_alphabet,
+                    );
+                } else {
+                    matcher.rebuild_from_alphabet(shape_vector.config.alphabet, active_alphabet);
+                }
             }
             let mut shape_sel = ShapeVectorGlyphSelector {
-                alphabet: shape_vector_alphabets.get(shape_vector_config.alphabet),
+                alphabet: active_alphabet,
                 matcher: &mut matcher,
                 materials: &mats.0,
                 water_z: water_config.water_z,
-                distance_threshold: shape_vector_config.distance_threshold,
-                global_crunch_exponent: shape_vector_config.global_crunch_exponent,
-                directional_crunch_exponent: shape_vector_config.directional_crunch_exponent,
-                sampling_quality: shape_vector_config.sampling_quality,
-                enable_global_crunch: shape_vector_config.enable_global_crunch,
-                enable_directional_crunch: shape_vector_config.enable_directional_crunch,
-                contrast_adaptive_threshold_boost: shape_vector_config
+                distance_threshold: shape_vector.config.distance_threshold,
+                global_crunch_exponent: shape_vector.config.global_crunch_exponent,
+                directional_crunch_exponent: shape_vector.config.directional_crunch_exponent,
+                sampling_quality: shape_vector.config.sampling_quality,
+                enable_global_crunch: shape_vector.config.enable_global_crunch,
+                enable_directional_crunch: shape_vector.config.enable_directional_crunch,
+                contrast_adaptive_threshold_boost: shape_vector
+                    .config
                     .contrast_adaptive_threshold_boost,
-                enable_contrast_adaptive_threshold: shape_vector_config
+                enable_contrast_adaptive_threshold: shape_vector
+                    .config
                     .enable_contrast_adaptive_threshold,
             };
             for cy in 0..ascii_h {
@@ -882,9 +952,9 @@ pub fn render_pipeline_system(
                     let i = cy * ascii_w + cx;
                     let cell = &resolve_buf[i];
                     let semantic_gate =
-                        matches!(shape_vector_config.mode, ShapeVectorMode::Combined)
+                        matches!(shape_vector.config.mode, ShapeVectorMode::Combined)
                             && is_shape_vector_semantic_gate_cell(cell);
-                    let decision = if shape_vector_config.mode == ShapeVectorMode::OriginalOnly
+                    let decision = if shape_vector.config.mode == ShapeVectorMode::OriginalOnly
                         || semantic_gate
                     {
                         ShapeVectorDecision::resolve_fallback()
@@ -902,7 +972,7 @@ pub fn render_pipeline_system(
                         cell.gl,
                         resolve_fg_rgb,
                         resolve_bk_rgb,
-                        &shape_vector_config,
+                        &shape_vector.config,
                         semantic_gate,
                     );
                     let (fg_rgb, bk_rgb) = choose_final_colors(
@@ -926,10 +996,12 @@ pub fn render_pipeline_system(
                     }
                     if semantic_gate {
                         debug_grid.cells[i].flags |= debug_flags::SHAPE_GATED_SEMANTIC;
-                        shape_vector_stats.semantic_gate_cells += 1;
+                        shape_vector.stats.semantic_gate_cells += 1;
                     }
 
-                    shape_vector_stats.note_selection(decision, cell.gl, gl, fg_rgb, bk_rgb);
+                    shape_vector
+                        .stats
+                        .note_selection(decision, cell.gl, gl, fg_rgb, bk_rgb);
 
                     match decision.skip_reason {
                         Some(crate::render::shape_vector::ShapeVectorSkipReason::Clear) => {
@@ -973,9 +1045,9 @@ pub fn render_pipeline_system(
                     let resolve_fg_rgb = XTERM_256_PALETTE[cell.fg as usize];
                     let resolve_bk_rgb = XTERM_256_PALETTE[cell.bk as usize];
                     let semantic_gate =
-                        matches!(shape_vector_config.mode, ShapeVectorMode::Combined)
+                        matches!(shape_vector.config.mode, ShapeVectorMode::Combined)
                             && is_shape_vector_semantic_gate_cell(cell);
-                    let decision = if shape_vector_config.mode == ShapeVectorMode::OriginalOnly
+                    let decision = if shape_vector.config.mode == ShapeVectorMode::OriginalOnly
                         || semantic_gate
                     {
                         ShapeVectorDecision::resolve_fallback()
@@ -997,7 +1069,7 @@ pub fn render_pipeline_system(
                         cell.gl,
                         resolve_fg_rgb,
                         resolve_bk_rgb,
-                        &shape_vector_config,
+                        &shape_vector.config,
                         semantic_gate,
                     );
                     let (fg_rgb, bk_rgb) = choose_final_colors(
@@ -1021,10 +1093,12 @@ pub fn render_pipeline_system(
                     }
                     if semantic_gate {
                         debug_grid.cells[i].flags |= debug_flags::SHAPE_GATED_SEMANTIC;
-                        shape_vector_stats.semantic_gate_cells += 1;
+                        shape_vector.stats.semantic_gate_cells += 1;
                     }
 
-                    shape_vector_stats.note_selection(decision, cell.gl, gl, fg_rgb, bk_rgb);
+                    shape_vector
+                        .stats
+                        .note_selection(decision, cell.gl, gl, fg_rgb, bk_rgb);
 
                     if decision.glyph.is_none() {
                         if gl == b' ' {
@@ -1081,15 +1155,15 @@ pub fn render_pipeline_system(
                 non_space,
                 cell_grid.char_indices.len(),
                 mesh_registry.loaded.len(),
-                shape_vector_stats.selector_override_cells,
-                shape_vector_stats.resolve_fallback_cells,
-                shape_vector_stats.threshold_skip_cells,
-                shape_vector_stats.clear_skip_cells,
-                shape_vector_stats.underwater_skip_cells,
-                shape_vector_stats.final_space_cells,
-                shape_vector_stats.colored_space_cells,
-                shape_vector_stats.avg_matched_distance(),
-                shape_vector_stats.avg_threshold_distance(),
+                shape_vector.stats.selector_override_cells,
+                shape_vector.stats.resolve_fallback_cells,
+                shape_vector.stats.threshold_skip_cells,
+                shape_vector.stats.clear_skip_cells,
+                shape_vector.stats.underwater_skip_cells,
+                shape_vector.stats.final_space_cells,
+                shape_vector.stats.colored_space_cells,
+                shape_vector.stats.avg_matched_distance(),
+                shape_vector.stats.avg_threshold_distance(),
             );
         }
     }

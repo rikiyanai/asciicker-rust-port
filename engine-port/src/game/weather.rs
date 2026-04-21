@@ -193,6 +193,13 @@ pub struct Weather {
     pub spawn_accumulator: f32,
 }
 
+#[derive(Resource, Debug, Clone, Copy, Default)]
+pub struct WeatherFrameStats {
+    pub live_particles: u32,
+    pub visible_particles: u32,
+    pub composited_cells: u32,
+}
+
 impl Default for Weather {
     fn default() -> Self {
         Self {
@@ -319,11 +326,14 @@ pub fn weather_composite_system(
     weather: Res<Weather>,
     mut cell_grid: ResMut<AsciiCellGrid>,
     camera: Res<GameCamera>,
+    mut stats: ResMut<WeatherFrameStats>,
 ) {
+    *stats = WeatherFrameStats::default();
     let grid_w = cell_grid.width;
     let grid_h = cell_grid.height;
 
     for particle in weather.pool.iter_live() {
+        stats.live_particles += 1;
         // Project particle world position to ASCII cell coordinates
         if let Some((sx, sy)) = project_world_to_screen(&particle.pos, &camera) {
             let px = sx as u32;
@@ -331,6 +341,7 @@ pub fn weather_composite_system(
 
             // Bounds check
             if px < grid_w && py < grid_h {
+                stats.visible_particles += 1;
                 // R20-W01 FIX: Preserve existing background color
                 let (_, _, existing_bg) = cell_grid.cell_at(px, py);
                 // R19-004 FIX: fg=255 (white) matching C++ weather.cpp line 289
@@ -341,6 +352,7 @@ pub fn weather_composite_system(
                     [255, 255, 255, 255],
                     existing_bg,
                 );
+                stats.composited_cells += 1;
             }
         }
     }

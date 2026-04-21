@@ -228,6 +228,92 @@ impl ShapeVectorAlphabetRegistry {
     }
 }
 
+#[derive(Resource, Debug, Clone)]
+pub struct ShapeVectorGlyphCandidates {
+    pub enabled: bool,
+    pub glyphs: BTreeSet<u8>,
+}
+
+impl Default for ShapeVectorGlyphCandidates {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            glyphs: minimal_candidate_set(),
+        }
+    }
+}
+
+impl ShapeVectorGlyphCandidates {
+    pub fn is_active(&self) -> bool {
+        self.enabled && !self.glyphs.is_empty()
+    }
+
+    pub fn restore_minimal(&mut self) {
+        self.enabled = true;
+        self.glyphs = minimal_candidate_set();
+    }
+
+    pub fn signature(&self) -> u64 {
+        custom_glyph_signature(&self.glyphs)
+    }
+
+    pub fn build_alphabet(
+        &self,
+        base: &ShapeVectorAlphabetData,
+    ) -> Option<ShapeVectorAlphabetData> {
+        if !self.is_active() {
+            return None;
+        }
+
+        let image = runtime_font_image();
+        let mut entries = self
+            .glyphs
+            .iter()
+            .copied()
+            .map(|glyph| CharacterEntry {
+                glyph,
+                vector: sample_runtime_font_glyph(
+                    image,
+                    glyph,
+                    &base.sampling_points,
+                    base.circle_radius,
+                ),
+            })
+            .collect::<Vec<_>>();
+        entries.sort_by_key(|entry| entry.glyph);
+
+        Some(ShapeVectorAlphabetData {
+            entries,
+            sampling_points: base.sampling_points,
+            external_points: base.external_points.clone(),
+            affects_mapping: base.affects_mapping.clone(),
+            circle_radius: base.circle_radius,
+        })
+    }
+}
+
+fn minimal_candidate_set() -> BTreeSet<u8> {
+    [b' ', b'.', b':', b'-', b'=', b'+', b'*', b'#', b'%', b'@']
+        .into_iter()
+        .collect()
+}
+
+pub fn alphabet_signature(id: ShapeVectorAlphabetId) -> u64 {
+    match id {
+        ShapeVectorAlphabetId::Default => 0xD_EFA0_17,
+        ShapeVectorAlphabetId::Minimal => 0x1E55,
+    }
+}
+
+fn custom_glyph_signature(glyphs: &BTreeSet<u8>) -> u64 {
+    let mut hash = 0xC057_0B57_5E7_u64;
+    for &glyph in glyphs {
+        hash = hash.rotate_left(5) ^ u64::from(glyph);
+        hash = hash.wrapping_mul(0x100_0000_01B3);
+    }
+    hash ^ glyphs.len() as u64
+}
+
 fn build_minimal_alphabet(default: &ShapeVectorAlphabetData) -> ShapeVectorAlphabetData {
     let wanted: BTreeSet<u8> = [b' ', b'.', b':', b'-', b'=', b'+', b'*', b'#', b'%', b'@']
         .into_iter()
@@ -606,6 +692,7 @@ fn rgb_is_black(rgb: [u8; 3]) -> bool {
 #[derive(Resource)]
 pub struct ShapeVectorMatcher {
     active_alphabet: ShapeVectorAlphabetId,
+    active_signature: u64,
     tree: KdTree<f32, 6>,
     cache: LruCache<u32, (u8, f32)>,
     entries: Vec<CharacterEntry>,
@@ -619,6 +706,18 @@ impl ShapeVectorMatcher {
     }
 
     pub fn new(active_alphabet: ShapeVectorAlphabetId, characters: &[CharacterEntry]) -> Self {
+        Self::new_with_signature(
+            active_alphabet,
+            alphabet_signature(active_alphabet),
+            characters,
+        )
+    }
+
+    pub fn new_with_signature(
+        active_alphabet: ShapeVectorAlphabetId,
+        active_signature: u64,
+        characters: &[CharacterEntry],
+    ) -> Self {
         let mut tree = KdTree::<f32, 6>::new();
         for (idx, entry) in characters.iter().enumerate() {
             tree.add(&entry.vector, idx as u64);
@@ -626,6 +725,7 @@ impl ShapeVectorMatcher {
 
         Self {
             active_alphabet,
+            active_signature,
             tree,
             cache: LruCache::new(NonZeroUsize::new(8192).unwrap()),
             entries: characters.to_vec(),
@@ -672,12 +772,38 @@ impl ShapeVectorMatcher {
         self.active_alphabet
     }
 
+    pub fn active_signature(&self) -> u64 {
+        self.active_signature
+    }
+
     pub fn rebuild_from_alphabet(
         &mut self,
         active_alphabet: ShapeVectorAlphabetId,
         alphabet: &ShapeVectorAlphabetData,
     ) {
-        *self = Self::new(active_alphabet, &alphabet.entries);
+        *self = Self::new_with_signature(
+            active_alphabet,
+            alphabet_signature(active_alphabet),
+            &alphabet.entries,
+        );
+    }
+
+    pub fn rebuild_from_entries(
+        &mut self,
+        active_alphabet: ShapeVectorAlphabetId,
+        active_signature: u64,
+        entries: &[CharacterEntry],
+    ) {
+        *self = Self::new_with_signature(active_alphabet, active_signature, entries);
+    }
+
+    pub fn rebuild_from_custom_alphabet(
+        &mut self,
+        active_alphabet: ShapeVectorAlphabetId,
+        active_signature: u64,
+        alphabet: &ShapeVectorAlphabetData,
+    ) {
+        self.rebuild_from_entries(active_alphabet, active_signature, &alphabet.entries);
     }
 }
 

@@ -29,8 +29,8 @@ use font::Font1;
 use pipeline::{PipelineTiming, camera_terrain_init_system, render_pipeline_system};
 use sample_buffer::SampleBuffer;
 use shape_vector::{
-    ShapeVectorAlphabetRegistry, ShapeVectorConfig, ShapeVectorFrameStats, ShapeVectorMatcher,
-    shape_vector_tuning_input_system,
+    ShapeVectorAlphabetRegistry, ShapeVectorConfig, ShapeVectorFrameStats,
+    ShapeVectorGlyphCandidates, ShapeVectorMatcher, shape_vector_tuning_input_system,
 };
 use sprite_blit::SpriteQueue;
 use workbench::RenderWorkbenchPlugin;
@@ -92,6 +92,7 @@ impl Plugin for CpuRasterizerPlugin {
             .init_resource::<RenderDebugGrid>()
             .init_resource::<Font1>()
             .init_resource::<ShapeVectorConfig>()
+            .init_resource::<ShapeVectorGlyphCandidates>()
             .init_resource::<ShapeVectorAlphabetRegistry>()
             .init_resource::<ShapeVectorFrameStats>()
             .insert_resource(WaterConfig {

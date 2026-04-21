@@ -285,6 +285,7 @@ impl Plugin for GamePlugin {
         ));
         app.init_resource::<SpatialGrid>();
         app.init_resource::<weather::Weather>();
+        app.init_resource::<weather::WeatherFrameStats>();
 
         // ---------------------------------------------------------------
         // P7-014 FIX: Gate ALL Phase 6 systems on GameState::Playing.
