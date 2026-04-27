@@ -11,8 +11,8 @@
 
 ```
 asciicker rust port/
-├── AGENTS.md                       # Agent roster and coordination protocol
-├── CLAUDE.md                       # Project context for Claude Code
+├── docs/agents/AGENTS.md           # Agent roster and coordination protocol
+├── docs/agents/CLAUDE.md           # Project context for Claude Code
 ├── ENGINE_ARCHITECTURE.md          # High-level engine architecture overview
 ├── MASTER_ROADMAP.md               # Single source of truth for roadmap
 ├── codedoc-a3d-world-format.md     # A3D binary format documentation
@@ -21,7 +21,7 @@ asciicker rust port/
 └── docs/
     ├── MASTER_INDEX.md             # This file
     ├── INDEX.md                    # Lightweight quick-reference index
-    ├── AGENT_PROTOCOL.md           # Agent operating protocol
+    ├── agents/AGENT_PROTOCOL.md    # Agent operating protocol
     │
     ├── PROCESS FILES (5 files)
     │   ├── ROADMAP_STATE.md               # Current state tracker
@@ -248,8 +248,8 @@ The following C++ source files do NOT have dedicated arch docs:
 | Technical details | `docs/arch/*.md` |
 | C++ format docs | `docs/codedoc-*.md` and root `codedoc-*.md` |
 | Gap analysis | `docs/GAPS_ANALYSIS_SUMMARY.md` |
-| Agent protocol | `docs/AGENT_PROTOCOL.md` |
-| Agent roster | `AGENTS.md` (root) |
+| Agent protocol | `docs/agents/AGENT_PROTOCOL.md` |
+| Agent roster | `docs/agents/AGENTS.md` |
 | Risk tracking | `docs/RISK_REGISTER.md` |
 
 ---

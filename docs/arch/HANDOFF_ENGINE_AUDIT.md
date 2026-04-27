@@ -313,7 +313,7 @@ If you see context getting large (>70% used), compact immediately. The work is s
 - Do NOT add comments to source code
 - Do NOT refactor or "clean up" anything
 - Do NOT create helper scripts
-- Do NOT rely on existing docs (CLAUDE.md, AGENTS.md, etc.) — read source directly
+- Do NOT rely on existing docs (`docs/agents/CLAUDE.md`, `docs/agents/AGENTS.md`, etc.) — read source directly
 - Do NOT use file summaries from previous sessions
 - Do NOT batch small functions as "utility functions include X, Y, Z" — document each one
 - Do NOT skip vendored files that are MODIFIED (check git diff for local changes)

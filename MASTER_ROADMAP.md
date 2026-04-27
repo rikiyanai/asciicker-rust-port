@@ -218,7 +218,7 @@ Decisions required before Milestone 2:
 ### Primary Documents
 | File | Purpose |
 |------|---------|
-| `AGENTS.md` | Entry point |
+| `docs/agents/AGENTS.md` | Entry point |
 | `MASTER_ROADMAP.md` | **This file** - single source of truth |
 | `AUDIT_MANIFEST.md` | Audit manifest (archived — see docs/archive/) |
 

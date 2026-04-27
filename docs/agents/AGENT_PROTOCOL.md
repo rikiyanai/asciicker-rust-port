@@ -1,13 +1,13 @@
 # Agent Protocol
 
-This file defines the agent startup protocol and evidence rules. Entry point: AGENTS.md.
+This file defines the agent startup protocol and evidence rules. Entry point: `docs/agents/AGENTS.md`.
 
 ## Source of Truth
-- Primary operational rules: [`AGENTS.md`](../AGENTS.md)
-- Claude-specific memory/instructions: [`CLAUDE.md`](../CLAUDE.md)
-- Documentation hub: [`docs/INDEX.md`](INDEX.md)
-- Canonical status ledger: [`.planning/ROADMAP.md`](../.planning/ROADMAP.md)
-- Acceptance outcomes and scope contract: [`.planning/PROJECT.md`](../.planning/PROJECT.md)
+- Primary operational rules: [`docs/agents/AGENTS.md`](AGENTS.md)
+- Claude-specific memory/instructions: [`docs/agents/CLAUDE.md`](CLAUDE.md)
+- Documentation hub: [`docs/INDEX.md`](../INDEX.md)
+- Canonical status ledger: [`.planning/ROADMAP.md`](../../.planning/ROADMAP.md)
+- Acceptance outcomes and scope contract: [`.planning/PROJECT.md`](../../.planning/PROJECT.md)
 
 ### Status Authority Model
 - Use `.planning/ROADMAP.md` as the single source of truth for phase/status state.
@@ -16,9 +16,9 @@ This file defines the agent startup protocol and evidence rules. Entry point: AG
 - Any completion claim must match both `.planning/ROADMAP.md` and commit/test evidence.
 
 ## Required Startup Sequence
-1. Read `AGENTS.md`.
+1. Read `docs/agents/AGENTS.md`.
 2. Read `docs/INDEX.md`.
-3. Read `CLAUDE.md` if using Claude tooling.
+3. Read `docs/agents/CLAUDE.md` if using Claude tooling.
 4. Run `git status` and resolve any blockers first.
 5. Confirm active planning artifacts in `.planning/` before making changes. If `.planning/` does not exist, GSD has not been initialized. Use `MASTER_ROADMAP.md` as interim status authority.
 

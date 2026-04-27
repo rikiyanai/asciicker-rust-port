@@ -1,9 +1,9 @@
 # Documentation Index (Master Hub)
 
 ## Start Here
-- [AGENTS.md](../AGENTS.md) - Agent entry point and repo guidelines
-- [CLAUDE.md](../CLAUDE.md) - Claude-specific memory and instructions
-- [Agent Protocol](AGENT_PROTOCOL.md) - Agent startup and evidence rules
+- [AGENTS.md](agents/AGENTS.md) - Agent entry point and repo guidelines
+- [CLAUDE.md](agents/CLAUDE.md) - Claude-specific memory and instructions
+- [Agent Protocol](agents/AGENT_PROTOCOL.md) - Agent startup and evidence rules
 - [Control Reference](CONTROL_REFERENCE.md) - Master list of gameplay, debug, tuning, and capture controls
 
 ## Planning

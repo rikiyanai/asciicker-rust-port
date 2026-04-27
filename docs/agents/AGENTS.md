@@ -2,8 +2,8 @@
 
 ## Master Memory
 - Canonical doc hub: `docs/INDEX.md` (add new high-signal docs there).
-- Agent protocol: `docs/AGENT_PROTOCOL.md`.
-- Claude-specific memory: `CLAUDE.md`.
+- Agent protocol: `docs/agents/AGENT_PROTOCOL.md`.
+- Claude-specific memory: `docs/agents/CLAUDE.md`.
 
 ---
 
@@ -64,7 +64,7 @@ Before porting or modifying a C++ subsystem, read the relevant skill pack:
 Before editing roadmaps, plans, or state docs, invoke the `agent-context-doc-health` skill:
 - **Skill path**: `.claude/skills/agent-context-doc-health/SKILL.md`
 - **Triggers**: Multi-agent doc edits, completion claims, branch switches, session handoffs
-- **Canonical source priority**: `AGENTS.md` > `docs/INDEX.md` > `docs/AGENT_PROTOCOL.md` > `.planning/ROADMAP.md` > `.planning/PROJECT.md` > `docs/plans/*` > `.planning/STATE.md` > `CLAUDE.md` > git evidence
+- **Canonical source priority**: `docs/agents/AGENTS.md` > `docs/INDEX.md` > `docs/agents/AGENT_PROTOCOL.md` > `.planning/ROADMAP.md` > `.planning/PROJECT.md` > `docs/plans/*` > `.planning/STATE.md` > `docs/agents/CLAUDE.md` > git evidence
 - For failure tracking: append to `docs/FAILURE_LOG.md` (status vocab: OPEN, PARTIAL, MONITORING, RESOLVED)
 
 <!-- codex-conductor:start -->

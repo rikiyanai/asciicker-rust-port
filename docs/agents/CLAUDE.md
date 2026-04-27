@@ -240,7 +240,8 @@ Conventional Commits with scope: `feat(render):`, `fix(terrain):`, `test(physics
 
 | Doc | Location | Status |
 |-----|----------|--------|
-| Agent protocol | `AGENTS.md` | Canonical rules |
+| Agent entry point | `docs/agents/AGENTS.md` | Canonical rules |
+| Agent protocol | `docs/agents/AGENT_PROTOCOL.md` | Startup and evidence rules |
 | Doc index | `docs/INDEX.md` | Master hub |
 | Render skill | `docs/skills/engine-render.md` | C++ render subsystem reference |
 | World skill | `docs/skills/world-loading.md` | C++ world/terrain reference |
