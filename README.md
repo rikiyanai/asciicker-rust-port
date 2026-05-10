@@ -1,13 +1,12 @@
 # Asciicker Rust Port
 
-Rust/Bevy reimplementation of the original Asciicker engine, with active work focused on renderer parity, deterministic replay captures, and visual regression testing.
+Rust/Bevy reimplementation of the original Asciicker engine, with active work focused on renderer parity, deterministic replay captures, and visual regression testing. PARKED. USED FOR RENDERING PERFORMANCE EXPERIMENTS ONLY. 
 
 ![Latest variant replay](docs/assets/latest-variant.gif)
 
 ## Current Snapshot
 
-- The canonical docs hub is [docs/INDEX.md](docs/INDEX.md).
-- Agent-facing docs are consolidated under [docs/agents/](docs/agents/).
+
 - The current renderer work includes 3 comparison modes: `original_only`, `combined`, and `harri_priority`.
 - Deterministic stitched variant replays are used as the default visual regression workflow.
 
