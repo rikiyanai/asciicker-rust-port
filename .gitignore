@@ -30,3 +30,4 @@ artifacts/comparisons/
 artifacts/session_snapshots/
 artifacts/video_inspect/
 artifacts/worktrees/
+venv/

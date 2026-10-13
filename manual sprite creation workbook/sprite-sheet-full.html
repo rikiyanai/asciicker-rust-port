@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sprite Sheet Reference — player-nude</title>
+<style>
+  @page {
+    size: letter;
+    margin: 0.5in 0.5in 0.6in 0.75in;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: "Courier New", monospace;
+    width: 8.5in;
+    margin: 0 auto;
+    padding: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .page {
+    width: 8.5in;
+    min-height: 11in;
+    position: relative;
+    padding: 0.5in 0.5in 0.5in 0.75in;
+  }
+
+  /* Sprite sheet area */
+  .sheet-container {
+    position: relative;
+    width: 7.5in;
+    height: 4.2857in;
+  }
+
+  .sheet-img {
+    width: 100%;
+    height: 100%;
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
+  }
+
+  .sheet-underdrawing {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+  }
+
+  .sheet-grid {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2;
+  }
+
+  /* Angle labels (left gutter) */
+  .al {
+    position: absolute;
+    left: -0.45in;
+    font-size: 5pt;
+    font-weight: bold;
+    color: #333;
+    line-height: 1;
+    transform: translateY(-50%);
+  }
+
+  /* Column markers (top) */
+  .cm {
+    position: absolute;
+    top: -0.18in;
+    font-size: 4pt;
+    color: #666;
+    transform: translateX(-50%);
+  }
+
+  /* Fiducials */
+  .fiducial {
+    position: absolute;
+    width: 0.15in;
+    height: 0.15in;
+    background: #000;
+  }
+  .fid-tl { top: 0.425in; left: 0.425in; }
+  .fid-tr { top: 0.425in; right: 0.425in; }
+  .fid-bl { bottom: 0.425in; left: 0.425in; }
+  .fid-br { bottom: 0.425in; right: 0.425in; }
+
+  /* Footer */
+  .footer {
+    margin-top: 0.15in;
+    padding: 0.08in 0;
+    border-top: 0.5pt solid #999;
+    font-size: 6pt;
+    font-family: "Courier New", monospace;
+    color: #333;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.05in 0.25in;
+  }
+  .footer .bubble {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border: 0.8pt solid #333;
+    border-radius: 50%;
+    margin: 0 1px;
+  }
+  .footer .fill {
+    border-bottom: 0.5pt solid #999;
+    min-width: 1in;
+    display: inline-block;
+  }
+
+  /* Calibration strip */
+  .calibration {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+    font-size: 5pt;
+    font-family: "Courier New", monospace;
+    margin-top: 0.06in;
+  }
+  .calibration .swatch {
+    width: 0.18in;
+    height: 0.18in;
+    border: 0.3pt solid #999;
+  }
+
+  /* Legend */
+  .legend {
+    font-size: 5pt;
+    color: #555;
+    margin-top: 0.06in;
+    line-height: 1.3;
+  }
+
+  @media print {
+    body { margin: 0; padding: 0; }
+    .page { padding: 0.5in 0.5in 0.5in 0.75in; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Fiducials -->
+  <div class="fiducial fid-tl"></div>
+  <div class="fiducial fid-tr"></div>
+  <div class="fiducial fid-bl"></div>
+  <div class="fiducial fid-br"></div>
+
+  <!-- Angle labels in left gutter -->
+  <div class="al" style="top:6.25%;">S</div>
+<div class="al" style="top:18.75%;">SW</div>
+<div class="al" style="top:31.25%;">W</div>
+<div class="al" style="top:43.75%;">NW</div>
+<div class="al" style="top:56.25%;">N</div>
+<div class="al" style="top:68.75%;">NE</div>
+<div class="al" style="top:81.25%;">E</div>
+<div class="al" style="top:93.75%;">SE</div>
+
+
+  <!-- Column markers -->
+  <div class="cm" style="left:2.38%;">0</div>
+<div class="cm" style="left:7.14%;">1</div>
+<div class="cm" style="left:11.90%;">2</div>
+<div class="cm" style="left:16.67%;">3</div>
+<div class="cm" style="left:21.43%;">4</div>
+<div class="cm" style="left:26.19%;">5</div>
+<div class="cm" style="left:30.95%;">6</div>
+<div class="cm" style="left:35.71%;">7</div>
+<div class="cm" style="left:40.48%;">8</div>
+<div class="cm" style="left:45.24%;">9</div>
+<div class="cm" style="left:50.00%;">10</div>
+<div class="cm" style="left:54.76%;">11</div>
+<div class="cm" style="left:59.52%;">12</div>
+<div class="cm" style="left:64.29%;">13</div>
+<div class="cm" style="left:69.05%;">14</div>
+<div class="cm" style="left:73.81%;">15</div>
+<div class="cm" style="left:78.57%;">16</div>
+<div class="cm" style="left:83.33%;">17</div>
+<div class="cm" style="left:88.10%;">18</div>
+<div class="cm" style="left:92.86%;">19</div>
+<div class="cm" style="left:97.62%;">20</div>
+
+
+  <!-- Sprite sheet -->
+  <div class="sheet-container">
+    <img class="sheet-img sheet-underdrawing" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAfgAAAEgCAYAAABYRWE9AAALVUlEQVR4nO3dXW7rNhAG0LjwOrz/dXkZekkfL6yi0WX4I/LjOW9Fi0w8JDOYjik9juP4/irwfr8//vn1en31JJ582i/3nQfWYn9kexee/386/z4AwA0UeAAIpMADQKDH1Qz+/P/8r9TOBMWTT/tlnvNw/nmtZ7ziyaf90u886OABIJACDwCBFHgACPS8+g96z+DEk0/7ZZ7zAOTQwQNAIAUeAAIp8ACw4wz+6h5u73uxpf++NP7s8Ubns/XnWT1eafzV45XGb008+bRf2p0HHTwABFLgASCQAg8AOzyLvvUM7GomWBuv9wz37nil8UfHax1/tnjp67davNn2R+t4pfGd97Xz+e4cTwcPAIEUeAAIpMADQCDvg/e++6H3ts/Ek88aaTP52c/D7PmrjZe2fjp4AAikwANAIAUeAHZ8Fn3p+6lbE08+7Zdx52H0++fFWyufpfe6V4uXtj918AAQSIEHgEAKPAAEKp7BA7nS33cvnnzutF908AAQSIEHgEAKPADs+Cx61tb73ibZ6zt6/4gnn/bLH+7BAwD/4X/RA0AgBR4AAhXP4M3I2pJP+Zx5vwDr0sEDQCAFHgACKfAAsOMMvvR9072fxSuefNov485D7/dhj453Ff9stc+XHu8q/tlrsc/XOp4OHgACKfAAEEiBB4BA7sGfuJfelnyulc/dvwMjn23z2Tq/d/89We086OABIJACDwCBFHgACPSsnQnUzkRKZw6rxSuNL5583rlfdiefaxn9nYrV6OABIJACDwCBFHgA2GEGXzqjHm30s45r443O5+zrt5r09Zs93ujz57zv7T35eSilgweAQAo8AARS4AFghxn81QyqtdJ4tTP32ePVGh0vXfr6zb5f7n72uPO+l1fY+dPBA0AgBR4AAinwALDjs+h3t/uzjFdjvdrmr/UMvPTe+mrxruKLJ58j94sOHgACKfAAEEiBB4BAz93vCV79/LtnZq2lxSv9+dZvrvfPiyef9ku/86CDB4BACjwABFLgASDQ4ziO77t/CWBOqz0LXjz5tF/+0MEDQCAFHgACKfAAEKh4Bm9G1pZ8yufM+wVYlw4eAAIp8AAQSIEHgB1n8KXPDu/9bGrx5NN+6Xcezno/2//qOwW9v3OQ9vnS413FP3st9vlax9PBA0AgBR4AAinwABDIPfgT99Lbks+189nb3d+5Gf2s+yu+w1SWT+v3+jFfOngACKTAA0AgBR4AAj1rZ0i97wGKJ5/2y33nYfS95qt4vaV9vvR4Z9bvkw4eAAIp8AAQSIEHgB1n8MC+7p6hiief9svv6eABIJACDwCBFHgACFQ8g0+/VymefNovQAIdPAAEUuABIJACDwCBit8H39vd70/2fuG+z74/s35z5XO28yGefNovvz8POngACKTAA0AgBR4AAj1bzwRXe39y6c9f7fOlx7N+bfN59/vnxZNP+6Xd+dPBA0AgBR4AAinwABBounvwwDzcS5dP+2Xd86CDB4BACjwABFLgASBQ8Qx+tRmEePJpvwA70sEDQCAFHgACKfAAsOMM/u73e4snn/bLfefh6ln/q8W7in+22udLj3cV/+y12OdrHU8HDwCBFHgACKTAA0Ag9+BP3LtvSz7Xyudu34EZ/VyN9HyOjmf9Xj/mSwcPAIEUeAAIpMADQKBn7Yyl9z1A8ebOZ+kMbrV4pfFXj7eb3veo6cv6/UwHDwCBFHgACKTAA8AOM/jSGSc/G53P2ddv9LOqa+Olr9/s+2U16etXe++99/lz3j/p4AEgkAIPAIEUeADYYQZ/NcOgzOh8zh6vduY+e7xa6fHSWb+5nh3/2vy86+ABIJACDwCBFHgA2PFZ9Lvx7Om1Wb+9nlMg3th8lt5bXy1e2v7UwQNAIAUeAAIp8AAQqHgGn3ZPsPTnj565tJYWz/q1zWf6++7Fk8+d9osOHgACKfAAEEiBB4BAj+M4vu/+JYA5rfYscfHk0375QwcPAIEUeAAIpMADQKDiGbwZWVvyKZ8z7xey2D97rY8OHgACKfAAEEiBB4Adn0V/NRPo/Sxe8eTTfnEe/H1p8/ezNX+v31Pl+0wHDwCBFHgACKTAA8COM3gz8LHvf98tXu3vM3u8WqPjATl08AAQSIEHgEAKPADs+Cz688zvSut78KvHK/35tfHujp+2frXxSuOvtl/Ek0/7Zd7zoIMHgEAKPAAEUuABYId78LUzwNmehXx3vKt7zK3jzT5zr7VavNb37GfbL7Ofv/R4q50H8cbuFx08AARS4AEgkAIPADvM4GtngKOfjS3ez/noPTMTby6jZ/7O317f2XDe1/rOlA4eAAIp8AAQSIEHgB3fB39mBtOWfMrnTPul9/vnr37e6vFKZ66tv8PQ+/PVxqv9fWaPN9t+0cEDQCAFHgACKfAAEKh4Bg/kmm2muVq8M/Hk8879ooMHgEAKPAAEUuABINDjOI7vu38J7jP6fdestT6zvw9dPPm0X/6fDh4AAinwABBIgQeAQMUzeDOytuRTPmfeL8C6dPAAEEiBB4BACjwA7DiDL33fdOtnN4snn/bLfech/VntZ62/03D350uPd2b9PungASCQAg8AgRR4AAjkHvyJe+ltyeda+Uz/DsyV0TPjM/HqWL9POngACKTAA0AgBR4AAj1rZ0ijZx6t70HOHm90PsXbO5/pSmfizMX6ldHBA0AgBR4AAinwALDjDL5U6Uyw9FnGtUbHq5V+jzxd+vqNPu+zx6uVHi/de7L108EDQCAFHgACKfAAEKj5DL505lA7A589Xq30eOnS12/0+Ss1+3dsVls/1lo/HTwABFLgASCQAg8AgZrP4FdTeo+WuVi/vvnsfa9XPPm0X/qdBx08AARS4AEgkAIPAIGKZ/Bp91hbv+9993yOjmf9xuZz9ffdiyefO+0XHTwABFLgASCQAg8AgR7HcXzf/UsAc5rt/dbiyaf98vd08AAQSIEHgEAKPAAEKp7Bm5G1JZ/yOfN+AdalgweAQAo8AARS4AFgxxl86bPDez+LVzz5tF/uOw+tZ/5X3ykY/azvtM+XHu/M+n3SwQNAIAUeAAIp8AAQyD34E/fS25LPtfPZ2+jv3FwZPTM+E6+O9fukgweAQAo8AARS4AEg0LN2hjR65iGefNovOfeaz67irf4dht6fLz2e9XsX5UsHDwCBFHgACKTAA8COM3hgX71ntuLJp/3S7/zp4AEgkAIPAIEUeAAI9Nz9XqV48mm/AIl08AAQSIEHgEAKPAAEKn4ffG/eD/3J+6Hb7if5vDd/4smn/TLu/OngASCQAg8AgRR4AAhU/T743jO50e8Xvorfmnv+dazf2PMw+jsN4smn/fL786CDB4BACjwABFLgASDQdPfggXm4By+f9su650EHDwCBFHgACKTAA0Cg4hn8ajMI8eTTfgF2pIMHgEAKPAAEUuABYMcZ/Oj3s4snn/bLPOfh6l0Jq8c7a/0dn7s/X3q8M+v3SQcPAIEUeAAIpMADQCD34E/cu29LPtfK590z/97xSuOv9vnS410ZPfM/my2eDh4AAinwABBIgQeAQM/amcDomUfrmdns8UbnU7y985mudMbJXKxfGR08AARS4AEgkAIPADvO4EuVzgRLn2Vca3S8Wun3yNOlr9/o8z57vFrp8dK9J1s/HTwABFLgASCQAg8AgZrP4EtnDrUz8Nnj1UqPly59/Uafv1Kzf8dmtfVjrfXTwQNAIAUeAAIp8AAQqPkMfjWrzej4qroHTd15aD1jFE8+7Zd+50EHDwCBFHgACKTAA0Cg4hl82j3W1u973z2fo+NZv7H5XP199+LJ5077RQcPAIEUeAAIpMADQKDHcRzfd/8SwJxme7+1ePJpv/w9HTwABFLgASCQAg8AX3n+Be7ehkuKdA9/AAAAAElFTkSuQmCC" alt="sprite underdrawing">
+    <img class="sheet-img sheet-grid" src="data:image/png;base64,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" alt="grid overlay">
+  </div>
+
+  <!-- Legend -->
+  <div class="legend">
+    player-nude.xp &nbsp;|&nbsp; 126×72 cells &nbsp;|&nbsp;
+    8 angles (S→SE) &nbsp;|&nbsp; frame: 6×9 cells &nbsp;|&nbsp;
+    grid: cell=thin, frame=thick
+  </div>
+
+  <!-- Calibration strip -->
+  <div class="calibration">
+    <span style="margin-right:0.05in;">CAL:</span>
+    <div class="swatch" style="background:#000;"></div>
+    <div class="swatch" style="background:#888;"></div>
+    <div class="swatch" style="background:#ddd;"></div>
+    <div class="swatch" style="background:#f00;"></div>
+    <div class="swatch" style="background:#0f0;"></div>
+    <div class="swatch" style="background:#00f;"></div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <span><strong>Sheet:</strong>
+      <span class="bubble"></span><span class="bubble"></span><span class="bubble"></span><span class="bubble"></span>
+      <span class="bubble"></span><span class="bubble"></span><span class="bubble"></span><span class="bubble"></span>
+    </span>
+    <span><strong>Sprite:</strong> player-nude</span>
+    <span><strong>Date:</strong> <span class="fill"></span></span>
+    <span><strong>Artist:</strong> <span class="fill"></span></span>
+  </div>
+
+</div>
+</body>
+</html>

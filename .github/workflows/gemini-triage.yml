@@ -58,7 +58,7 @@ jobs:
       - name: 'Run Gemini issue analysis'
         id: 'gemini_analysis'
         if: |-
-          ${{ steps.get_labels.outputs.available_labels != '' }}
+          ${{ steps.get_labels.outputs.available_labels != '' && secrets.GEMINI_API_KEY != '' }}
         uses: 'google-github-actions/run-gemini-cli@9dbec29a20fab3f35017a40ad0eb798a257d4d51' # v0 pinned
         env:
           GITHUB_TOKEN: '' # Do NOT pass any auth tokens here since this runs on untrusted inputs

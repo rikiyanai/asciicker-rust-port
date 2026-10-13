@@ -81,9 +81,10 @@ def check_git_dirty(project_root: Path) -> bool:
 
 def find_latest_manifest(artifact_dir: Path) -> Path | None:
     """Find the most recent cleanup_manifest_*.json in artifact_dir."""
+    # We sort by filename (lexicographically) since the filename includes a sortable timestamp
+    # (e.g. cleanup_manifest_20260220T000000.json). Relying on st_mtime can be flaky in tests.
     manifests = sorted(
         artifact_dir.glob("cleanup_manifest_*.json"),
-        key=lambda p: p.stat().st_mtime,
         reverse=True,
     )
     return manifests[0] if manifests else None
