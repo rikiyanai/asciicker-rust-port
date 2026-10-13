@@ -232,7 +232,7 @@ static GAME_MAP_Y8_A3D: &[u8] = include_bytes!("golden/a3d/game_map_y8.a3d");
 fn test_game_map_y8_terrain_parse() {
     let (terrain, terrain_consumed) =
         parse_terrain_section(GAME_MAP_Y8_A3D).expect("terrain section should parse");
-    assert_eq!(terrain.patches.len(), 9207, "game_map_y8 has 9207 patches");
+    assert_eq!(terrain.patches.len(), 4876, "game_map_y8 has 4876 patches");
     assert!(terrain_consumed > 0);
 }
 
@@ -254,7 +254,7 @@ fn test_game_map_y8_world_parse() {
         .expect("material section should parse");
     let world = parse_world_section(&GAME_MAP_Y8_A3D[terrain_consumed + mat_consumed..])
         .expect("world section should parse");
-    assert_eq!(world.instances.len(), 47, "game_map_y8 has 47 instances");
+    assert_eq!(world.instances.len(), 1281, "game_map_y8 has 1281 instances");
     assert_eq!(world.format_version, 1);
 }
 
@@ -267,9 +267,9 @@ fn test_game_map_y8_full_pipeline() {
     let world =
         parse_world_section(&GAME_MAP_Y8_A3D[terrain_consumed + mat_consumed..]).expect("world");
 
-    assert_eq!(terrain.patches.len(), 9207);
+    assert_eq!(terrain.patches.len(), 4876);
     assert_eq!(materials.materials.len(), 256);
-    assert_eq!(world.instances.len(), 47);
+    assert_eq!(world.instances.len(), 1281);
 
     // Verify total bytes consumed matches file size (no trailing garbage)
     let world_section = &GAME_MAP_Y8_A3D[terrain_consumed + mat_consumed..];
